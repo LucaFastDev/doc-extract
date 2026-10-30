@@ -124,10 +124,10 @@ This app takes **no real payments**. Every item here checks that only test mode 
       `customer.subscription.deleted`, and its signing secret is the one in
       `STRIPE_WEBHOOK_SECRET`.
 - [ ] Stripe dashboard (test mode) → Settings → Billing → Customer portal is activated with
-      cancellation allowed.
+      cancellation allowed (OQ-37).
 - [ ] One upgrade with the test card `4242 4242 4242 4242` turns a Free workspace into Pro within
-      10 seconds, the webhook endpoint shows the delivery as succeeded, and cancelling it through
-      the portal returns the workspace to Free at the period end.
+      10 seconds (OQ-36), the webhook endpoint shows the delivery as succeeded, and cancelling it
+      through the portal returns the workspace to Free at the period end (OQ-37).
 
 ## Scheduled jobs
 
@@ -138,8 +138,8 @@ This app takes **no real payments**. Every item here checks that only test mode 
       `succeeded`.
 - [ ] Edge Functions → `process-queue` and `purge-files` → Logs: recent invocations return 200 (a
       401 means the cron job's `CRON_SECRET` does not match the function's).
-- [ ] Retention: SQL editor, `select count(*) from documents where created_at < now() - interval
-      '8 days' and file_deleted_at is null`. Pass: 0.
+- [ ] Retention (OQ-14, OQ-39): SQL editor, `select count(*) from documents where created_at <
+      now() - interval '8 days' and file_deleted_at is null`. Pass: 0.
 - [ ] Queue: SQL editor, `select * from pgmq.metrics('extract')`. Pass: the oldest message is less
       than 10 minutes old (no stuck queue).
 
