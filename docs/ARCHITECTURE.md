@@ -160,26 +160,60 @@ function bundler follows). The scaffold milestone proves both builds can import 
 ## 4. Database schema
 
 All tables are in `public`, have RLS enabled, and start with `revoke all … from anon,
-authenticated`; each grant below is explicit. Timestamps are `timestamptz`, ids are `uuid` with
-`gen_random_uuid()`.
+authenticated`; each grant below is explicit. No policy is open to every row: a table that clients
+read in full is read through a function instead (see `plan_limits`). Timestamps are `timestamptz`,
+ids are `uuid` with `gen_random_uuid()`.
 
-### 4.1 Helper functions
+### 4.1 Database functions
 
-All `security definer`, `set search_path = ''`, `stable`, owned by `postgres`, executable by
-`authenticated` only:
+**Rule for every function**, here and in every later milestone. Its migration and its row in the
+table below state all three:
 
-- `is_member(ws uuid) → boolean`: the caller (`auth.uid()`) has a row in `workspace_members`.
-- `is_owner(ws uuid) → boolean`: that row has role `owner`.
+1. **Security**: `security invoker`, unless the function must bypass RLS to do its job; then
+   `security definer`, owned by `postgres`, and it checks the caller itself (`auth.uid()`,
+   `is_member`, `is_owner`, the invite) before it reads or writes anything.
+2. **Search path**: `set search_path = ''`, with every name in the body schema-qualified
+   (`public.documents`, `auth.uid()`).
+3. **Grants**: `revoke execute on function … from public, anon, authenticated, service_role`, then
+   `grant execute … to` exactly the roles in its row: `authenticated` for a client RPC, `anon` as
+   well only when it must be called signed out, `service_role` for a server-only function, and none
+   for a trigger function. Supabase's default privileges grant execute on new functions to `anon`,
+   `authenticated` and `service_role` by name, so revoking from `public` alone would leave those
+   grants in place.
 
-They exist so that policies on `workspace_members` do not recurse into themselves.
+A function not in this table is added to it, by the same rule, in the milestone that creates it.
 
-Server-only functions (`security definer`, `set search_path = ''`, `execute` revoked from
-`public`, `anon` and `authenticated`, granted to `service_role`): `reserve_pages`,
-`release_pages`, `reserve_spend`, `settle_spend`, `spend_cap_reached`, `record_extraction`.
+| Function | Called by | Security | Search path | Grants | Why this security mode |
+|---|---|---|---|---|---|
+| `is_member(ws uuid) → boolean`, `stable`: the caller has a row in `workspace_members` | RLS and Storage policies | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | reads `workspace_members` without recursing into that table's own policy |
+| `is_owner(ws uuid) → boolean`, `stable`: that row has role `owner` | RLS policies, RPCs | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | as `is_member` |
+| `create_workspace(name text) → uuid` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | inserts into `workspaces` and `workspace_members`, which clients cannot insert into |
+| `accept_invite(token text) → uuid` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | reads `workspace_invites`, which the invitee cannot select, and inserts the membership |
+| `remove_member(ws uuid, member uuid)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | deletes from `workspace_members`, which has no client delete |
+| `set_member_role(ws uuid, member uuid, role text)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | updates `workspace_members`, which has no client update |
+| `create_document(ws uuid, file_name text, mime_type text, byte_size bigint) → (id uuid, storage_path text)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | inserts into `documents`, which has no client insert |
+| `add_line_item(…)` (only if OQ-44 keeps it) | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | inserts into `extraction_fields`, which has no client insert |
+| `delete_line_item(…)` (only if OQ-44 keeps it) | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | deletes from `extraction_fields`, which has no client delete |
+| `retry_document(document_id uuid)` (proposed, OQ-10) | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | resets `attempts` and status, reserves pages and sends to the queue, none of which clients may do |
+| `spend_cap_status() → (reached boolean, resumes_on date)` | browser, signed in or not | definer | `set search_path = ''` | revoke execute from public; grant execute to `anon`, `authenticated` | reads `ai_spend_periods` and `app_config`, which have no client grants; `anon` because the public demo calls it signed out |
+| `get_plan_limits() → table (plan text, pages_per_period int)`, `stable` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` (also `anon` only if OQ-27 says yes) | reads `plan_limits`, which has RLS and no select policy |
+| `reserve_pages(workspace_id uuid, pages int)` | Edge Functions (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | `service_role` bypasses RLS, so definer is not needed |
+| `release_pages(…)` | Edge Functions (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
+| `reserve_spend(document_id uuid, estimate numeric) → uuid` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
+| `settle_spend(reservation uuid, actual_cost numeric)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
+| `spend_cap_reached() → boolean` | `submit-document` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
+| `record_extraction(…)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
+| `handle_new_user()`, trigger after insert on `auth.users` | Auth, through the trigger | definer | `set search_path = ''` | revoke execute from public; no grant | inserts into `public.profiles` as Auth's own role, which has no grant on it |
+| `set_correction_audit()`, trigger before update on `extraction_fields` | the trigger | invoker | `set search_path = ''` | revoke execute from public; no grant | only sets `corrected_by = auth.uid()` and `corrected_at = now()` on the row being updated |
+
+"revoke execute from public" in the table is short for the full revoke in rule 3. When
+`retry_document` calls `reserve_pages`, it runs as its owner, `postgres`, which owns
+`reserve_pages` and the tables, so that call needs no further grant.
 
 ### 4.2 Tables
 
-**profiles**: one row per auth user, created by a trigger on `auth.users`.
+**profiles**: one row per auth user, created by the trigger `handle_new_user()` on `auth.users`
+(section 4.1).
 
 | Column | Type |
 |---|---|
@@ -206,7 +240,7 @@ of `display_name` where `id = auth.uid()` (column grant). No insert or delete by
 
 RLS: select where `is_member(id)`; update of `name` only where `is_owner(id)` (column grant on
 `name`). `plan` and the Stripe columns are written only by `stripe-webhook` with the service role.
-Creation through `rpc create_workspace(name)` (security definer: inserts the workspace and the
+Creation through `rpc create_workspace(name)` (section 4.1: inserts the workspace and the
 caller as owner in one transaction; whether it runs automatically at first sign-in is OQ-17). No
 client delete (OQ-30).
 
@@ -222,8 +256,7 @@ client delete (OQ-30).
 
 RLS: select where `is_member(workspace_id)`. No direct insert, update or delete: `rpc
 accept_invite(token)`, `rpc remove_member(ws, user)` and `rpc set_member_role(ws, user, role)`
-(security definer, `set search_path = ''`) check `is_owner` (or the invite) and refuse to leave a
-workspace without an owner.
+(section 4.1) check `is_owner` (or the invite) and refuse to leave a workspace without an owner.
 
 **workspace_invites**
 
@@ -266,8 +299,8 @@ verified email, not expired, not accepted, not revoked.
 
 Index on `(workspace_id, created_at desc)` and `(workspace_id, sha256)`.
 
-RLS: select where `is_member(workspace_id)`. Insert only through `rpc create_document` (checks
-`is_member`, sets status `uploading` and the storage path). Clients may update `doc_type` while the
+RLS: select where `is_member(workspace_id)`. Insert only through `rpc create_document` (section
+4.1; checks `is_member`, sets status `uploading` and the storage path). Clients may update `doc_type` while the
 status is `needs_review` (column grant, policy `is_member`; only if OQ-1 lets users change the
 type). Every other change is made by Edge Functions with the service role. Delete: OQ-20.
 
@@ -289,10 +322,10 @@ type). Every other change is made by Edge Functions with the service role. Delet
 | | unique (document_id, path) |
 
 RLS: select where `is_member(workspace_id)`. Update of `corrected_value` only (column grant),
-where `is_member(workspace_id)` and the document's status is `needs_review`; a trigger sets
-`corrected_by` and `corrected_at`. Insert of a new line-item row, and delete of a line item, through
-`rpc add_line_item` / `rpc delete_line_item` with the same conditions (only if OQ-44 keeps adding
-and deleting line items). Extracted values are never
+where `is_member(workspace_id)` and the document's status is `needs_review`; the trigger
+`set_correction_audit()` sets `corrected_by` and `corrected_at`. Insert of a new line-item row, and
+delete of a line item, through `rpc add_line_item` / `rpc delete_line_item` (section 4.1) with the
+same conditions (only if OQ-44 keeps adding and deleting line items). Extracted values are never
 changed by clients.
 
 **check_results**
@@ -351,9 +384,10 @@ period_start, pages_used)` with select where `user_id = auth.uid()` is added in 
 | plan | text PK ('free','pro') |
 | pages_per_period | int |
 
-Seeded with 20 and 500. RLS: select for `anon` and `authenticated` using `(true)`; no writes by
-clients. Plan limits are public on purpose, because the pricing page (part of the landing page
-content, OQ-27) reads them before anyone signs in.
+Seeded with 20 and 500. RLS: enabled, no policies and no client grants (the `revoke all`
+baseline). Clients read the limits only through `rpc get_plan_limits()` (section 4.1), granted to
+`authenticated`; whether visitors who are not signed in see them, which would also grant it to
+`anon`, is OQ-27.
 
 **ai_spend_periods**
 
@@ -370,8 +404,8 @@ content, OQ-27) reads them before anyone signs in.
 `amount_tolerance` (OQ-7).
 
 RLS on both: enabled, no client grants. Clients learn only whether the cap is reached through
-`rpc spend_cap_status() → (reached boolean, resumes_on date)`, security definer, granted to
-`anon` and `authenticated`.
+`rpc spend_cap_status() → (reached boolean, resumes_on date)` (section 4.1), granted to `anon`
+and `authenticated`.
 
 **stripe_events**: webhook idempotency.
 
@@ -411,16 +445,19 @@ test).
 `supabase/tests/` holds a pgTAP file per table, run by `supabase test db` in CI. Each checks, as
 `anon`, as a member of workspace A and as a member of workspace B: what each can select, insert,
 update and delete, including the RPCs and the server-only functions being refused to clients.
+For every function in section 4.1 they also check that exactly the roles in its row can execute it.
 
 ## 5. Storage
 
 | Bucket | Public | Path | Policies on `storage.objects` |
 |---|---|---|---|
 | `documents` | no | `{workspace_id}/{document_id}/original` | insert: `authenticated`, where `is_member` of the first path segment and a `documents` row with that id, status `uploading` and that path exists; select: `authenticated`, where `is_member` of the first segment; no update; no client delete |
-| `demo` | read only | `{slug}.{ext}` | select: `anon` and `authenticated` where `bucket_id = 'demo'`; no client writes |
+| `demo` | no | `{slug}.{ext}` | select: `anon` and `authenticated`, where `bucket_id = 'demo'` and a published `demo_documents` row has that object's name as its `file_path`; no client writes |
 
-The `documents` bucket sets `file_size_limit` and `allowed_mime_types` from OQ-4. The review screen
-shows a file through a signed URL valid for 10 minutes. Deletion is done only by `purge-files`
+The `documents` bucket sets `file_size_limit` and `allowed_mime_types` from OQ-4. The review screen,
+and the demo's review screen, show a file through a signed URL valid for 10 minutes. The `demo`
+bucket is not public, because a public bucket serves every object by URL whatever the policies say,
+including the files of unpublished samples. Deletion is done only by `purge-files`
 through the Storage API with the service role (section 8).
 
 ## 6. Queue and Edge Functions
@@ -467,8 +504,8 @@ throws if `STRIPE_SECRET_KEY` does not start with `sk_test_` (PRD US-11.1 AC-4).
 | Attempts reach 3 (`documents.attempts`) | Fatal. |
 
 Fatal: status `failed` with a user-readable `status_reason`, archive the message, and apply OQ-10
-to the reserved pages (`release_pages` or not). The user's retry (`rpc retry_document`, proposed,
-OQ-10) resets
+to the reserved pages (`release_pages` or not). The user's retry (`rpc retry_document`, section
+4.1, proposed, OQ-10) resets
 `attempts`, reserves pages again if they were released, and re-enqueues.
 
 `process-queue` handles one document per call so a long bank statement fits in one Edge Function
@@ -634,7 +671,7 @@ are answered; a worker who finds one unanswered stops and asks.
 | 6 | The other five types: field sets, schemas, prompts, checks, duplicate detection | 1.5 | 5 | OQ-6, OQ-9, OQ-15, OQ-16, OQ-28, OQ-29, OQ-43 |
 | 7 | Review screen, corrections, approval | 1.5 | 6 | OQ-11, OQ-12, OQ-40, OQ-44 |
 | 8 | Export CSV and XLSX | 0.5 | 7 | OQ-13 |
-| 9 | Billing in Stripe test mode | 1 | 2 | OQ-20, OQ-24, OQ-36, OQ-37, OQ-45 |
+| 9 | Billing in Stripe test mode | 1 | 2 | OQ-20, OQ-24, OQ-27, OQ-36, OQ-37, OQ-45 |
 | 10 | 7-day purge job and spend cap message in the UI | 0.5 | 5 | OQ-14, OQ-23, OQ-39 |
 | 11 | Public demo | 1 | 7 | OQ-25, OQ-38 |
 | 12 | Landing page | 0.5 | 11, 13 | OQ-27, OQ-45 |
@@ -675,8 +712,8 @@ not add secrets to CI.
    `env()`); protected routes; access tests for every table.
 3. **Invitations and roles**: `workspace_invites`, `invite-member`, `accept_invite`,
    `remove_member`, `set_member_role`; members page; last-owner rule; access tests.
-4. **Upload**: `documents`, `page_usage`, `plan_limits`, `documents` bucket and policies,
-   `create_document`, `submit-document` (page count, magic bytes, SHA-256, `reserve_pages`),
+4. **Upload**: `documents`, `page_usage`, `plan_limits`, `get_plan_limits`, `documents` bucket
+   and policies, `create_document`, `submit-document` (page count, magic bytes, SHA-256, `reserve_pages`),
    upload UI, document list, Realtime subscription.
 5. **Queue and extraction**: pgmq queue `extract`, cron job, `process-queue`, `extractions`,
    `extraction_fields`, `check_results`, `ai_spend_periods`, `app_config`, spend functions,
@@ -688,7 +725,9 @@ not add secrets to CI.
    (OQ-40).
 8. **Export**: CSV writer with tests; XLSX; export UI on approved documents.
 9. **Billing**: `create-checkout`, `create-portal`, `stripe-webhook`, `stripe_events`, billing
-   page, test-mode notice, live-key refusal; webhook tested with signed fixture events.
+   page with the plans and their limits from `get_plan_limits`, test-mode notice, live-key
+   refusal; webhook tested with signed fixture events. `get_plan_limits` is granted to `anon` only
+   if OQ-27 says visitors who are not signed in see the plans.
 10. **Retention and cap message**: `purge-files` and its cron job, stale-row and reservation
     sweep, `spend_cap_status` and the paused message on upload and retry.
 11. **Demo**: `demo_documents`, `demo` bucket, seed rows and sample files, data migration for
