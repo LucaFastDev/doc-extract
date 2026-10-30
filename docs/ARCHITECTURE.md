@@ -291,7 +291,8 @@ type). Every other change is made by Edge Functions with the service role. Delet
 RLS: select where `is_member(workspace_id)`. Update of `corrected_value` only (column grant),
 where `is_member(workspace_id)` and the document's status is `needs_review`; a trigger sets
 `corrected_by` and `corrected_at`. Insert of a new line-item row, and delete of a line item, through
-`rpc add_line_item` / `rpc delete_line_item` with the same conditions. Extracted values are never
+`rpc add_line_item` / `rpc delete_line_item` with the same conditions (only if OQ-44 keeps adding
+and deleting line items). Extracted values are never
 changed by clients.
 
 **check_results**
@@ -309,8 +310,8 @@ changed by clients.
 
 RLS: select where `is_member(workspace_id)`. Written only by `process-queue` and
 `approve-document`. While a user edits, the browser re-runs the same checks from
-`shared/doctypes/` to update flags live (PRD AC-7 of US-4.1); the stored rows are the server's
-result.
+`shared/doctypes/` to update flags live (PRD AC-7 of US-4.1, proposed, OQ-44); the stored rows are
+the server's result.
 
 **extractions**: one row per Claude call, for cost and debugging.
 
@@ -350,8 +351,9 @@ period_start, pages_used)` with select where `user_id = auth.uid()` is added in 
 | plan | text PK ('free','pro') |
 | pages_per_period | int |
 
-Seeded with 20 and 500. RLS: select for `anon` and `authenticated` using `(plan in
-('free','pro'))`; no writes by clients.
+Seeded with 20 and 500. RLS: select for `anon` and `authenticated` using `(true)`; no writes by
+clients. Plan limits are public on purpose, because the pricing page (part of the landing page
+content, OQ-27) reads them before anyone signs in.
 
 **ai_spend_periods**
 
@@ -427,7 +429,7 @@ through the Storage API with the service role (section 8).
 
 | Function | Caller | Auth | Does |
 |---|---|---|---|
-| `submit-document` | browser | user JWT | Checks membership and status `uploading`; downloads the object; checks magic bytes match the MIME type; counts pages (PDF via pdf-lib; image = 1, OQ-2); computes SHA-256; refuses if `spend_cap_reached()`; `reserve_pages` (atomic, refuses over the allowance); sets status `queued`; `pgmq.send('extract', {document_id})`. A refusal sets status `rejected` with the reason and returns 409. |
+| `submit-document` | browser | user JWT | Checks membership and status `uploading`; downloads the object; checks magic bytes match the MIME type; counts pages (PDF via pdf-lib; image = 1, OQ-2); computes SHA-256; refuses if `spend_cap_reached()` (proposed, OQ-23); `reserve_pages` (atomic, refuses over the allowance); sets status `queued`; `pgmq.send('extract', {document_id})`. A refusal sets status `rejected` with the reason and returns 409. |
 | `process-queue` | pg_cron via pg_net | shared secret header | Reads one message (`pgmq.read('extract', vt => 300, qty => 1)`), extracts it (6.2), archives it. |
 | `approve-document` | browser | user JWT | Re-runs the checks on the corrected values, stores them, applies OQ-11, sets `approved`. |
 | `invite-member` | browser | user JWT | Checks `is_owner`, stores the invite, delivers it (OQ-19). |
@@ -465,7 +467,8 @@ throws if `STRIPE_SECRET_KEY` does not start with `sk_test_` (PRD US-11.1 AC-4).
 | Attempts reach 3 (`documents.attempts`) | Fatal. |
 
 Fatal: status `failed` with a user-readable `status_reason`, archive the message, and apply OQ-10
-to the reserved pages (`release_pages` or not). The user's retry (`rpc retry_document`) resets
+to the reserved pages (`release_pages` or not). The user's retry (`rpc retry_document`, proposed,
+OQ-10) resets
 `attempts`, reserves pages again if they were released, and re-enqueues.
 
 `process-queue` handles one document per call so a long bank statement fits in one Edge Function
@@ -518,7 +521,8 @@ The function:
    deletes from `storage.objects` leave the files behind and are not used.
 3. Sets `file_deleted_at` for each object that was removed. One that failed keeps
    `file_deleted_at` null and is retried on the next run. Running daily keeps every file under
-   8 days old (PRD US-14.1 AC-1).
+   8 days old, the bound proposed in PRD US-14.1 AC-1 (OQ-39); a tighter bound needs a more
+   frequent schedule.
 4. Removes `uploading` rows older than one hour and their objects, and releases stale spend
    reservations (section 6.3).
 
@@ -576,8 +580,9 @@ function returns how many files it removed and how many failed.
   review screen in demo mode, from `result`, with no Supabase session. No Edge Function is called,
   so the demo can never call Claude (an e2e test asserts that no request goes to any function
   from a demo page).
-- How the stored results are produced, and what a visitor can do with them, are OQ-25. Demo mode
-  keeps any edits in browser memory only.
+- How the stored results are produced, and what a visitor can do with them, are OQ-25. Proposed
+  there: demo mode keeps any edits in browser memory only. Which flags the samples must show is
+  OQ-38.
 
 ## 11. Export
 
@@ -621,18 +626,18 @@ are answered; a worker who finds one unanswered stops and asks.
 
 | # | Milestone | Days | Depends on | Open questions |
 |---|---|---|---|---|
-| 1 | Scaffold: agent-ready repo | 1 | this PR | — |
-| 2 | Auth, profiles, workspaces, RLS helpers | 1 | 1 | OQ-17, OQ-21 |
+| 1 | Scaffold: agent-ready repo | 1 | this PR | OQ-40, OQ-41 |
+| 2 | Auth, profiles, workspaces, RLS helpers | 1 | 1 | OQ-17, OQ-21, OQ-34 |
 | 3 | Invitations and roles | 1 | 2 | OQ-18, OQ-19, OQ-20 |
-| 4 | Upload, Storage, `submit-document`, page allowance, document list with live status | 1 | 2 | OQ-1, OQ-2, OQ-3, OQ-4, OQ-5 |
-| 5 | Queue, `process-queue`, Claude client, mock server, spend cap, retries (invoice type only) | 1.5 | 4 | OQ-7, OQ-8, OQ-10, OQ-22, OQ-23 |
-| 6 | The other five types: field sets, schemas, prompts, checks, duplicate detection | 1.5 | 5 | OQ-6, OQ-9, OQ-15, OQ-16, OQ-28, OQ-29 |
-| 7 | Review screen, corrections, approval | 1.5 | 6 | OQ-11, OQ-12 |
+| 4 | Upload, Storage, `submit-document`, page allowance, document list with live status | 1 | 2 | OQ-1, OQ-2, OQ-3, OQ-4, OQ-5, OQ-23, OQ-35, OQ-42, OQ-45 |
+| 5 | Queue, `process-queue`, Claude client, mock server, spend cap, retries (invoice type only) | 1.5 | 4 | OQ-7, OQ-8, OQ-10, OQ-22, OQ-23, OQ-43 |
+| 6 | The other five types: field sets, schemas, prompts, checks, duplicate detection | 1.5 | 5 | OQ-6, OQ-9, OQ-15, OQ-16, OQ-28, OQ-29, OQ-43 |
+| 7 | Review screen, corrections, approval | 1.5 | 6 | OQ-11, OQ-12, OQ-40, OQ-44 |
 | 8 | Export CSV and XLSX | 0.5 | 7 | OQ-13 |
-| 9 | Billing in Stripe test mode | 1 | 2 | OQ-24 |
-| 10 | 7-day purge job and spend cap message in the UI | 0.5 | 5 | OQ-14 |
-| 11 | Public demo | 1 | 7 | OQ-25 |
-| 12 | Landing page | 0.5 | 11, 13 | OQ-27 |
+| 9 | Billing in Stripe test mode | 1 | 2 | OQ-20, OQ-24, OQ-36, OQ-37, OQ-45 |
+| 10 | 7-day purge job and spend cap message in the UI | 0.5 | 5 | OQ-14, OQ-23, OQ-39 |
+| 11 | Public demo | 1 | 7 | OQ-25, OQ-38 |
+| 12 | Landing page | 0.5 | 11, 13 | OQ-27, OQ-45 |
 | 13 | Eval set and accuracy runner | 1 | 6 | OQ-26, OQ-32 |
 
 Total: 13 days. Milestone 9 needs only milestone 2, milestone 10 only milestone 5, and milestone 13
@@ -679,7 +684,8 @@ not add secrets to CI.
 6. **Document types**: receipts, bank statements, purchase orders, delivery notes and quotes in
    `shared/doctypes/`; all checks as pure functions with unit tests per check; duplicate detection.
 7. **Review**: the review screen (document viewer through a signed URL, fields flagged first,
-   corrections, line-item add and delete, live re-check), `approve-document`, phone layout.
+   corrections, line-item add and delete, live re-check: OQ-44), `approve-document`, phone layout
+   (OQ-40).
 8. **Export**: CSV writer with tests; XLSX; export UI on approved documents.
 9. **Billing**: `create-checkout`, `create-portal`, `stripe-webhook`, `stripe_events`, billing
    page, test-mode notice, live-key refusal; webhook tested with signed fixture events.
