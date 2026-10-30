@@ -656,7 +656,9 @@ its question is answered.
 27. **OQ-27 Landing page content.** Headline, sections, screenshots, links to the portfolio and the
     repo? Is there a custom domain? Confirm or replace the proposal in AC-1 and AC-2 of US-15.1:
     the page says what doc-extract does, lists the six types, has a sign-up button beside the demo
-    button, and shows the latest measured accuracy per type with its date and model.
+    button, and shows the latest measured accuracy per type with its date and model. Does the
+    landing page show the plans and their page limits to visitors who are not signed in? Proposed:
+    no. If yes, `get_plan_limits()` is also granted to `anon`.
 28. **OQ-28 Field sets.** Confirm or change the proposed field sets and checks in section 4.1.
 29. **OQ-29 Sensitive numbers.** Is storing only the last four digits of account numbers, IBANs
     and cards right (with a longer card number read from a receipt cut to its last four), or must

@@ -60,10 +60,12 @@ when it is answered.
       address outside the Supabase team.
 - [ ] Auth → Rate limits and sign-up protection match OQ-33.
 - [ ] Storage: dashboard → Storage shows bucket `documents` (**not public**, file size limit and
-      allowed MIME types as OQ-4 sets) and bucket `demo` (public read). Pass: opening a
-      `documents` object URL without a signed token returns an error.
+      allowed MIME types as OQ-4 sets) and bucket `demo` (**not public**; read through its select
+      policy). Pass: opening a `documents` or `demo` object URL without a signed token returns an
+      error.
 - [ ] Storage: the `demo` bucket holds one file per published `demo_documents` row (`select slug,
-      file_path from demo_documents where published`). Pass: every `file_path` opens.
+      file_path from demo_documents where published`). Pass: every sample's file opens on its
+      `/demo/:slug` page while signed out.
 - [ ] Realtime: dashboard → Database → Publications → `supabase_realtime` includes `documents`.
 - [ ] Security advisors show no open finding (dashboard → Advisors → Security), in particular no
       table without RLS and no `security definer` function with a mutable search path.
