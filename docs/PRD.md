@@ -73,9 +73,10 @@ gets read without my retyping it.
   status "Queued" and its page count.
 - AC-5: An upload that would take the workspace over its page allowance (F11, F13) is refused
   with a message saying how many pages remain, and no pages are counted.
-- AC-6: While the AI spend cap is reached (F12), a new upload is refused with the spend cap
-  message, and no pages are counted.
-- AC-7: A user can upload several files in one action; each becomes its own document.
+- AC-6: **Proposed** (**OQ-23**): while the AI spend cap is reached (F12), a new upload is refused
+  with the spend cap message, and no pages are counted.
+- AC-7: **Proposed** (**OQ-42**): a user can upload several files in one action; each becomes its
+  own document.
 
 **US-1.2** As a user, I want to know which document type a file is, so that the right fields
 are extracted. Who chooses the type, the user at upload or Claude, is **OQ-1**.
@@ -96,8 +97,8 @@ that I do not type them.
 - AC-5: Dates are stored in ISO 8601 (YYYY-MM-DD); amounts as exact decimals, with no rounding
   beyond what is printed.
 - AC-6: If extraction fails after its retries, the document has status "Failed" with a reason the
-  user can read, and the user can retry it. Whether the failed attempt's pages count against the
-  allowance is **OQ-10**.
+  user can read. **Proposed** (**OQ-10**): the user can retry it. Whether the failed attempt's
+  pages count against the allowance is also **OQ-10**.
 - AC-7: A multi-page document is extracted as one document. Whether one file may hold several
   documents (for example a PDF of ten invoices) is **OQ-5**; until it is settled, one file is one
   document.
@@ -115,28 +116,30 @@ fits how I use it. The field sets are in section 4.
 - AC-1: Every check listed for a type in section 4 runs on every extraction of that type.
 - AC-2: A check that fails flags each field it names, with a reason that says what did not add up
   (for example "Line items sum to 1,180.00; subtotal is 1,200.00").
-- AC-3: A check whose inputs are empty (for example no tax printed) is recorded as "Skipped", not
-  as passed or failed.
+- AC-3: **Proposed** (**OQ-43**): a check whose inputs are empty (for example no tax printed) is
+  recorded as "Skipped", not as passed or failed.
 - AC-4: Arithmetic checks compare amounts with a tolerance (**OQ-7**) in the document's currency.
 - AC-5: Date sanity checks follow the rules in section 4.2 (**OQ-6** for the exact rules).
 - AC-6: Duplicate detection flags a document that matches an earlier document in the same
   workspace by the rule in section 4.3 (**OQ-9**), and links to the earlier one.
-- AC-7: When the user corrects a field on the review screen, the checks that use it are
-  re-evaluated and the flags update without a page reload.
+- AC-7: **Proposed** (**OQ-44**): when the user corrects a field on the review screen, the checks
+  that use it are re-evaluated and the flags update without a page reload.
 
 ### F5. Review
 
 **US-5.1** As a user, I want to see the document beside the extracted fields, flagged fields
 first, so that I check what is doubtful before the rest.
 
-- AC-1: The review screen shows the original document (all pages, zoomable) beside the fields.
+- AC-1: The review screen shows the original document beside the fields. **Proposed**
+  (**OQ-44**): all pages are shown, and the document can be zoomed.
 - AC-2: Flagged fields (failed check, low confidence, duplicate) are listed before unflagged
   fields, each with its reason.
 - AC-3: Each field shows its confidence.
-- AC-4: The user can edit any field and any line-item cell, add a missing line item and delete a
-  wrong one; the original extracted value stays visible next to a corrected one.
-- AC-5: The user can approve the document; it then has status "Approved", with who approved it and
-  when.
+- AC-4: The user can edit any field and any line-item cell. **Proposed** (**OQ-44**): the user can
+  also add a missing line item and delete a wrong one, and the original extracted value stays
+  visible next to a corrected one.
+- AC-5: The user can approve the document; it then has status "Approved". **Proposed**
+  (**OQ-44**): who approved it and when is recorded and shown.
 - AC-6: Whether a document can be approved while a check still fails is **OQ-11**. Whether an
   approved document can be reopened is **OQ-12**.
 - AC-7: After the file is deleted (F14), the review screen shows the fields and says the file was
@@ -150,9 +153,10 @@ into a spreadsheet or another tool.
 - AC-1: Only approved documents can be exported.
 - AC-2: An export contains the corrected value where there is one, and the extracted value
   otherwise.
-- AC-3: CSV is UTF-8 with a header row, RFC 4180 quoting, and amounts as plain decimals without
-  thousands separators, with the currency in its own column.
-- AC-4: XLSX holds the same data, with amounts as numbers and dates as dates.
+- AC-3: **Proposed** (**OQ-13**): CSV is UTF-8 with a header row, RFC 4180 quoting, and amounts
+  as plain decimals without thousands separators, with the currency in its own column.
+- AC-4: **Proposed** (**OQ-13**): XLSX holds the same data, with amounts as numbers and dates as
+  dates.
 - AC-5: How documents are selected for one export, and how header fields and line items are laid
   out (one file per type, one row per line item, one sheet per type) is **OQ-13**.
 - AC-6: QuickBooks, Xero or any other accounting integration is not offered (section 9).
@@ -181,13 +185,15 @@ else's.
 
 **US-8.2** As a workspace owner, I want to invite people by email, so that we can share the work.
 
-- AC-1: An owner can invite an email address as owner or member.
-- AC-2: The invitee who signs in with that email address and accepts becomes a member with the
-  invited role; nobody else can accept the invitation.
-- AC-3: An invitation can be accepted once, and expires after a time set in **OQ-18**.
-- AC-4: An owner can revoke a pending invitation and remove a member.
-- AC-5: A workspace always has at least one owner: removing or demoting the last owner is refused.
-- AC-6: A member cannot invite, remove members or change roles.
+- AC-1: **Proposed** (**OQ-20**): an owner can invite an email address as owner or member.
+- AC-2: **Proposed** (**OQ-18**): the invitee who signs in with that email address and accepts
+  becomes a member with the invited role; nobody else can accept the invitation.
+- AC-3: **Proposed** (**OQ-18**): an invitation can be accepted once, and expires after a time set
+  in **OQ-18**.
+- AC-4: **Proposed** (**OQ-20**): an owner can revoke a pending invitation and remove a member.
+- AC-5: **Proposed** (**OQ-20**): a workspace always has at least one owner: removing or demoting
+  the last owner is refused.
+- AC-6: **Proposed** (**OQ-20**): a member cannot invite, remove members or change roles.
 - AC-7: How the invitation reaches the invitee (an email, which needs an email provider, or a link
   the owner copies) is **OQ-19**.
 - AC-8: What a member can do besides upload, review, approve and export (for example billing, or
@@ -200,9 +206,10 @@ else's.
 
 - AC-1: A user can sign in with email (method in **OQ-21**: magic link, password, or both).
 - AC-2: A user can sign in with Google.
-- AC-3: Signing in with Google and with email for the same address gives the same account.
+- AC-3: **Proposed** (**OQ-34**): signing in with Google and with email for the same address
+  gives the same account.
 - AC-4: Signing out ends the session; a signed-out visitor who opens an app page is sent to
-  sign-in and, after signing in, back to that page.
+  sign-in. **Proposed** (**OQ-34**): after signing in, they are sent back to that page.
 
 ### F10. Live status
 
@@ -212,7 +219,7 @@ that I do not reload the page.
 - AC-1: The statuses are: Queued, Processing, Needs review, Approved, Failed, and Waiting for
   budget if queued documents wait while the spend cap is reached (**OQ-23**).
 - AC-2: A status change made on the server appears on every open document list and review screen
-  of that workspace within 5 seconds, without a reload.
+  of that workspace without a reload. **Proposed** (**OQ-35**): within 5 seconds.
 - AC-3: A user never receives status updates for another workspace's documents.
 
 ### F11. Billing (Stripe test mode)
@@ -224,13 +231,13 @@ that I do not reload the page.
   10-page account cap (F13) is **OQ-2**; how plan limits apply (per workspace or per account) is
   **OQ-3**.
 - AC-3: Upgrading opens Stripe Checkout **in test mode**; completing it with a Stripe test card
-  makes the workspace Pro within 10 seconds of Stripe's webhook.
+  makes the workspace Pro. **Proposed** (**OQ-36**): within 10 seconds of Stripe's webhook.
 - AC-4: The app never creates a real charge: the server refuses to start if its Stripe key is a
   live key.
-- AC-5: The page says plainly that billing is a test-mode demonstration and that test cards only
-  are accepted.
-- AC-6: Cancelling (through Stripe's customer portal) returns the workspace to Free at the end of
-  the paid period.
+- AC-5: **Proposed** (**OQ-45**): the page says plainly that billing is a test-mode demonstration
+  and that test cards only are accepted.
+- AC-6: **Proposed** (**OQ-37**): cancelling (through Stripe's customer portal) returns the
+  workspace to Free at the end of the paid period.
 - AC-7: The Pro price shown in test mode, the period the allowance resets on (calendar month or
   billing period), and what happens to a downgrade mid-period are **OQ-24**.
 
@@ -260,7 +267,8 @@ can never cost me more.
 - AC-1: The landing page has one button that opens the demo, with no sign-up and no sign-in.
 - AC-2: The demo offers fixed sample documents, at least one of each of the six types.
 - AC-3: Opening a sample shows its stored result on the review screen: document, fields, line
-  items, confidences, checks and flags, including at least one sample with a failed check.
+  items, confidences, checks and flags. **Proposed** (**OQ-38**): at least one sample has a failed
+  check.
 - AC-4: The demo never calls Claude: opening every sample leaves the app's AI spend unchanged.
 - AC-5: What a visitor can do on a sample (edit fields, approve, export) and whether anything
   they do is kept is **OQ-25**. **Proposed:** edits and export work in the browser only, nothing
@@ -271,30 +279,33 @@ can never cost me more.
 
 - AC-1: Uploading needs an account.
 - AC-2: An account can process at most 10 pages (period and relation to the plans: **OQ-2**).
-- AC-3: The upload screen shows how many of the 10 pages are left.
+- AC-3: The upload screen shows how many of the 10 pages are left (what the 10 pages are counted
+  over: **OQ-2**).
 
 ### F14. Retention
 
 **US-14.1** As a user, I want my uploaded files deleted after 7 days, so that my documents are not
 kept longer than needed.
 
-- AC-1: Every uploaded file is deleted from storage within 24 hours after it is 7 days old
-  (measured from upload; **OQ-14** for whether extracted data is deleted too, and whether the
-  clock starts at upload or approval).
+- AC-1: Every uploaded file is deleted from storage after it is 7 days old (measured from upload;
+  **OQ-14** for whether extracted data is deleted too, and whether the clock starts at upload or
+  approval). **Proposed** (**OQ-39**): within 24 hours after it is 7 days old.
 - AC-2: Deletion runs on a schedule with no person involved, and a failed deletion is retried on
   the next run.
 - AC-3: The demo's sample files are not deleted.
-- AC-4: The landing page and the upload screen say that files are deleted after 7 days.
+- AC-4: **Proposed** (**OQ-45**): the landing page and the upload screen say that files are
+  deleted after 7 days.
 
 ### F15. Landing page
 
 **US-15.1** As a visitor, I want to understand in a few seconds what the product does.
 
-- AC-1: A public landing page at `/` says what doc-extract does, lists the six document types,
-  shows the demo button (F13) and a sign-up button.
-- AC-2: It shows the measured accuracy per document type from the latest eval run (F16), with the
-  date of that run and the model used.
-- AC-3: It states the 7-day file deletion and that billing is in test mode.
+- AC-1: A public landing page at `/` shows the demo button (F13). **Proposed** (**OQ-27**): it
+  also says what doc-extract does, lists the six document types and shows a sign-up button.
+- AC-2: **Proposed** (**OQ-27**): it shows the measured accuracy per document type from the latest
+  eval run (F16), with the date of that run and the model used.
+- AC-3: **Proposed** (**OQ-45**): it states the 7-day file deletion and that billing is in test
+  mode.
 - AC-4: Its further content (copy, sections, screenshots) is **OQ-27**.
 
 ### F16. Eval set
@@ -308,7 +319,8 @@ how well it works and catch regressions when the prompt or model changes.
   field accuracy defined in section 10.
 - AC-3: The eval never runs in CI and never runs on its own; it runs only when the operator starts
   it (who pays for it: **OQ-26**).
-- AC-4: Each run's results are saved in the repo with the date, the model and the prompt version.
+- AC-4: **Proposed** (**OQ-26**): each run's results are saved in the repo with the date, the
+  model and the prompt version.
 - AC-5: The scoring (comparing a result to an expected result) has unit tests.
 
 ### F17. Look
@@ -318,14 +330,16 @@ how well it works and catch regressions when the prompt or model changes.
 - AC-1: Every colour, radius and font the app uses comes from design tokens (CSS variables) in
   `src/index.css`, as shadcn/ui lays them out, so the look changes in one place.
 - AC-2: UI components come from shadcn/ui.
-- AC-3: The app works at phone width (360px) and desktop width; the review screen stacks the
-  document above the fields at phone width.
-- AC-4: Light theme is required; a dark theme is not in v1 unless the operator asks.
+- AC-3: **Proposed** (**OQ-40**): the app works at phone width (360px) and desktop width; the
+  review screen stacks the document above the fields at phone width.
+- AC-4: **Proposed** (**OQ-41**): light theme is required; a dark theme is not in v1.
 
 ## 4. Document types: field sets and checks
 
-**Proposed field sets** (**OQ-28**). The issue fixes the six types and the three kinds of check;
-the field lists below are this PRD's proposal for the operator to confirm or change.
+**Proposed field sets and checks** (**OQ-28**). The issue fixes the six types, the three kinds of
+check and three arithmetic checks (line items sum to subtotal, subtotal + tax = total, opening
+balance + transactions = closing balance); the field lists and every other check below are this
+PRD's proposal for the operator to confirm or change.
 
 Every type also has these common fields: `language` (detected, BCP 47 code), `currency` (ISO 4217
 code), `currency_as_printed`.
@@ -378,8 +392,8 @@ Checks:
 - D1 transaction_date is not in the future
 - U1 duplicate: same merchant, transaction_date, transaction_time and total
 
-`card_last4` holds at most four digits; anything longer read from the document is cut to its last
-four.
+**Proposed** (**OQ-29**): `card_last4` holds at most four digits; anything longer read from the
+document is cut to its last four.
 
 #### Bank statement
 
@@ -499,18 +513,20 @@ not to each workspace, and the demo does not count against it because it makes n
 ## 6. The demo
 
 - One click from the landing page, no account.
-- Fixed sample documents, at least one per type, chosen so that the six together show every kind
-  of flag: a failed arithmetic check, a date flag, a low-confidence field and a duplicate.
+- Fixed sample documents, at least one per type. **Proposed** (**OQ-38**): chosen so that the six
+  together show every kind of flag: a failed arithmetic check, a date flag, a low-confidence field
+  and a duplicate.
 - **Results are hardcoded**: each sample's stored extraction result is shown; nothing is
   re-extracted per visitor and the demo never calls Claude.
-- The sample documents are fictitious: no real person's or company's data. Who makes them, and
-  how their stored results are produced (one real extraction run reviewed by the operator, or
-  written by hand), is **OQ-25**.
+- **Proposed** (**OQ-25**): the sample documents are fictitious, with no real person's or
+  company's data. Who makes them, and how their stored results are produced (one real extraction
+  run reviewed by the operator, or written by hand), is also **OQ-25**.
 - Uploading one's own documents needs an account, capped at 10 pages per account (OQ-2).
 
 ## 7. Retention
 
-- Uploaded files are deleted 7 days after upload by a scheduled job (F14).
+- Uploaded files are deleted 7 days after upload by a scheduled job (F14; when the clock starts
+  is **OQ-14**, how soon after the 7 days is **OQ-39**).
 - Demo sample files are kept.
 - What happens to extracted fields, check results and approvals after the file is deleted, and
   how long they are kept, is **OQ-14**.
@@ -535,11 +551,12 @@ not to each workspace, and the demo does not count against it because it makes n
 - Mobile apps, an email-in address, a public API or webhooks for customers (**OQ-31** if any are
   wanted).
 - Unless the operator decides otherwise: several documents in one file (OQ-5), translation
-  (OQ-15), dark theme.
+  (OQ-15), dark theme (**Proposed**, OQ-41).
 
 ## 10. Success measures
 
-**Field accuracy**, measured by the eval set (F16): for a document type, the share of expected
+**Field accuracy**, measured by the eval set (F16). **Proposed** definition (**OQ-32**): for a
+document type, the share of expected
 field values (header fields and line-item cells) that the extraction returns exactly, after
 normalisation (dates as ISO 8601, amounts as decimals, text with case and surrounding whitespace
 ignored). An empty expected value counts as correct only when the extraction is also empty.
@@ -557,8 +574,8 @@ ignored). An empty expected value counts as correct only when the extraction is 
 
 Other measures:
 
-- **Check usefulness**: in the eval set, every seeded misread of a total or subtotal is flagged by
-  an arithmetic check.
+- **Check usefulness** (**Proposed**, **OQ-32**): in the eval set, every seeded misread of a total
+  or subtotal is flagged by an arithmetic check.
 - **Demo**: a visitor reaches a sample's review screen in one click from the landing page.
 - **Cost**: the deployed app's Claude spend stays at or under $10 in every month.
 
@@ -587,14 +604,18 @@ its question is answered.
    acceptable as the per-field confidence, or must it be calibrated against the eval set?
 9. **OQ-9 Duplicate rule.** Confirm or replace section 4.3: the matching keys per type, whether
    there is a time window, and whether documents whose files were deleted still count.
-10. **OQ-10 Failed extractions and the allowance.** Do pages of a document whose extraction failed
-    count against the page allowance? Does a user retry count again?
+10. **OQ-10 Failed extractions and the allowance.** Can the user retry a document whose extraction
+    failed (proposed in AC-6 of US-2.1: yes)? Do pages of a document whose extraction failed count
+    against the page allowance? Does a user retry count again?
 11. **OQ-11 Approving with failed checks.** Can a document be approved while a check fails or a
     field is flagged? If yes, must the user acknowledge each flag?
 12. **OQ-12 Reopening.** Can an approved document be reopened and edited? Who can do it?
-13. **OQ-13 Export layout.** Which documents go into one export (one document, a selection, all
-    approved in a date range)? One file per type, or mixed types? Header fields and line items in
-    one sheet (one row per line item, header repeated) or two sheets / two files?
+13. **OQ-13 Export layout and format.** Which documents go into one export (one document, a
+    selection, all approved in a date range)? One file per type, or mixed types? Header fields and
+    line items in one sheet (one row per line item, header repeated) or two sheets / two files?
+    Confirm or replace the formats proposed in AC-3 and AC-4 of US-6.1: CSV in UTF-8 with a header
+    row, RFC 4180 quoting, plain decimals without thousands separators and the currency in its own
+    column; XLSX with amounts as numbers and dates as dates.
 14. **OQ-14 Retention scope.** Are only the uploaded files deleted after 7 days, or also the
     extracted data? Does the clock start at upload or at approval? Is the 7 days the same on every
     plan?
@@ -604,38 +625,78 @@ its question is answered.
     from context and flag the field, or ask the user?
 17. **OQ-17 Workspace creation.** Is a personal workspace created automatically at first sign-in?
     Can a user belong to several workspaces and create more? Can a workspace be renamed or deleted?
-18. **OQ-18 Invitation expiry.** How long is an invitation valid?
+18. **OQ-18 Invitation rules.** How long is an invitation valid? Confirm or replace the proposal in
+    AC-2 and AC-3 of US-8.2: an invitation can be accepted only by someone signed in with the
+    invited email address, and only once.
 19. **OQ-19 Invitation and sign-in email.** Email sign-in and email invitations need an email
     provider in production (Supabase's built-in sender only reaches the project's own team and is
     heavily rate-limited). Which provider and sending domain? Or should invitations be a link the
     owner copies?
-20. **OQ-20 Roles.** Confirm or replace the proposal in AC-8 of US-8.2: what may a member do that an
-    owner may also do, and what is owner-only (billing, deleting documents, renaming)?
+20. **OQ-20 Roles.** Confirm or replace the proposals in AC-1 and AC-4 to AC-8 of US-8.2: only
+    owners invite (as owner or member), revoke invitations, remove members and change roles; a
+    workspace always keeps at least one owner; what may a member do that an owner may also do, and
+    what is owner-only (billing, deleting documents, renaming)?
 21. **OQ-21 Email sign-in method.** Magic link, password, or both? Is email confirmation required?
 22. **OQ-22 Spend cap month.** Calendar month in UTC, or another reset date? Who sees how much of
     the budget is used (only the operator, or users too)?
-23. **OQ-23 Queued work at the cap.** When the cap is reached with documents still queued, do they
-    wait until the cap resets (status "Waiting for budget") or fail?
+23. **OQ-23 Work at the cap.** When the cap is reached with documents still queued, do they wait
+    until the cap resets (status "Waiting for budget") or fail? Is a new upload while the cap is
+    reached refused (proposed in AC-6 of US-1.1), or accepted and left waiting?
 24. **OQ-24 Billing details.** The Pro price to show in test mode and its currency; whether the
     allowance resets on the calendar month or the billing period; what a downgrade or cancellation
     does to pages already used; whether there is a trial.
 25. **OQ-25 Demo details.** What can a visitor do on a sample (edit, approve, export) and is
-    anything kept? Who makes the fictitious sample documents, and are the stored results produced
-    by one reviewed real extraction or written by hand? How many samples per type?
+    anything kept? Must the sample documents be fictitious, with no real person's or company's data
+    (proposed in section 6)? Who makes them, and are the stored results produced by one reviewed
+    real extraction or written by hand? How many samples per type?
 26. **OQ-26 Eval set.** How many documents per type? Where do they come from (generated,
     public-domain, the operator's own with data removed)? Who checks the expected results? Is the
-    eval run paid from the deployed app's $10 budget or from a separate key?
+    eval run paid from the deployed app's $10 budget or from a separate key? Are each run's results
+    kept in the repo with the date, model and prompt version (proposed in AC-4 of US-16.1)?
 27. **OQ-27 Landing page content.** Headline, sections, screenshots, links to the portfolio and the
-    repo? Is there a custom domain?
+    repo? Is there a custom domain? Confirm or replace the proposal in AC-1 and AC-2 of US-15.1:
+    the page says what doc-extract does, lists the six types, has a sign-up button beside the demo
+    button, and shows the latest measured accuracy per type with its date and model.
 28. **OQ-28 Field sets.** Confirm or change the proposed field sets and checks in section 4.1.
 29. **OQ-29 Sensitive numbers.** Is storing only the last four digits of account numbers, IBANs
-    and cards right, or must the full number be extracted and exported?
+    and cards right (with a longer card number read from a receipt cut to its last four), or must
+    the full number be extracted and exported?
 30. **OQ-30 Account and workspace deletion.** Can a user delete their account and a workspace and
     its data? Is a privacy policy or terms page needed?
 31. **OQ-31 Further channels.** Confirm that an email-in address, a public API and customer
     webhooks are out of scope for v1.
-32. **OQ-32 Accuracy targets.** Confirm or replace the proposed targets in section 10. What
-    happens when a type misses its target: does it block launch, or is it shown as measured?
+32. **OQ-32 Accuracy measure and targets.** Confirm or replace the proposed definition of field
+    accuracy (exact match after normalisation), the proposed targets and the proposed
+    check-usefulness measure in section 10. What happens when a type misses its target: does it
+    block launch, or is it shown as measured?
 33. **OQ-33 Abuse of sign-up.** The 10-page account cap can be multiplied by creating accounts,
     which drains the shared $10 budget. Is a captcha, email confirmation or another limit on
     sign-ups wanted?
+34. **OQ-34 Sign-in behaviour.** Does signing in with Google and with email for the same address
+    give one account (proposed), or two separate accounts? After signing in, is the user sent back
+    to the page they first opened (proposed), or to a fixed start page?
+35. **OQ-35 Live status delay.** How soon must a status change appear on open screens? Proposed:
+    within 5 seconds.
+36. **OQ-36 Upgrade delay.** How soon after Stripe's webhook must the workspace be Pro? Proposed:
+    within 10 seconds.
+37. **OQ-37 Cancellation.** Can an owner cancel Pro (proposed: through Stripe's customer portal), and
+    does the workspace return to Free at the end of the paid period (proposed) or at once?
+38. **OQ-38 Demo coverage.** Must the demo include a sample with a failed check, and must the
+    samples together show every kind of flag (failed arithmetic check, date flag, low-confidence
+    field, duplicate)? Proposed: yes to both.
+39. **OQ-39 Deletion time bound.** How soon after a file is 7 days old must it be deleted? Proposed:
+    within 24 hours (so no file is older than 8 days).
+40. **OQ-40 Screen sizes.** Which widths must the app support? Proposed: phone width from 360px and
+    desktop, with the review screen stacking the document above the fields at phone width.
+41. **OQ-41 Dark theme.** Is a dark theme wanted in v1? Proposed: no, light theme only.
+42. **OQ-42 Several files at once.** Can a user upload several files in one action, each becoming
+    its own document? Proposed: yes. Is there a maximum number per action?
+43. **OQ-43 Checks with missing inputs.** When a value a check needs is not printed (for example no
+    tax), is the check recorded as "Skipped" (proposed), failed, or flagged as a missing field?
+44. **OQ-44 Review screen details.** Confirm or replace the proposals in US-4.1 AC-7 and US-5.1 AC-1,
+    AC-4 and AC-5: checks re-run and flags update live as the user corrects a field; all pages
+    shown and zoomable; line items can be added and deleted; the original value stays visible
+    beside a corrected one; who approved and when is recorded and shown.
+45. **OQ-45 Notices.** Must the landing page and the upload screen state that files are deleted
+    after 7 days, and must the landing page and the billing page state that billing is a test-mode
+    demonstration accepting test cards only? Proposed: yes, in each of those places.
