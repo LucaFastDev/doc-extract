@@ -52,6 +52,7 @@ Audiences:
 | F16 | Eval set with measured field accuracy per document type |
 | F17 | A clean look defined on shadcn/ui, adjustable later |
 | F18 | Account and workspace deletion; privacy and terms pages |
+| F19 | Delete a single document |
 
 ## 3. User stories and acceptance criteria
 
@@ -228,9 +229,8 @@ else's.
   is refused.
 - AC-6 (**OQ-20**): A member cannot invite, revoke invitations, remove members or change roles.
 - AC-7 (**OQ-20**): Owners manage members, invitations and billing, and rename and delete the
-  workspace. Members and owners both upload, review, correct, approve, reopen, change types, retry
-  and export. No one deletes a single document in v1: a document's file goes after 7 days (F14),
-  and its data goes with its workspace (F18).
+  workspace. Members and owners both upload, review, correct, approve, reopen, change types, retry,
+  export and delete single documents (F19).
 
 ### F9. Sign-in
 
@@ -333,7 +333,8 @@ kept longer than needed.
 - AC-4 (**OQ-45**): The landing page and the upload screen say that files are deleted after 7
   days.
 - AC-5 (**OQ-14**, **OQ-30**): Extracted fields, check results and approvals are kept after the
-  file is deleted, until the user deletes the workspace or their account (F18).
+  file is deleted, until a member deletes the document (F19) or the user deletes the workspace or
+  their account (F18).
 
 ### F15. Landing page
 
@@ -406,6 +407,28 @@ how well it works and catch regressions when the prompt or model changes.
   from the landing page and the sign-in page. The privacy page states that documents are read by
   Claude, that files are deleted after 7 days, that sign-in is through Google and that billing is
   in Stripe test mode. The Lead writes their copy.
+
+### F19. Single-document deletion
+
+**US-19.1** As a user, I want to delete a document, so that a wrong or unwanted upload is gone.
+
+- AC-1 (**OQ-20**): Any member of a workspace, owner or member, can delete any document in it,
+  whoever uploaded it and whatever its status, from the document list and the review screen.
+- AC-2 (**OQ-20**): Before deleting, the app asks for a confirmation that names the file.
+  Cancelling it leaves the document unchanged; nothing is deleted without the confirmation.
+- AC-3 (**OQ-20**): Deleting removes the document, its stored file and its extracted results:
+  fields, line items, corrections, check results, ticks and history. Afterwards the document is
+  not in the document list, its review screen says it no longer exists, it cannot be exported, and
+  its file is no longer in storage.
+- AC-4 (**OQ-20**): Pages the document used are not refunded: the workspace's pages used this
+  month and the uploader's lifetime pages (F11, F13) are the same after the deletion as before,
+  and still count towards the limits.
+- AC-5 (**OQ-10**, **OQ-20**): A document deleted while it is queued, waiting for budget or
+  processing has used no pages yet (section 5); the pages held for it are released, as for a
+  failure (US-2.1 AC-6).
+- AC-6 (**OQ-20**): Someone who is not a member of the workspace, or not signed in, cannot delete
+  its documents; the server refuses, and nothing changes.
+- AC-7: The demo's samples (F13) cannot be deleted; the demo shows no delete action.
 
 ## 4. Document types: field sets and checks
 
@@ -586,8 +609,9 @@ whose files were deleted still count, because their hash and fields are kept (F1
 An upload must fit both the workspace's monthly allowance and the uploader's lifetime cap. The
 spend cap and the daily ceiling apply to the whole deployed app, not to each workspace, and the
 demo does not count against them because it makes no Claude calls. Work that would pass either
-waits as "Waiting for budget" (F12). There is no captcha or other sign-up limit (**OQ-33**): the
-account cap and the daily ceiling are the abuse limits.
+waits as "Waiting for budget" (F12). Deleting a document does not give back the pages it used
+(F19). There is no captcha or other sign-up limit (**OQ-33**): the account cap and the daily
+ceiling are the abuse limits.
 
 ## 6. The demo
 
@@ -608,7 +632,8 @@ account cap and the daily ceiling are the abuse limits.
   scheduled job, on every plan (F14; **OQ-14**, **OQ-39**).
 - Demo sample files are kept.
 - Extracted fields, check results and approvals are kept after the file is deleted, until the
-  workspace or the account is deleted (**OQ-14**, **OQ-30**).
+  document, the workspace or the account is deleted (**OQ-14**, **OQ-20**, **OQ-30**).
+- Deleting a document deletes its file and all its data at once (F19; **OQ-20**).
 - Deleting a workspace deletes all its data; deleting an account deletes the workspaces where the
   user is the only member (F18; **OQ-30**).
 
@@ -635,8 +660,7 @@ account cap and the daily ceiling are the abuse limits.
 - A custom domain (**OQ-27**).
 - A captcha or other sign-up limit (**OQ-33**).
 - Mobile apps, an email-in address, a public API or webhooks for customers (**OQ-31**).
-- Several documents in one file (**OQ-5**); a dark theme (**OQ-41**); deleting single documents
-  (**OQ-20**).
+- Several documents in one file (**OQ-5**); a dark theme (**OQ-41**).
 
 ## 10. Success measures
 
@@ -702,8 +726,8 @@ directed. Each entry gives the answer and where it is applied.
     XLSX has two sheets (Documents, Line items); CSV is two files in a zip; the drafted CSV and XLSX
     formats stand. Applied: US-6.1 AC-3 to AC-5.
 14. **OQ-14 Retention scope.** As drafted: only files are deleted, 7 days from upload, on every
-    plan; extracted data stays until the workspace or account is deleted. Applied: US-5.1 AC-8,
-    US-14.1 AC-1 and AC-5, section 7.
+    plan; extracted data stays until the workspace or account is deleted, or, since the change to
+    OQ-20, the document. Applied: US-5.1 AC-8, US-14.1 AC-1 and AC-5, section 7.
 15. **OQ-15 Translation.** No translation; text is kept as printed. Applied: US-7.1 AC-2,
     section 9.
 16. **OQ-16 Missing currency.** Claude guesses it and the field is flagged. Applied: US-7.1 AC-5,
@@ -716,7 +740,11 @@ directed. Each entry gives the answer and where it is applied.
     shared as a copy-link. Applied: US-8.2 AC-1, US-9.1 AC-1, US-7.1 AC-1, section 9.
 20. **OQ-20 Roles.** As drafted: owners invite, revoke, remove members, change roles and manage
     billing; a workspace keeps at least one owner; members and owners both upload, review, approve
-    and export. Applied: US-8.2 AC-4 to AC-7, US-11.1 AC-8, US-18.2 AC-2.
+    and export. Changed by the operator's answer of 2026-10-31 on the review of PR #5: v1 has
+    single-document delete. Any member can delete any document of the workspace; its row, stored
+    file and extracted results are removed; the pages it used are not refunded and still count; the
+    UI asks for confirmation first. Applied: US-8.2 AC-4 to AC-7, US-11.1 AC-8, US-18.2 AC-2,
+    US-19.1, sections 5, 7 and 9.
 21. **OQ-21 Email sign-in method.** None: sign-in is Google only, with no email sign-in and no magic
     link; F9 is "Sign-in with Google". Applied: section 2 (F9), US-9.1 AC-1, section 9.
 22. **OQ-22 Spend cap month and visibility.** Calendar month in UTC; signed-in users see "$x of $10

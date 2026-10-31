@@ -9,7 +9,7 @@ where a design follows from an answer, it names the question (OQ-n).
 | Layer | Choice |
 |---|---|
 | Web app | Next.js (App Router), TypeScript, Tailwind, shadcn/ui, on Vercel |
-| Server code in the web app | Next.js route handlers on Vercel: Stripe checkout, customer portal and webhook; workspace and account deletion; the OAuth callback |
+| Server code in the web app | Next.js route handlers on Vercel: Stripe checkout, customer portal and webhook; document, workspace and account deletion; the OAuth callback |
 | Backend | Supabase: Postgres with RLS, Auth (Google only), Storage, Realtime, pgmq + pg_cron + pg_net, Edge Functions (Deno) for the extraction pipeline |
 | Supabase clients | `@supabase/ssr` with cookie sessions: one browser module, one server module |
 | AI | Claude API, called only from the `process-queue` Edge Function |
@@ -31,7 +31,7 @@ flowchart LR
   end
   subgraph Vercel
     SC["Server components,<br/>middleware"]
-    RH["Route handlers<br/>/auth/callback<br/>/api/billing/*<br/>/api/stripe/webhook<br/>/api/workspaces/[id]<br/>/api/account"]
+    RH["Route handlers<br/>/auth/callback<br/>/api/billing/*<br/>/api/stripe/webhook<br/>/api/documents/[id]<br/>/api/workspaces/[id]<br/>/api/account"]
   end
   subgraph Supabase
     Auth["Auth<br/>Google"]
@@ -152,7 +152,8 @@ stateDiagram-v2
 
 The UI shows `unsupported` as "Not supported" and `waiting_budget` as "Waiting for budget".
 `uploading` rows that never get submitted (the browser closed mid-upload) are removed after one
-hour by the daily purge job, with their file if any. `rejected` rows are not listed.
+hour by the daily purge job, with their file if any. `rejected` rows are not listed. A member can
+delete a document in any listed status (section 6.2); it then leaves the diagram.
 
 ## 3. Repository layout
 
@@ -165,6 +166,7 @@ src/
     auth/callback/route.ts     exchanges Google's code for a session cookie
     api/billing/checkout/route.ts, api/billing/portal/route.ts
     api/stripe/webhook/route.ts
+    api/documents/[id]/route.ts    DELETE: delete one document
     api/workspaces/[id]/route.ts   DELETE: delete a workspace
     api/account/route.ts           DELETE: delete the signed-in account
     layout.tsx                 root layout; imports ../index.css
@@ -248,11 +250,12 @@ A function not in this table is added to it, by the same rule, in the milestone 
 | `get_budget_status() → (spent_usd numeric, cap_usd numeric, daily_reached boolean, monthly_reached boolean, resumes_at timestamptz)` | browser, signed in | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | reads `ai_spend_periods`, `ai_spend_days` and `app_config`, which have no client grants; signed-in users only (OQ-22) |
 | `get_plan_limits() → table (plan text, pages_per_period int, monthly_price_usd numeric)`, `stable` | browser and server components, signed in or not | definer | `set search_path = ''` | revoke execute from public; grant execute to `anon`, `authenticated` | reads `plan_limits`, which has RLS and no select policy; `anon` because the landing page shows the plans to visitors who are not signed in (OQ-27) |
 | `reserve_pages(document_id uuid) → boolean` | `submit-document` (service role), `retry_document`, `change_document_type` | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | `service_role` bypasses RLS, so definer is not needed |
-| `release_pages(document_id uuid)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
+| `release_pages(document_id uuid)` | `process-queue` (service role), `delete_document` | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
 | `reserve_spend(document_id uuid, estimate numeric) → (reservation uuid, refused_by text)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
 | `settle_spend(reservation uuid, actual_cost numeric)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
 | `release_stale_spend_reservations() → int` | `purge-files` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
 | `record_extraction(…)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
+| `delete_document(document_id uuid)` | `DELETE /api/documents/[id]` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages`; the route handler checks `is_member` before calling it (section 6.2) |
 | `handle_new_user()`, trigger after insert on `auth.users` | Auth, through the trigger | definer | `set search_path = ''` | revoke execute from public; no grant | inserts into `public.profiles`, and creates the personal workspace with the user as owner (OQ-17), as Auth's own role, which has no grant on them |
 | `set_correction_audit()`, trigger before update on `extraction_fields` | the trigger | invoker | `set search_path = ''` | revoke execute from public; no grant | only sets `corrected_by = auth.uid()` and `corrected_at = now()` on the row being updated |
 
@@ -263,7 +266,8 @@ further grant.
 
 Workspace deletion, account deletion and the Stripe webhook are not database functions: they run in
 Next.js route handlers with the service-role client (section 6.2), because they also call Stripe
-and the Storage API.
+and the Storage API. Document deletion runs in a route handler for the same reason, because it
+removes the file through the Storage API; its database part is `delete_document`.
 
 ### 4.2 Tables
 
@@ -362,8 +366,11 @@ Index on `(workspace_id, created_at desc)` and `(workspace_id, sha256)`.
 RLS: select where `is_member(workspace_id)`. Insert only through `rpc create_document` (section
 4.1; checks `is_member`, sets status `uploading` and the storage path). No client update: type
 changes, retries and reopening go through the RPCs in section 4.1, and every other change is made
-by Edge Functions with the service role. No client delete; a document goes with its workspace
-(OQ-20, OQ-30).
+by Edge Functions with the service role. No client delete: a member deletes a document through
+`DELETE /api/documents/[id]` (section 6.2, OQ-20), and every document goes with its workspace
+(OQ-30). The tables that hold its results (`extraction_fields`, `check_results`, `check_ticks`,
+`document_events`, `extractions`) reference `documents` `on delete cascade`, so deleting the row
+deletes them.
 
 **document_events**: the document's history: approvals, reopens, type changes and retries (OQ-12,
 OQ-44).
@@ -608,6 +615,7 @@ All run on the Node.js runtime and are short; none calls Claude.
 | `POST /api/billing/checkout` | browser | session cookie | Server client; checks `is_owner` (OQ-20); creates a Stripe Checkout session in subscription mode for `STRIPE_PRICE_PRO`, with no trial (OQ-24), the workspace id as metadata; returns its URL. |
 | `POST /api/billing/portal` | browser | session cookie | Checks `is_owner`; creates a customer portal session; returns its URL (OQ-37). |
 | `POST /api/stripe/webhook` | Stripe | Stripe signature, no session | Reads the raw body (`request.text()`), verifies it with `stripe.webhooks.constructEvent` and `STRIPE_WEBHOOK_SECRET`; inserts the event id into `stripe_events` with the service-role client (a duplicate is acknowledged and skipped); on `checkout.session.completed` and `customer.subscription.updated` sets the workspace's plan, customer, subscription and period end; on `customer.subscription.deleted`, which Stripe sends at the end of a cancelled period, sets the plan to `free` (OQ-24, OQ-37). |
+| `DELETE /api/documents/[id]` | browser, after the user confirms (PRD US-19.1) | session cookie | Reads the document with the server client, as the caller, so RLS returns it only to a member of its workspace; otherwise 404, and nothing changes. Checks `is_member(workspace_id)`; any member, owner or member, may delete any document of the workspace (OQ-20). With the service-role client: unless `file_deleted_at` is set, removes the object at `storage_path` in `documents` through the Storage API (an object already gone counts as removed); then `rpc delete_document(id)`, which in one transaction locks the row `for update`, calls `release_pages` if the status is `queued`, `waiting_budget` or `processing` (pages held, not yet used, PRD US-19.1 AC-5), and deletes the row, which cascades to its fields, check results, ticks, history and extractions. Pages already counted stay in `page_usage` and `account_page_usage`, which are not keyed by document, so they are not refunded (PRD US-19.1 AC-4); spend already recorded in `ai_spend_periods` and `ai_spend_days` stays too, and `ai_spend_reservations.document_id` and a later document's `duplicate_of` become null. If removing the file fails, it stops before deleting the row and returns 500, so it is safe to run again. Returns 204. |
 | `DELETE /api/workspaces/[id]` | browser | session cookie | Checks `is_owner`. With the service-role client: cancels an active subscription at once in Stripe; removes every object under `{id}/` in `documents` through the Storage API, in batches of 100; then deletes the `workspaces` row, which cascades. If removing files fails, it stops before deleting the row and returns 500, so it is safe to run again (OQ-17, OQ-30). |
 | `DELETE /api/account` | browser | session cookie | Refuses with 409 while the caller is the only owner of a workspace that has other members (OQ-20). Deletes, as above, every workspace where the caller is the only member; then `auth.admin.deleteUser(caller)`, which cascades to `profiles`, memberships and `account_page_usage`, and sets the caller's audit columns elsewhere to null (OQ-30). |
 
@@ -641,7 +649,9 @@ AC-4). `src/lib/supabase/server.ts` throws when `NEXT_PUBLIC_SUPABASE_URL` or
    `currency_guessed`, OQ-16).
 8. In one transaction (`record_extraction`): `settle_spend` with the actual usage, the
    `extractions` row, the `extraction_fields` and `check_results` rows, `doc_type` and
-   `doc_type_source = 'detected'` when it was detected, status `needs_review`.
+   `doc_type_source = 'detected'` when it was detected, status `needs_review`. It locks the
+   document row first; if a member deleted the document during the call (section 6.2), it only
+   settles spend and the message is archived.
 9. `pgmq.archive`.
 
 A document's pages stay reserved from `submit-document` until the extraction succeeds, when they
@@ -731,10 +741,10 @@ The function:
 4. Removes `uploading` rows older than one hour and their objects, and calls
    `release_stale_spend_reservations()` (section 6.4).
 
-Only files are deleted: fields, checks, ticks and history stay until the workspace or account is
-deleted (OQ-14, OQ-30). A document whose file is deleted cannot be retried or change type. The
-`demo` bucket is never touched. The function's run is logged in `cron.job_run_details`, and the
-function returns how many files it removed and how many failed.
+Only files are deleted: fields, checks, ticks and history stay until the document, the workspace
+or the account is deleted (OQ-14, OQ-20, OQ-30). A document whose file is deleted cannot be
+retried or change type. The `demo` bucket is never touched. The function's run is logged in
+`cron.job_run_details`, and the function returns how many files it removed and how many failed.
 
 ## 9. Calling Claude
 
@@ -813,8 +823,8 @@ and zip libraries are chosen and justified in the export milestone.
 |---|---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | browser and server modules | `http://127.0.0.1:54321` (from `supabase status`) | the production project URL; Vercel, Production env |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | browser and server modules | local anon key | the production anon (publishable) key; Vercel |
-| `SUPABASE_SERVICE_ROLE_KEY` | route handlers: Stripe webhook, workspace and account deletion (server only) | local service role key | the production service role key; Vercel, Production env, sensitive (secret) |
-| `STRIPE_SECRET_KEY` | billing, webhook and deletion route handlers (server only) | a test key (`sk_test_…`) or empty, Stripe mocked in tests | a test key (`sk_test_…`); Vercel, sensitive (secret) |
+| `SUPABASE_SERVICE_ROLE_KEY` | route handlers: Stripe webhook, document, workspace and account deletion (server only) | local service role key | the production service role key; Vercel, Production env, sensitive (secret) |
+| `STRIPE_SECRET_KEY` | billing, webhook, workspace and account deletion route handlers (server only) | a test key (`sk_test_…`) or empty, Stripe mocked in tests | a test key (`sk_test_…`); Vercel, sensitive (secret) |
 | `STRIPE_WEBHOOK_SECRET` | webhook route handler (server only) | from `stripe listen` | the test-mode endpoint's signing secret; Vercel, sensitive (secret) |
 | `STRIPE_PRICE_PRO` | checkout route handler (server only) | a test price id | the test-mode Pro price id ($19 a month); Vercel |
 | `SITE_URL` | checkout and portal return URLs (server only) | `http://localhost:<port>` | `https://<project>.vercel.app`; Vercel |
@@ -858,7 +868,7 @@ PRD.md.
 | 4 | Upload, Storage, `submit-document`, page allowances, document list with live status | 1 | 2 | OQ-2, OQ-3, OQ-4, OQ-5, OQ-27, OQ-35, OQ-42, OQ-45 |
 | 5 | Queue, `process-queue`, Claude client with type detection, mock server, spend cap and daily ceiling, waiting for budget, retries (invoice type only) | 1.5 | 4 | OQ-1, OQ-7, OQ-8, OQ-10, OQ-22, OQ-23, OQ-33, OQ-43 |
 | 6 | The other five types: field sets, schemas, tools, checks, duplicate detection, currency rule | 1.5 | 5 | OQ-6, OQ-9, OQ-15, OQ-16, OQ-28, OQ-29, OQ-43 |
-| 7 | Review screen, corrections, check ticks, approval, reopen, type change, history | 1.5 | 6 | OQ-1, OQ-11, OQ-12, OQ-40, OQ-44 |
+| 7 | Review screen, corrections, check ticks, approval, reopen, type change, history, single-document delete | 1.5 | 6 | OQ-1, OQ-11, OQ-12, OQ-20, OQ-40, OQ-44 |
 | 8 | Export CSV (zip) and XLSX | 0.5 | 7 | OQ-13 |
 | 9 | Billing in Stripe test mode, as route handlers | 1 | 2 | OQ-20, OQ-24, OQ-36, OQ-37, OQ-45 |
 | 10 | 7-day purge job and budget display in the UI | 0.5 | 5 | OQ-14, OQ-22, OQ-23, OQ-39 |
@@ -929,7 +939,10 @@ needed. It does not add secrets to CI.
 7. **Review**: the review screen (document viewer through a signed URL, all pages and zoom, fields
    flagged first, corrections, line-item add and delete, live re-check), `check_ticks` and
    `set_check_ticked`, `approve-document`, `reopen_document`, `change_document_type`, the document
-   history, phone layout.
+   history, phone layout; single-document delete (`DELETE /api/documents/[id]`, `delete_document`,
+   the confirmation on the document list and the review screen, none in demo mode), with tests
+   that the row, the object and every result row are gone, that page usage is unchanged, and that a
+   non-member is refused.
 8. **Export**: CSV writer with tests; zip of the two CSV files; XLSX with two sheets; export UI
    choosing a type, then approved documents of that type.
 9. **Billing**: `/api/billing/checkout`, `/api/billing/portal`, `/api/stripe/webhook`,
