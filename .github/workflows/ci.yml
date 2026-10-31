@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    # The repo is public, so CI runs on GitHub's hosted runners. It uses no secrets: every test
+    # runs against the local Supabase stack started below.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm run lint
+
+      - run: npm test
+
+      # The CLI pinned in package.json.
+      - name: Start the local Supabase stack
+        run: npx supabase start
+
+      # Replays every migration and the seed from scratch, so a folder that cannot be replayed
+      # fails here.
+      - run: npx supabase db reset
+
+      # The app, the access tests and the e2e tests read the stack from .env.local. Only a local
+      # stack: a hosted project's URL would send every test to production.
+      - name: Write .env.local from the local stack
+        run: |
+          node --input-type=module -e '
+          import { execFileSync } from "node:child_process"
+          import { writeFileSync } from "node:fs"
+          const status = JSON.parse(execFileSync("npx", ["supabase", "status", "-o", "json"], { encoding: "utf8" }))
+          const local = /^(http|postgresql):\/\/([^@/]+@)?127\.0\.0\.1:\d+(\/postgres)?$/
+          for (const key of ["API_URL", "DB_URL"]) {
+            if (!local.test(status[key] ?? "")) throw new Error(`${key} is not a local stack: ${status[key]}`)
+          }
+          for (const key of ["ANON_KEY", "SERVICE_ROLE_KEY"]) {
+            if (!status[key]) throw new Error(`supabase status gave no ${key}`)
+          }
+          writeFileSync(".env.local", [
+            `NEXT_PUBLIC_SUPABASE_URL=${status.API_URL}`,
+            `NEXT_PUBLIC_SUPABASE_ANON_KEY=${status.ANON_KEY}`,
+            `SUPABASE_SERVICE_ROLE_KEY=${status.SERVICE_ROLE_KEY}`,
+            `SUPABASE_DB_URL=${status.DB_URL}`,
+            "",
+          ].join("\n"))
+          console.log(`.env.local points at ${status.API_URL}`)
+          '
+
+      - run: npm run test:access
+
+      - run: npm run build
+
+      # playwright.config.ts runs every spec in Chromium.
+      - run: npx playwright install --with-deps chromium
+
+      - run: npm run test:e2e
