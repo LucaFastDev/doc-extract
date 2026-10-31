@@ -35,8 +35,8 @@ export interface SubmitDeps {
   reservePages(id: string): Promise<boolean>
   /** get_page_allowance, as the caller. */
   allowance(workspaceId: string): Promise<PageAllowance>
-  /** Sets status rejected with the reason. */
-  reject(id: string, reason: string, file?: { page_count?: number | null; sha256?: string | null }): Promise<void>
+  /** Sets status rejected with the reason, only while the status is one of `from`. */
+  reject(id: string, reason: string, from: readonly string[], file?: { page_count?: number | null; sha256?: string | null }): Promise<void>
   /** Sets status queued. */
   queue(id: string): Promise<void>
   /** Sends {document_id} to the extract queue, through extract_send. */
@@ -74,8 +74,9 @@ export async function submitDocument(body: unknown, deps: SubmitDeps): Promise<S
   }
   if (doc.status !== 'uploading') return refused(`${doc.file_name} has already been submitted.`)
 
+  // A refusal changes only a document still uploading, so a second submit cannot undo the first.
   const reject = async (reason: string, file?: { page_count?: number | null; sha256?: string | null }) => {
-    await deps.reject(doc.id, reason, file)
+    await deps.reject(doc.id, reason, ['uploading'], file)
     return refused(reason)
   }
 
@@ -99,14 +100,15 @@ export async function submitDocument(body: unknown, deps: SubmitDeps): Promise<S
 
   // The status is set first: process-queue skips a message whose document is not queued. If either
   // step fails, the pages go back, and the document is rejected so it is not listed as queued
-  // with no message behind it (Lead ruling on #20). The first error is what the caller sees.
+  // with no message behind it (Lead ruling on #20). The first error is what the caller sees. This
+  // is the one refusal that also changes a queued document.
   try {
     await deps.queue(doc.id)
     await deps.enqueue(doc.id)
   } catch (error) {
     try {
       await deps.releasePages(doc.id)
-      await deps.reject(doc.id, `${doc.file_name} could not be queued for extraction. Upload it again.`)
+      await deps.reject(doc.id, `${doc.file_name} could not be queued for extraction. Upload it again.`, ['uploading', 'queued'])
     } catch (cleanup) {
       console.error('submit-document could not give back the pages of', doc.id, cleanup)
     }

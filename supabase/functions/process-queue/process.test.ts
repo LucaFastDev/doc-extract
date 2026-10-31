@@ -111,7 +111,7 @@ function fake(o: Options = {}): Fake {
     },
     record: async (_id, reservation, result) => {
       f.calls.push('record')
-      expect(reservation).toBe('res-1')
+      expect(reservation).toBe(f.calls.includes('reserveSpend') ? 'res-1' : null)
       f.records.push(result)
       return o.recordResult ?? 'recorded'
     },
@@ -167,6 +167,21 @@ describe('processQueue', () => {
     const stale = fake({ doc: { status: 'processing', processing_started_at: '2026-10-31T11:49:00Z', attempts: 1 } })
     expect((await processQueue(stale)).outcome).toBe('needs_review')
     expect(stale.started).toBe(2)
+  })
+
+  it('fails a document whose run was killed on its last attempt, with no spend reserved and no Claude call', async () => {
+    const deps = fake({ doc: { status: 'processing', processing_started_at: '2026-10-31T11:49:00Z', attempts: 3 } })
+    expect(await processQueue(deps)).toEqual({ outcome: 'failed', document_id: DOC })
+    expect(deps.calls).toEqual(['record', 'archive'])
+    expect(deps.calls).not.toContain('reserveSpend')
+    expect(deps.calls).not.toContain('claude')
+    expect(deps.started).toBeNull()
+    expect(deps.records).toHaveLength(1)
+    expect(deps.records[0]).toMatchObject({
+      status: 'failed',
+      status_reason: 'Extraction failed 3 times. The last time, the run did not finish. Retry later.',
+      cost_usd: 0,
+    })
   })
 
   it('at a cap: waiting_budget naming the limit, the message delayed 600 s, no attempt, no Claude call', async () => {

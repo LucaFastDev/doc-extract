@@ -24,6 +24,8 @@ interface Fake extends SubmitDeps {
   queued: boolean
   recorded: { page_count: number; sha256: string } | null
   enqueued: string | null
+  /** The document's status in the database, which reject changes only from the statuses it is given. */
+  status: string
 }
 
 function fake(overrides: Partial<SubmitDeps> & { file?: Uint8Array | null; doc?: Partial<SubmittedDocument> | null } = {}): Fake {
@@ -59,13 +61,17 @@ function fake(overrides: Partial<SubmitDeps> & { file?: Uint8Array | null; doc?:
       return true
     },
     allowance: async () => ({ workspace_used: 0, workspace_limit: 20, account_used: 0, account_cap: 10 }),
-    reject: async (_id, reason, file) => {
+    status: doc?.status ?? 'uploading',
+    reject: async (_id, reason, from, file) => {
       f.calls.push('reject')
+      if (!from.includes(f.status)) return
+      f.status = 'rejected'
       f.rejected = { reason, ...file }
     },
     queue: async () => {
       f.calls.push('queue')
       f.queued = true
+      f.status = 'queued'
     },
     enqueued: null,
     enqueue: async (id) => {
@@ -225,5 +231,42 @@ describe('submitDocument and the extract queue', () => {
       },
     })
     await expect(submitDocument({ document_id: DOC }, deps)).rejects.toThrow('pgmq unavailable')
+  })
+
+  // Lead ruling on review 1 of #25: only the "could not be queued" path rejects a queued document.
+  it('leaves a document a concurrent submit queued as queued when this submit refuses it', async () => {
+    for (const file of [null, PNG, new TextEncoder().encode('%PDF-1.7\nbroken'), await pdf(11)]) {
+      const deps: Fake = fake({
+        // The other submit passed the uploading check too, and queued the document meanwhile.
+        download: async () => {
+          deps.status = 'queued'
+          return file
+        },
+      })
+      expect((await submitDocument({ document_id: DOC }, deps)).status).toBe(409)
+      expect(deps.calls).toContain('reject')
+      expect(deps.status).toBe('queued')
+      expect(deps.rejected).toBeNull()
+    }
+
+    const overAllowance: Fake = fake({
+      reservePages: async () => {
+        overAllowance.status = 'queued'
+        return false
+      },
+    })
+    expect((await submitDocument({ document_id: DOC }, overAllowance)).status).toBe(409)
+    expect(overAllowance.calls).toContain('reject')
+    expect(overAllowance.status).toBe('queued')
+  })
+
+  it('rejects the queued document when it could not be sent to the queue', async () => {
+    const deps = fake({
+      enqueue: async () => {
+        throw new Error('pgmq unavailable')
+      },
+    })
+    await expect(submitDocument({ document_id: DOC }, deps)).rejects.toThrow('pgmq unavailable')
+    expect(deps.status).toBe('rejected')
   })
 })

@@ -118,6 +118,11 @@ export function waitingReason(refusedBy: 'daily' | 'monthly', now: Date): string
   return `The ${refusedBy} AI spending limit is reached. It resets at 00:00 UTC on ${date}, when processing resumes.`
 }
 
+/** The status_reason of a document that failed on its last attempt (section 6.4). */
+function failedReason(attempts: number, reason: string): string {
+  return `Extraction failed ${attempts} times. The last time, ${reason} Retry later.`
+}
+
 /**
  * Whether this run takes the document: 'go'; 'archive' when it is done, deleted or retried by
  * hand; or, while another run is processing it, the seconds until that run would count as killed.
@@ -146,8 +151,29 @@ export async function processQueue(deps: ProcessDeps): Promise<ProcessOutcome> {
   else if (decision !== 'go') await deps.delay(msg.msg_id, decision)
   if (!doc || decision !== 'go') return { outcome: 'skipped' }
 
-  // Step 2: the spend cap and the daily ceiling. Not a failure, and no attempt (OQ-23).
   const config = await deps.config()
+  const model = deps.modelOverride || config.model
+  const base = { model, prompt_version: PROMPT_VERSION }
+
+  // A run killed on the last attempt is not taken over: the document fails, with no spend
+  // reserved and no Claude call (section 6.4).
+  if (doc.status === 'processing' && doc.attempts >= MAX_ATTEMPTS) {
+    const reason = 'the run did not finish.'
+    await deps.record(doc.id, null, {
+      ...base,
+      outcome: 'retryable_error',
+      error: 'The run did not finish.',
+      input_tokens: null,
+      output_tokens: null,
+      cost_usd: 0,
+      status: 'failed',
+      status_reason: failedReason(doc.attempts, reason),
+    })
+    await deps.archive(msg.msg_id)
+    return { outcome: 'failed', document_id: doc.id }
+  }
+
+  // Step 2: the spend cap and the daily ceiling. Not a failure, and no attempt (OQ-23).
   const { reservation, refused_by } = await deps.reserveSpend(doc.id, estimateCost(config, doc.page_count))
   if (refused_by) {
     await deps.setWaiting(doc.id, waitingReason(refused_by, deps.now()))
@@ -158,8 +184,6 @@ export async function processQueue(deps: ProcessDeps): Promise<ProcessOutcome> {
   // Step 3.
   const attempts = doc.attempts + 1
   await deps.startProcessing(doc.id, attempts)
-  const model = deps.modelOverride || config.model
-  const base = { model, prompt_version: PROMPT_VERSION }
 
   const finish = async (record: ExtractionRecord, final: boolean): Promise<ProcessOutcome> => {
     const stored = await deps.record(doc.id, reservation, record)
@@ -174,7 +198,7 @@ export async function processQueue(deps: ProcessDeps): Promise<ProcessOutcome> {
   const retryOrFail = (record: Omit<ExtractionRecord, 'status' | 'status_reason'>, reason: string) => {
     if (attempts >= MAX_ATTEMPTS) {
       return finish(
-        { ...record, status: 'failed', status_reason: `Extraction failed ${attempts} times. The last time, ${reason} Retry later.` },
+        { ...record, status: 'failed', status_reason: failedReason(attempts, reason) },
         true,
       )
     }

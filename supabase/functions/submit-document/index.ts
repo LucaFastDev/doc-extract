@@ -26,9 +26,9 @@ function deps(authorization: string): SubmitDeps {
   })
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: noSession })
 
-  const update = async (id: string, values: Record<string, unknown>, from = ['uploading']) => {
-    // Only a document still uploading changes here, so a second submit cannot undo the first; a
-    // document that could not be sent to the queue is rejected from queued too.
+  const update = async (id: string, values: Record<string, unknown>, from: readonly string[] = ['uploading']) => {
+    // Only a document still in one of `from` changes here: uploading, so a second submit cannot undo
+    // the first, unless submitDocument says otherwise.
     const { error } = await admin.from('documents').update(values).eq('id', id).in('status', from)
     if (error) throw error
   }
@@ -73,7 +73,7 @@ function deps(authorization: string): SubmitDeps {
       if (error) throw error
       return data as Awaited<ReturnType<SubmitDeps['allowance']>>
     },
-    reject: (id, reason, file) => update(id, { status: 'rejected', status_reason: reason, ...file }, ['uploading', 'queued']),
+    reject: (id, reason, from, file) => update(id, { status: 'rejected', status_reason: reason, ...file }, from),
     queue: (id) => update(id, { status: 'queued', status_reason: null }),
     async enqueue(id) {
       const { error } = await admin.rpc('extract_send', { document_id: id })
