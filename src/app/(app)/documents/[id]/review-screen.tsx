@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FunctionsHttpError } from '@supabase/supabase-js'
@@ -116,15 +116,35 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
   // has finished; moving from one field to another, by click or Tab, keeps them held.
   const [hold] = useState(() => sectionHold(inField, () => setLayout(null)))
   useEffect(() => {
-    const press = () => hold.press()
-    const lift = () => hold.lift()
+    // The field whose label, border or padding a press started on. A press there ends in that field:
+    // if the release leaves no field focused, the field takes the focus, before the hold checks it.
+    let pressed: string | null = null
+    const press = (e: PointerEvent) => {
+      const target = e.target instanceof Element ? e.target : null
+      pressed = e.button === 0 && !target?.closest('input') ? (target?.closest('[data-field]')?.getAttribute('data-field') ?? null) : null
+      hold.press()
+    }
+    const lift = () => {
+      const path = pressed
+      pressed = null
+      if (path !== null) {
+        setTimeout(() => {
+          if (!inField()) document.querySelector<HTMLInputElement>(`[data-field="${CSS.escape(path)}"] input`)?.focus()
+        })
+      }
+      hold.lift()
+    }
+    const cancel = () => {
+      pressed = null
+      hold.lift()
+    }
     window.addEventListener('pointerdown', press, true)
     window.addEventListener('pointerup', lift, true)
-    window.addEventListener('pointercancel', lift, true)
+    window.addEventListener('pointercancel', cancel, true)
     return () => {
       window.removeEventListener('pointerdown', press, true)
       window.removeEventListener('pointerup', lift, true)
-      window.removeEventListener('pointercancel', lift, true)
+      window.removeEventListener('pointercancel', cancel, true)
     }
   }, [hold])
 
@@ -317,15 +337,17 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
             </p>
           ) : (
             <>
-              <Checks
-                checks={review.checks}
-                ticks={ticks}
-                editable={editable}
-                busy={busy}
-                onTick={(id, ticked) => void setTicked(id, ticked)}
-              />
+              <HeldBox held={layout !== null} reorders>
+                <Checks
+                  checks={review.checks}
+                  ticks={ticks}
+                  editable={editable}
+                  busy={busy}
+                  onTick={(id, ticked) => void setTicked(id, ticked)}
+                />
+              </HeldBox>
               {editable && (
-                <div className="flex flex-col gap-2">
+                <HeldBox held={layout !== null} reorders className="flex flex-col gap-2">
                   <Button type="button" className="self-start" disabled={busy || unticked.length > 0} onClick={() => void approve()}>
                     Approve
                   </Button>
@@ -334,12 +356,13 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
                       Tick {listChecks(unticked)} to approve, or correct the fields until {unticked.length === 1 ? 'it passes' : 'they pass'}.
                     </p>
                   )}
-                </div>
+                </HeldBox>
               )}
               <Fields
                 def={def}
                 rows={rows}
                 review={review}
+                held={layout !== null}
                 layout={layout ?? review.flags}
                 revision={revision}
                 editable={editable}
@@ -435,6 +458,7 @@ function Fields({
   def,
   rows,
   review,
+  held,
   layout,
   revision,
   editable,
@@ -447,6 +471,7 @@ function Fields({
   def: DocTypeDef
   rows: ReviewRow[]
   review: Review
+  held: boolean
   layout: Review['flags']
   revision: number
   editable: boolean
@@ -464,6 +489,7 @@ function Fields({
       def={def}
       row={row}
       reasons={flagReasons(row, review.flags[row.path] ?? [], review.checks, rows)}
+      held={held}
       revision={revision}
       editable={editable}
       onEnter={onEnter}
@@ -473,53 +499,85 @@ function Fields({
   return (
     <>
       {groups.flagged.length > 0 && (
-        <Section title="Flagged fields">
-          <div className="grid gap-3">{groups.flagged.map(entry)}</div>
-        </Section>
+        <HeldBox held={held}>
+          <Section title="Flagged fields">
+            <div className="grid gap-3">{groups.flagged.map(entry)}</div>
+          </Section>
+        </HeldBox>
       )}
-      <Section title="Fields">
-        <div className="grid gap-3 sm:grid-cols-2">{groups.fields.map(entry)}</div>
-      </Section>
-      <Section
-        title={def.linesKey === 'transactions' ? 'Transactions' : 'Line items'}
-        action={
-          editable && (
-            <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => onAddLine(groups.lines.length - 1)}>
-              <PlusIcon aria-hidden />
-              Add {word.toLowerCase()}
-            </Button>
-          )
-        }
-      >
-        {groups.lines.length === 0 && <p className="text-sm text-muted-foreground">None.</p>}
-        {groups.lines.map((cells, i) => (
-          <section key={i} aria-label={`${word} ${i + 1}`} className="flex flex-col gap-3 rounded-lg border p-3">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-medium">
-                {word} {i + 1}
-              </h3>
-              {editable && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  disabled={busy}
-                  aria-label={`Delete ${word.toLowerCase()} ${i + 1}`}
-                  onClick={() => onDeleteLine(i)}
-                >
-                  <Trash2Icon aria-hidden />
-                  Delete
-                </Button>
+      <HeldBox held={held}>
+        <Section title="Fields">
+          <div className="grid gap-3 sm:grid-cols-2">{groups.fields.map(entry)}</div>
+        </Section>
+      </HeldBox>
+      <HeldBox held={held}>
+        <Section
+          title={def.linesKey === 'transactions' ? 'Transactions' : 'Line items'}
+          action={
+            editable && (
+              <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => onAddLine(groups.lines.length - 1)}>
+                <PlusIcon aria-hidden />
+                Add {word.toLowerCase()}
+              </Button>
+            )
+          }
+        >
+          {groups.lines.length === 0 && <p className="text-sm text-muted-foreground">None.</p>}
+          {groups.lines.map((cells, i) => (
+            <section key={i} aria-label={`${word} ${i + 1}`} className="flex flex-col gap-3 rounded-lg border p-3">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-medium">
+                  {word} {i + 1}
+                </h3>
+                {editable && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy}
+                    aria-label={`Delete ${word.toLowerCase()} ${i + 1}`}
+                    onClick={() => onDeleteLine(i)}
+                  >
+                    <Trash2Icon aria-hidden />
+                    Delete
+                  </Button>
+                )}
+              </div>
+              {cells.length < def.lineFields.length && (
+                <p className="text-xs text-muted-foreground">Its flagged cells are listed under Flagged fields.</p>
               )}
-            </div>
-            {cells.length < def.lineFields.length && (
-              <p className="text-xs text-muted-foreground">Its flagged cells are listed under Flagged fields.</p>
-            )}
-            <div className="grid gap-3 sm:grid-cols-2">{cells.map(entry)}</div>
-          </section>
-        ))}
-      </Section>
+              <div className="grid gap-3 sm:grid-cols-2">{cells.map(entry)}</div>
+            </section>
+          ))}
+        </Section>
+      </HeldBox>
     </>
+  )
+}
+
+/**
+ * While the section hold is active, the element keeps at least the height it had when the hold
+ * began, and its content updates inside it, so nothing below it moves under a press. Once the hold
+ * releases, the height is freed. `reorders`: its content can move inside it, so the browser's
+ * scroll anchoring must not follow it, or the page scrolls under the pointer instead.
+ */
+function useHeldHeight<T extends HTMLElement>(held: boolean, reorders = false) {
+  const ref = useRef<T>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.minHeight = held ? `${el.getBoundingClientRect().height}px` : ''
+    if (reorders) el.style.overflowAnchor = held ? 'none' : ''
+  }, [held, reorders])
+  return ref
+}
+
+function HeldBox({ held, reorders, className, children }: { held: boolean; reorders?: boolean; className?: string; children: ReactNode }) {
+  const box = useHeldHeight<HTMLDivElement>(held, reorders)
+  return (
+    <div ref={box} className={className}>
+      {children}
+    </div>
   )
 }
 
@@ -528,6 +586,7 @@ function FieldEntry({
   def,
   row,
   reasons,
+  held,
   revision,
   editable,
   onEnter,
@@ -536,12 +595,15 @@ function FieldEntry({
   def: DocTypeDef
   row: ReviewRow
   reasons: string[]
+  held: boolean
   revision: number
   editable: boolean
   onEnter: () => void
   onSave: (row: ReviewRow, typed: string) => void
 }) {
   const id = useId()
+  // A field whose reasons clear keeps its height while the sections are held, so the fields after it stay put.
+  const box = useHeldHeight<HTMLDivElement>(held)
   const input = useRef<HTMLInputElement>(null)
   // Set between a click's focus and its mouseup, which would otherwise undo the selection.
   const clickedIn = useRef(false)
@@ -552,7 +614,7 @@ function FieldEntry({
     if (input.current && input.current !== document.activeElement) input.current.value = value
   }, [value, revision])
   return (
-    <div data-field={row.path} className={cn('flex min-w-0 flex-col gap-1.5 rounded-md border p-3', reasons.length > 0 && 'border-destructive/50')}>
+    <div ref={box} data-field={row.path} className={cn('flex min-w-0 flex-col gap-1.5 rounded-md border p-3', reasons.length > 0 && 'border-destructive/50')}>
       <div className="flex items-baseline justify-between gap-2">
         <Label htmlFor={id} className="[overflow-wrap:anywhere]">
           {label}
