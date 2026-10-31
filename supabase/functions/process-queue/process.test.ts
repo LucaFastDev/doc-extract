@@ -156,10 +156,13 @@ describe('processQueue', () => {
     expect(bad.calls).toEqual(['archive'])
   })
 
-  it('skips a document another run is processing, and takes over one whose run was killed', async () => {
+  it('leaves a document another run is processing until that run would count as killed, then takes it over', async () => {
+    // Started 5 minutes ago: the message comes back when 10 minutes have passed, not archived, so
+    // a run killed mid-call (section 6.4) is still picked up.
     const fresh = fake({ doc: { status: 'processing', processing_started_at: '2026-10-31T11:55:00Z', attempts: 1 } })
     expect((await processQueue(fresh)).outcome).toBe('skipped')
-    expect(fresh.calls).toEqual(['archive'])
+    expect(fresh.calls).toEqual(['delay'])
+    expect(fresh.delayed).toBe(301)
 
     const stale = fake({ doc: { status: 'processing', processing_started_at: '2026-10-31T11:49:00Z', attempts: 1 } })
     expect((await processQueue(stale)).outcome).toBe('needs_review')

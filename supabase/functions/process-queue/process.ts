@@ -118,11 +118,20 @@ export function waitingReason(refusedBy: 'daily' | 'monthly', now: Date): string
   return `The ${refusedBy} AI spending limit is reached. It resets at 00:00 UTC on ${date}, when processing resumes.`
 }
 
-function eligible(doc: QueuedDocument, now: Date): boolean {
-  if (doc.status === 'queued' || doc.status === 'waiting_budget') return true
-  if (doc.status !== 'processing') return false
+/**
+ * Whether this run takes the document: 'go'; 'archive' when it is done, deleted or retried by
+ * hand; or, while another run is processing it, the seconds until that run would count as killed.
+ * The message comes back then rather than being archived: it reappears after its 300 s visibility
+ * timeout, before a killed run is 10 minutes stale, and archiving it would leave the document in
+ * processing for good (section 6.4).
+ */
+function decide(doc: QueuedDocument | null, now: Date): 'go' | 'archive' | number {
+  if (!doc) return 'archive'
+  if (doc.status === 'queued' || doc.status === 'waiting_budget') return 'go'
+  if (doc.status !== 'processing') return 'archive'
   const started = doc.processing_started_at ? Date.parse(doc.processing_started_at) : 0
-  return now.getTime() - started > STALE_MS
+  const elapsed = now.getTime() - started
+  return elapsed > STALE_MS ? 'go' : Math.ceil((STALE_MS - elapsed) / 1000) + 1
 }
 
 export async function processQueue(deps: ProcessDeps): Promise<ProcessOutcome> {
@@ -132,10 +141,10 @@ export async function processQueue(deps: ProcessDeps): Promise<ProcessOutcome> {
   // Step 1: only a document still waiting for this message is processed.
   const id = msg.message?.document_id
   const doc = typeof id === 'string' && UUID.test(id) ? await deps.loadDocument(id) : null
-  if (!doc || !eligible(doc, deps.now())) {
-    await deps.archive(msg.msg_id)
-    return { outcome: 'skipped' }
-  }
+  const decision = decide(doc, deps.now())
+  if (decision === 'archive') await deps.archive(msg.msg_id)
+  else if (decision !== 'go') await deps.delay(msg.msg_id, decision)
+  if (!doc || decision !== 'go') return { outcome: 'skipped' }
 
   // Step 2: the spend cap and the daily ceiling. Not a failure, and no attempt (OQ-23).
   const config = await deps.config()
