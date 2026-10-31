@@ -44,10 +44,9 @@ file_size_limit = "10MiB"
 [auth]
 enabled = true
 enable_signup = true
-# Auth returns users only to /auth/callback on this machine, on whatever port the dev server or a
-# checkout's e2e run uses (playwright.config.ts). Production's URLs are set in the dashboard
-# (docs/go-live.md).
-site_url = "http://127.0.0.1:3000"
+# additional_redirect_urls let Auth return users to /auth/callback on any local port, so the dev
+# server and each checkout's e2e run (playwright.config.ts) work on their own. site_url is left at
+# the default. Production's URLs are set in the dashboard (docs/go-live.md).
 additional_redirect_urls = ["http://localhost:*/auth/callback**", "http://127.0.0.1:*/auth/callback**"]
 
 # The e2e test of the sign-in round trip sends a magic link through the test-only email provider;
