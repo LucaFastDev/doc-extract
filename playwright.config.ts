@@ -1,5 +1,10 @@
 import { createHash } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { defineConfig, devices } from '@playwright/test'
+
+// The specs sign test users in against the local stack (e2e/support/auth.ts), whose URL and keys
+// are in .env.local, or in the environment in CI, which wins over the file.
+if (existsSync('.env.local')) process.loadEnvFile('.env.local')
 
 // One port per checkout, so a worktree, a QA pass and the main checkout never share a dev server
 // (ai-hq docs/03-workers.md, "Tests"). E2E_PORT, when set, wins. Set here, before defineConfig,
