@@ -63,11 +63,27 @@ domain (OQ-27). `<site>` below means that address.
 - [ ] Migrations: production's history matches the repo (`supabase migration list` shows no
       local-only row).
 - [ ] Extensions: dashboard → Database → Extensions shows `pgmq`, `pg_cron` and `pg_net` enabled.
-- [ ] Auth → URL configuration: the site URL is `<site>`, and the redirect URLs allow
-      `<site>/auth/callback` (and nothing on `localhost`).
-- [ ] Auth → Providers → Email is **disabled** (OQ-19, OQ-21). The local `config.toml` enables it
-      for tests only, so it is never pushed to production with `supabase config push`. Pass: the
-      provider shows disabled, and `<site>/sign-in` offers only "Continue with Google".
+- [ ] Auth → URL configuration: the site URL is `<site>`, and the redirect URLs list exactly
+      `<site>/auth/callback**`. The `**` is needed because the app returns to
+      `/auth/callback?next=<path>` (OQ-34); without it Auth drops the redirect and sends users to
+      the site URL. Pass: no entry on `localhost` or `127.0.0.1` (those are only in the local
+      `config.toml`), and signing in from `<site>/documents?x=1` while signed out lands on
+      `<site>/documents?x=1`.
+- [ ] Auth → Providers → Email is **disabled** (OQ-19, OQ-21). The local `config.toml` enables it,
+      with a raised email rate limit, for tests only, so it is never pushed to production with
+      `supabase config push`. Pass: the provider shows disabled; `<site>/sign-in` offers only
+      "Continue with Google" and no email field; and `curl -X POST
+      https://<prod ref>.supabase.co/auth/v1/otp -H "apikey: <anon key>" -H
+      "Content-Type: application/json" -d
+      '{"email":"someone@example.com"}'` is refused (email sign-ins disabled), not answered 200.
+- [ ] Auth → Sign In / Providers → "Allow new users to sign up" is **on**: a first Google sign-in
+      creates the account (OQ-17). Pass: a Google account that has never signed in gets in.
+- [ ] Sign-up trigger: SQL editor, `select tgname, tgenabled from pg_trigger where tgrelid =
+      'auth.users'::regclass and tgname = 'on_auth_user_created'`. Pass: one row, `tgenabled` `O`.
+      Then `select count(*) from auth.users u where not exists (select 1 from public.profiles p
+      where p.id = u.id)` is 0, and so is `select count(*) from public.profiles p where not exists
+      (select 1 from public.workspace_members m where m.user_id = p.id and m.role = 'owner')`:
+      every user has a profile and owns at least their personal workspace.
 - [ ] Auth → no custom SMTP is configured and no captcha is enabled: the app sends no email and has
       no captcha (OQ-19, OQ-33).
 - [ ] Storage: dashboard → Storage shows bucket `documents` (**not public**, file size limit 10 MB,
@@ -92,14 +108,22 @@ Google is the only sign-in method (OQ-19, OQ-21).
 
 - [ ] Google Cloud Console → APIs & Services → Credentials: the OAuth 2.0 client (type Web
       application) lists `https://<prod ref>.supabase.co/auth/v1/callback` as an authorised
-      redirect URI.
+      redirect URI, and `<site>` as an authorised JavaScript origin. Pass: exactly that redirect
+      URI, no `localhost` entry on the production client (local development uses its own client,
+      whose id and secret are in the gitignored `supabase/.env`).
 - [ ] Google Cloud Console → OAuth consent screen: publishing status is **In production** (not
       Testing, which only admits listed test users), the app name and support email are set, the
-      home page is `<site>` and the privacy policy link is `<site>/privacy`.
+      home page is `<site>` and the privacy policy link is `<site>/privacy`. The scopes are only
+      `openid`, `email` and `profile`. Pass: the consent screen shows the app name and asks for
+      nothing beyond name, email and profile picture.
 - [ ] Supabase → Auth → Providers → Google is enabled with that client's id and secret (secret
-      stored only there).
-- [ ] Pass: signing in with a Google account that is not a test user lands signed in on `<site>`,
-      with a personal workspace (OQ-17).
+      stored only there; never in the repo or in Vercel), and "Skip nonce checks" is off. Pass: the
+      client id shown matches the Google Cloud client's.
+- [ ] Pass: in a private window, opening `<site>/documents` goes to `<site>/sign-in?next=%2Fdocuments`;
+      "Continue with Google" with an account that is not a test user returns to
+      `<site>/documents`, signed in, with the workspace switcher showing "Personal", of which the
+      user is owner (OQ-17, OQ-34). "Sign out" ends the session: opening `<site>/documents` again
+      goes back to sign-in.
 
 ## Site address
 
