@@ -1,12 +1,12 @@
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DOC_TYPES, toolsFor } from '@shared/doctypes/index'
-import { buildRequest, PROMPT_VERSION, type ExtractRequest, type MessagesApi } from '../supabase/functions/_shared/claude'
+import { buildRequest, classifyError, PROMPT_VERSION, type ExtractRequest, type MessagesApi } from '../supabase/functions/_shared/claude'
 import { fixture } from '../supabase/functions/_shared/fake-claude'
 import { expectedFile } from './make-documents'
-import { main, toolInput, type EvalResults } from './run'
+import { ANTHROPIC_API, anthropicApi, main, toolInput, type EvalResults } from './run'
 import type { ExpectedResult } from './score'
 import { DOCUMENTS_DIR, EVAL_DOCUMENTS, EXPECTED_DIR } from './values'
 
@@ -229,5 +229,33 @@ describe('npm run eval', () => {
     expect(out).toMatch(/Estimated output tokens\s+[\d,]+/)
     expect(out).toMatch(/Estimated cost at claude-sonnet-5-5 prices\s+USD \d+\.\d{2}/)
     expect(out).toContain('bank-statement-04.pdf')
+  })
+})
+
+describe('anthropicApi', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('posts the request to the Messages API with the key, and throws an error with the status as the SDK does', async () => {
+    const calls: { url: string; init: RequestInit }[] = []
+    const answers = [
+      new Response(JSON.stringify({ content: [], usage: { input_tokens: 1, output_tokens: 1 } }), { status: 200 }),
+      new Response(JSON.stringify({ type: 'error', error: { type: 'rate_limit_error', message: 'slow down' } }), { status: 429 }),
+    ]
+    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+      calls.push({ url, init })
+      return answers.shift()!
+    })
+    const api = anthropicApi('test-key', ANTHROPIC_API)
+    const params = buildRequest({ bytes: new Uint8Array([37, 80, 68, 70]), mimeType: 'application/pdf' }, null, { model: 'claude-sonnet-5-5', maxTokens: 8192 })
+
+    expect(await api.create(params)).toEqual({ content: [], usage: { input_tokens: 1, output_tokens: 1 } })
+    expect(calls[0].url).toBe('https://api.anthropic.com/v1/messages')
+    expect(calls[0].init.method).toBe('POST')
+    expect(calls[0].init.headers).toMatchObject({ 'x-api-key': 'test-key', 'anthropic-version': '2023-06-01' })
+    expect(JSON.parse(calls[0].init.body as string)).toEqual(params)
+
+    const error = await api.create(params).catch((e: unknown) => e)
+    expect(error).toMatchObject({ status: 429, message: '429 slow down' })
+    expect(classifyError(error)).toMatchObject({ kind: 'retryable', status: 429 })
   })
 })

@@ -63,7 +63,8 @@ saying so instead of running the default model. Run the same file without npm in
 
 `--model` defaults to `claude-sonnet-5-5`. Each run writes
 `eval/results/<yyyy-mm-dd>-<model>.json` (UTC date); a second run on the same day with the same
-model replaces it. `ANTHROPIC_BASE_URL` is used if set, `https://api.anthropic.com` otherwise. A
+model replaces it. The runner always calls `https://api.anthropic.com`, whatever
+`ANTHROPIC_BASE_URL` says, so a local functions setting cannot point it at the mock server. A
 Node warning that "Transform Types is an experimental feature" is expected: the runner imports the
 app's own Claude client, which needs it.
 

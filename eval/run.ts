@@ -41,6 +41,9 @@ export const RETRY_DELAYS_MS = [10_000, 30_000]
 
 export const RESULTS_DIR = new URL('./results/', import.meta.url)
 
+/** Where the eval sends its requests: the real Claude API, always (issue #43 criterion 4). */
+export const ANTHROPIC_API = 'https://api.anthropic.com'
+
 interface EvalDocumentFile {
   expected: ExpectedResult
   file: ExtractFile
@@ -322,12 +325,11 @@ export async function main(argv: string[], env: Record<string, string | undefine
     log('ANTHROPIC_API_KEY is not set. Set it to your own Anthropic API key (eval/README.md), or use --dry-run for an estimate.')
     return 1
   }
-  const baseUrl = env.ANTHROPIC_BASE_URL?.trim() || 'https://api.anthropic.com'
-  const client = createClaudeClient(deps.api ?? anthropicApi(apiKey, baseUrl), { model: args.model, maxTokens: SETTINGS.max_tokens })
+  const client = createClaudeClient(deps.api ?? anthropicApi(apiKey, ANTHROPIC_API), { model: args.model, maxTokens: SETTINGS.max_tokens })
   const now = (deps.now ?? (() => new Date()))()
   const today = utcDate(now)
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
-  log(`Running ${docs.length} documents through ${args.model} at ${baseUrl}, one at a time.`)
+  log(`Running ${docs.length} documents through ${args.model}, one at a time.`)
 
   const documents: DocumentResult[] = []
   const misread: MisreadTotal[] = []

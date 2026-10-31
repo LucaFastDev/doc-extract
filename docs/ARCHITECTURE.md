@@ -1032,7 +1032,7 @@ written `'=1+1`. Parsed numbers and full dates are never changed, so `-12.50` st
 | `STRIPE_PRICE_PRO` | checkout route handler (server only) | a test price id | the test-mode Pro price id ($19 a month); Vercel |
 | `SITE_URL` | invitation links `<site>/invite/<token>` (`src/lib/site.ts`), checkout and portal return URLs (server only) | `http://localhost:<port>`; the e2e config gives its dev server its own address | `https://<project>.vercel.app`; Vercel |
 | `ANTHROPIC_API_KEY` | process-queue; the eval runner, from the operator's own shell (`eval/README.md`) | a dummy value | the production key; Supabase function secrets (secret). The eval uses the operator's own key, never this one |
-| `ANTHROPIC_BASE_URL` | process-queue; the eval runner, optional (`https://api.anthropic.com` when unset) | the mock server's URL | `https://api.anthropic.com`; function secrets |
+| `ANTHROPIC_BASE_URL` | process-queue (the eval runner ignores it and always calls the real API) | the mock server's URL | `https://api.anthropic.com`; function secrets |
 | `CLAUDE_MODEL` | process-queue locally: optional, overrides `app_config.model` when set (the eval takes `--model` instead) | unset, or a model to try | never set: `app_config.model` in the database decides |
 | `CRON_SECRET` | process-queue, purge-files (checked) and pg_cron (sent) | any random string | random 32 bytes; function secrets and Supabase Vault (secret) |
 | `app_config.extract_concurrency` (a column, not a variable; Lead ruling 3 on #24) | pg_cron job, read on every run | 1 | 2; set with SQL (go-live) |
