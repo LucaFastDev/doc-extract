@@ -7,6 +7,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@shared': fileURLToPath(new URL('./shared', import.meta.url)),
       // server-only throws on import outside a React Server Components build; tests run in Node.
       'server-only': fileURLToPath(new URL('./tests/server-only-stub.ts', import.meta.url)),
     },
