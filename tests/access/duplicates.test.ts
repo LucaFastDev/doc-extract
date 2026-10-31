@@ -267,6 +267,33 @@ describe('duplicate detection in record_extraction', () => {
     expect(await read(order)).toMatchObject({ duplicate_key: 'purchase_order|examplestudioltd|po7731', duplicate_of: null })
   })
 
+  it('makes two documents of a workspace that record at the same moment see each other', async () => {
+    const { user, ws } = await workspace()
+    const earlier = await processingDocument(user, ws, { name: 'earlier.pdf', sha: 'f1', minutesAgo: 10 })
+    const later = await processingDocument(user, ws, { name: 'later.pdf', sha: 'f2', minutesAgo: 5 })
+    await withDb(async (one) => {
+      await withDb(async (two) => {
+        const pid = (await two.query('select pg_backend_pid() as pid')).rows[0].pid
+        await one.query('begin')
+        await asServiceRole(one)
+        await one.query('select public.record_extraction($1, null, $2)', [earlier, invoice()])
+        // The later document records while the earlier one's transaction is still open.
+        await two.query('begin')
+        await asServiceRole(two)
+        const pending = two.query('select public.record_extraction($1, null, $2)', [later, invoice()])
+        // It waits for the workspace's lock rather than reading past the open transaction. Asked
+        // from a third connection: inside a transaction, pg_stat_activity is a snapshot.
+        const waiting = () =>
+          withDb(async (db) => (await db.query('select wait_event from pg_stat_activity where pid = $1', [pid])).rows[0]?.wait_event)
+        await expect.poll(waiting).toBe('advisory')
+        await one.query('commit')
+        await pending
+        await two.query('commit')
+      })
+    })
+    expect(await read(later)).toMatchObject({ duplicate_of: earlier, u1: { status: 'fail' } })
+  })
+
   it('keeps record_extraction from anon and members', async () => {
     const { user, ws } = await workspace()
     const id = await processingDocument(user, ws, { name: 'x.pdf', sha: 'x', minutesAgo: 1 })

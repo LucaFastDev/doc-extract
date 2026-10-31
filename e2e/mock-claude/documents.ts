@@ -31,4 +31,16 @@ export const MOCK_DOCUMENTS = {
   overloadedOnce: document('Invoice when busy.png', 'overloaded once', ['error-529', 'invoice']),
   /** Rate limited once, then read: 429, then the invoice. */
   rateLimitedOnce: document('Invoice when limited.png', 'rate limited once', ['error-429', 'invoice']),
+  /** A café receipt that prints only "$": its currency is guessed (OQ-16). */
+  receipt: document('Cafe receipt.png', 'receipt', ['receipt']),
+  /** A September bank statement whose balances add up. */
+  bankStatement: document('Bank statement September.png', 'bank statement', ['bank-statement']),
+  /** A purchase order whose checks pass. */
+  purchaseOrder: document('Purchase order PO-7731.png', 'purchase order', ['purchase-order']),
+  /** A delivery note for that order, with no currency. */
+  deliveryNote: document('Delivery note DN-5520.png', 'delivery note', ['delivery-note']),
+  /** A quote in German, in CHF. */
+  quote: document('Angebot Q-2026-118.png', 'quote', ['quote']),
+  /** Another file of the invoice above: its vendor tax id and number printed differently (OQ-9). */
+  duplicateInvoice: document('Invoice INV-1042 rescan.png', 'duplicate invoice', ['invoice-duplicate']),
 } satisfies Record<string, MockDocument>

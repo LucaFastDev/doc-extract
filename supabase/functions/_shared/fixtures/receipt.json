@@ -12,7 +12,7 @@
         "name": "record_receipt",
         "input": {
           "language": { "value": "en", "confidence": 0.99 },
-          "currency": { "value": "USD", "confidence": 0.7 },
+          "currency": { "value": "USD", "confidence": 0.85 },
           "currency_as_printed": { "value": "$", "confidence": 0.95 },
           "merchant_name": { "value": "Lantern Street Café", "confidence": 0.96 },
           "merchant_address": { "value": "12 Lantern Street, Sampleton", "confidence": 0.9 },

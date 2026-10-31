@@ -223,7 +223,7 @@ export function dateCheck(id: string, v: DocumentValues, today: string, dates: D
   const present = readings.filter((r): r is DateReading => r !== null)
   if (present.length === 0) {
     const labels = dates.map((d) => d.label)
-    const what = labels.length === 1 ? `no ${labels[0]} is printed` : `none of ${labels.slice(0, -1).join(', ')} and ${labels.at(-1)} is printed`
+    const what = labels.length === 1 ? `no ${labels[0]} is printed` : `neither ${labels.join(' nor ')} is printed`
     return { check_id: id, status: 'skipped', field_paths, message: `Skipped: ${what}.` }
   }
 
