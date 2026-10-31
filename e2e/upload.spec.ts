@@ -7,6 +7,22 @@ import { expectNoSideScroll } from './support/workspace'
 // OQ-4, OQ-35, OQ-42, OQ-45), at phone width (OQ-40). submit-document runs in the local stack.
 test.use({ viewport: { width: 360, height: 740 } })
 
+// A cold edge runtime loads the function's npm modules on its first request, which can take longer
+// than an assertion waits; one request first, refused for its empty body, starts it.
+test.beforeAll(async () => {
+  test.setTimeout(90_000)
+  const response = await fetch(new URL('/functions/v1/submit-document', process.env.NEXT_PUBLIC_SUPABASE_URL), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: '{}',
+    signal: AbortSignal.timeout(60_000),
+  })
+  expect(response.status).toBe(400)
+})
+
 async function workspaceOf(user: TestUser): Promise<string> {
   const [row] = await sql<{ workspace_id: string }>('select workspace_id from public.workspace_members where user_id = $1', [
     user.id,

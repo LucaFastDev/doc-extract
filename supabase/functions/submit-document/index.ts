@@ -54,7 +54,11 @@ function deps(authorization: string): SubmitDeps {
     },
     async download(path) {
       const { data, error } = await admin.storage.from('documents').download(path)
-      if (error || !data) return null
+      if (error || !data) {
+        // Most often the browser never finished the upload; the log keeps any other cause.
+        console.error('submit-document could not download', path, error)
+        return null
+      }
       return new Uint8Array(await data.arrayBuffer())
     },
     recordFile: (id, file) => update(id, file),
