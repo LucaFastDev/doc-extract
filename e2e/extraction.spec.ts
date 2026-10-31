@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { expect, test, type Page } from '@playwright/test'
 import { MOCK_DOCUMENTS, type MockDocument } from './mock-claude/documents'
 import { mockClaudePort } from './mock-claude/port'
@@ -278,6 +279,58 @@ test('a file Claude cannot read reaches Failed with its reason, and Retry sends 
     await sql('update public.app_config set extract_concurrency = 1')
   }
 })
+
+// The type change (milestone 7, PRD US-1.2 AC-4 and AC-5, OQ-1): a Not supported document is
+// extracted again as the type the user picks, with only that type's tool, and its page counts
+// once that extraction succeeds.
+for (const { name, viewport } of [
+  { name: 'at 360px', viewport: { width: 360, height: 740 } },
+  { name: 'on a desktop', viewport: { width: 1280, height: 900 } },
+]) {
+  test.describe(name, () => {
+    test.use({ viewport })
+
+    test('a Not supported document changes type and reaches Needs review as the chosen type', async ({ page, context, baseURL }) => {
+      const doc = MOCK_DOCUMENTS.receiptAsLetter
+      const { user } = await openDocuments(page, context, baseURL!)
+      await upload(page, doc)
+      await expect(row(page, doc.name)).toContainText('Not supported', PIPELINE)
+      expect(await accountPagesUsed(user)).toBe(0)
+
+      await row(page, doc.name).getByRole('link', { name: doc.name }).click()
+      await page.getByRole('button', { name: 'Change type' }).click()
+      const dialog = page.getByRole('dialog', { name: `Change the type of ${doc.name}` })
+      await dialog.getByRole('radio', { name: 'Receipt' }).click()
+      await dialog.getByRole('button', { name: 'Change type and extract again' }).click()
+
+      await expect(page).toHaveURL(/\/documents$/)
+      await expect(row(page, doc.name).getByRole('cell')).toHaveText([doc.name, 'Receipt', 'Needs review', '1'], PIPELINE)
+      const stored = await documentOf(user, doc.name)
+      expect(stored).toMatchObject({ status: 'needs_review', doc_type: 'receipt', doc_type_source: 'user', pages_reserved: true })
+      expect(await accountPagesUsed(user)).toBe(1)
+      const events = await sql('select kind, actor from public.document_events where document_id = $1 order by created_at', [stored.id])
+      expect(events).toEqual([
+        { kind: 'type_changed', actor: user.id },
+        { kind: 'extracted', actor: null },
+      ])
+
+      // Extracted again with only the receipt's tool, so without type detection.
+      const sha = createHash('sha256').update(doc.buffer).digest('hex')
+      const seen = (await (await fetch(`http://127.0.0.1:${mockClaudePort()}/requests`)).json()) as {
+        sha256: string
+        tools: { name: string; strict: boolean }[]
+        status: number
+      }[]
+      const forced = seen.filter((s) => s.sha256 === sha && s.tools.length === 1)
+      expect(forced.length).toBeGreaterThan(0)
+      for (const s of forced) expect(s).toMatchObject({ tools: [{ name: 'record_receipt', strict: true }], status: 200 })
+
+      await row(page, doc.name).getByRole('link', { name: doc.name }).click()
+      await expect(page.getByRole('region', { name: 'History' })).toContainText('Type changed by')
+      await expect(page.getByLabel('Merchant name', { exact: true })).toHaveValue('Lantern Street Café')
+    })
+  })
+}
 
 test('Retry is not offered once the file is deleted', async ({ page, context, baseURL }) => {
   const user = await createUser()
