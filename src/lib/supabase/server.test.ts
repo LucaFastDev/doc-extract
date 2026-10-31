@@ -35,4 +35,20 @@ describe('src/lib/supabase/server.ts', () => {
     const { createClient } = await import('./server')
     expect((await createClient()).auth).toBeDefined()
   })
+
+  it('throws when the service-role client is asked for while SUPABASE_SERVICE_ROLE_KEY is unset', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', URL)
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', ANON_KEY)
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', '')
+    const { createServiceRoleClient } = await import('./server')
+    expect(() => createServiceRoleClient()).toThrow('SUPABASE_SERVICE_ROLE_KEY is not set')
+  })
+
+  it('builds the service-role client when its key is set', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', URL)
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', ANON_KEY)
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key')
+    const { createServiceRoleClient } = await import('./server')
+    expect(createServiceRoleClient().storage).toBeDefined()
+  })
 })

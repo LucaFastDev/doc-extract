@@ -178,6 +178,33 @@ result (sections 6.1, 6.3, 6.4, 7 and 9).
 - [ ] Pass: a "Failed" document shows its reason and a Retry button; Retry puts it back to
       "Queued" (`select kind from document_events where document_id = '<id>'` shows `retried`).
 
+## Review, approval and delete
+
+Milestone 7: the review screen corrects fields through RLS and the review RPCs, approves through
+the `approve-document` Edge Function, and deletes a document through `DELETE /api/documents/[id]`,
+a Vercel route handler that uses `SUPABASE_SERVICE_ROLE_KEY` (sections 4.1, 5, 6.1 and 6.2).
+
+- [ ] `approve-document` is deployed from the release's commit **with** JWT verification:
+      `supabase functions deploy approve-document --project-ref <prod ref>`. It reads only
+      `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`, which Supabase provides,
+      so it needs no secret of its own. Pass: Dashboard → Edge Functions lists `approve-document`
+      with "Enforce JWT verification" on and the release's deploy time, and `curl -X POST
+      https://<prod ref>.supabase.co/functions/v1/approve-document` with no `Authorization` header
+      is refused with 401.
+- [ ] `SUPABASE_SERVICE_ROLE_KEY` is set in Vercel's Production environment (see Environment and
+      secrets): the delete route now reads it. Pass: deleting a document on `<site>` succeeds;
+      without the key the route answers 500 and Vercel's function log says
+      "SUPABASE_SERVICE_ROLE_KEY is not set".
+- [ ] Pass: signed in on `<site>`, open a document in "Needs review" from the list. Its file is
+      shown (every page of a PDF), and zoom in and out work. Correct a field: the original value
+      stays shown beside it, the checks change without a reload, and the correction is still there
+      after a reload. Tick each failed check, approve, and see "Approved by <you> on <time>";
+      Reopen puts it back to "Needs review", and the History lists the reopen above the approval.
+- [ ] Pass: delete a document from the list after its confirmation. It leaves the list, its review
+      URL says "This document does not exist", Storage → `documents` no longer holds
+      `<workspace>/<document>/original`, and `select pages_used from page_usage` is the same as
+      before (PRD US-19.1 AC-4).
+
 ## Google sign-in
 
 Google is the only sign-in method (OQ-19, OQ-21).

@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useState, type DragEvent } from 'react'
+import Link from 'next/link'
 import { FunctionsHttpError, type RealtimeChannel } from '@supabase/supabase-js'
-import { UploadIcon } from 'lucide-react'
+import { Trash2Icon, UploadIcon } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import {
   allowanceSummary,
@@ -11,6 +12,7 @@ import {
   checkSelection,
   DOC_TYPE_LABELS,
   isListed,
+  isReviewable,
   STATUS_LABELS,
   statusReason,
   systemLiveState,
@@ -19,6 +21,7 @@ import {
 } from '@/lib/documents/upload'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { DeleteDocument } from './delete-document'
 
 export interface DocumentItem {
   id: string
@@ -54,7 +57,8 @@ async function reason(fileName: string, error: unknown): Promise<string> {
 // returns, then submit-document, which counts its pages and queues it. The list follows every
 // change to the workspace's documents through Realtime, which sends only rows the user may read.
 // A Failed, Not supported or Waiting for budget row says why, and a failed one whose file is still
-// there can be retried (US-2.1 AC-6 and AC-7, issue #24).
+// there can be retried (US-2.1 AC-6 and AC-7, issue #24). A document that needs review, is
+// approved or is not supported opens its review screen; any row can be deleted (F5, F19).
 export function DocumentsView({
   workspace,
   initialDocuments,
@@ -327,13 +331,13 @@ export function DocumentsView({
                 <th scope="col" className="px-3 py-2 font-medium">
                   Name
                 </th>
-                <th scope="col" className="w-24 px-3 py-2 font-medium sm:w-36">
+                <th scope="col" className="w-20 px-3 py-2 font-medium sm:w-36">
                   Type
                 </th>
                 <th scope="col" className="w-24 px-3 py-2 font-medium sm:w-36">
                   Status
                 </th>
-                <th scope="col" className="w-14 px-3 py-2 text-right font-medium">
+                <th scope="col" className="w-[4.5rem] py-2 pr-1 pl-2 text-right font-medium">
                   Pages
                 </th>
               </tr>
@@ -344,7 +348,13 @@ export function DocumentsView({
                 return (
                 <tr key={doc.id}>
                   <td className="px-3 py-2 font-medium [overflow-wrap:anywhere]">
-                    {doc.file_name}
+                    {isReviewable(doc.status) ? (
+                      <Link href={`/documents/${doc.id}`} className="underline-offset-4 hover:underline">
+                        {doc.file_name}
+                      </Link>
+                    ) : (
+                      doc.file_name
+                    )}
                     {reason && <p className="mt-1 text-xs font-normal text-muted-foreground">{reason}</p>}
                     {canRetry(doc) && (
                       <Button
@@ -362,7 +372,27 @@ export function DocumentsView({
                   </td>
                   <td className="px-3 py-2">{doc.doc_type ? (DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type) : ''}</td>
                   <td className="px-3 py-2">{STATUS_LABELS[doc.status]}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{doc.page_count ?? ''}</td>
+                  <td className="py-2 pr-1 pl-2">
+                    {/* Icon only, so each cell's text stays what it was: the page count here. */}
+                    <div className="flex items-center justify-end gap-0.5">
+                      <span className="tabular-nums">{doc.page_count ?? ''}</span>
+                      <DeleteDocument
+                        document={doc}
+                        onDeleted={() => remove(doc.id)}
+                        trigger={
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="-my-1.5 size-8 text-muted-foreground"
+                            aria-label={`Delete ${doc.file_name}`}
+                          >
+                            <Trash2Icon aria-hidden />
+                          </Button>
+                        }
+                      />
+                    </div>
+                  </td>
                 </tr>
                 )
               })}
