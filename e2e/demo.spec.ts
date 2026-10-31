@@ -3,6 +3,7 @@ import { expect, test, type Download, type Page } from '@playwright/test'
 import { strFromU8, unzipSync } from 'fflate'
 import { createUser, signIn, sql } from './support/auth'
 import { check, detail, expectNoSideScroll, field } from './support/review'
+import { readXlsx } from './support/xlsx'
 
 // The public demo (milestone 11, PRD F13, OQ-25, OQ-38; issue #41 criteria 5 to 9 and 11), at
 // phone width and on a desktop. The samples' rows come from their migration and their files from
@@ -68,7 +69,7 @@ function csvRows(bytes: Uint8Array): string[][] {
   return rows
 }
 
-const columnOf = (rows: string[][], name: string) => rows.slice(1).map((r) => r[rows[0].indexOf(name)])
+const columnOf = (rows: (string | null)[][], name: string) => rows.slice(1).map((r) => r[rows[0].indexOf(name)])
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -146,6 +147,57 @@ for (const { name, viewport } of VIEWPORTS) {
       await expect(page.getByLabel('Total', { exact: true })).toHaveValue('313.43')
       await expect(check(page, 'A3')).toHaveAttribute('data-status', 'fail')
       await expect(flagged.locator('[data-field="total"]')).toBeVisible()
+      expect(calls).toEqual([])
+    })
+
+    test('a visitor zooms, adds and deletes lines and ticks a check in memory, exports XLSX with the lines as edited, and a reload restores the stored result', async ({
+      page,
+    }) => {
+      const calls = serverCalls(page)
+      await page.goto('/demo/invoice-total-mismatch')
+      await expect(pages(page, 'invoice-total-mismatch.pdf')).toHaveCount(1)
+
+      // Zoom, as on the signed-in review screen.
+      const zoom = page.getByRole('group', { name: 'Zoom' })
+      await zoom.getByRole('button', { name: 'Zoom in' }).click()
+      await expect(zoom.getByLabel('Zoom level')).toHaveText('125%')
+      await zoom.getByRole('button', { name: 'Zoom out' }).click()
+      await zoom.getByRole('button', { name: 'Zoom out' }).click()
+      await expect(zoom.getByLabel('Zoom level')).toHaveText('75%')
+
+      // A tick, an added line and a deleted one, all kept in the browser.
+      const tick = check(page, 'A3').getByRole('checkbox', { name: 'Tick A3' })
+      await tick.click()
+      await expect(tick).toBeChecked()
+      const lines = page.getByRole('region', { name: /^Line \d+$/ })
+      await expect(lines).toHaveCount(3)
+      await page.getByRole('button', { name: 'Add line' }).click()
+      await expect(lines).toHaveCount(4)
+      await page.getByLabel('Line 4 · Description', { exact: true }).fill('Sealing wax, red')
+      await page.getByLabel('Line 4 · Description', { exact: true }).press('Enter')
+      await page.getByRole('button', { name: 'Delete line 1' }).click()
+      await expect(lines).toHaveCount(3)
+      await expect(page.getByLabel('Line 1 · Description', { exact: true })).toHaveValue('Kraft envelopes C5, box of 250')
+      // The added line has no amount, so the browser's re-check skips the sum of the lines.
+      await expect(check(page, 'A2')).toHaveAttribute('data-status', 'skipped')
+      await expect(check(page, 'A2')).toContainText('Skipped: line 3 has no amount.')
+
+      const [xlsx] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download' }).click()])
+      expect(xlsx.suggestedFilename()).toBe(`invoice-export-${today()}.xlsx`)
+      const sheets = readXlsx(await bytesOf(xlsx))
+      const items = sheets['Line items'] as string[][]
+      expect(columnOf(items, 'description')).toEqual(['Kraft envelopes C5, box of 250', 'Fountain pen ink, blue-black, 50 ml', 'Sealing wax, red'])
+      expect(columnOf(items, 'position')).toEqual(['1', '2', '3'])
+      expect(columnOf(sheets.Documents as string[][], 'document_id')).toEqual([await sampleId('invoice-total-mismatch')])
+      expect(columnOf(sheets.Documents as string[][], 'approved_at')).toEqual([null])
+
+      // Nothing was saved.
+      await page.reload()
+      await expect(lines).toHaveCount(3)
+      await expect(page.getByLabel('Line 1 · Description', { exact: true })).toHaveValue('Recycled copy paper A4, 500 sheets')
+      await expect(check(page, 'A3').getByRole('checkbox', { name: 'Tick A3' })).not.toBeChecked()
+      await expect(check(page, 'A2')).toHaveAttribute('data-status', 'pass')
+      await expectNoSideScroll(page)
       expect(calls).toEqual([])
     })
 
