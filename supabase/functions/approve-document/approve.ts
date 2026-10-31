@@ -1,6 +1,6 @@
 import { DOC_TYPES, type DocType } from '../../../shared/doctypes/index.ts'
 import { utcDate } from '../../../shared/doctypes/checks.ts'
-import { currentValue, recheck, type StoredField } from '../../../shared/doctypes/review.ts'
+import { currentValue, listChecks, recheck, type StoredField } from '../../../shared/doctypes/review.ts'
 import type { CheckResult } from '../../../shared/doctypes/fields.ts'
 
 // approve-document's steps (ARCHITECTURE.md section 6.1, PRD US-5.1 AC-5 and AC-6, OQ-11), with
@@ -67,11 +67,6 @@ export function approvalInput(docType: DocType, rows: StoredField[], amountToler
     flags,
     duplicate: { key: duplicate.key, label: duplicate.label, flag_paths: duplicate.flag_paths },
   }
-}
-
-/** "A2", "A2 and U1", "A1, A2 and U1". */
-export function listChecks(ids: string[]): string {
-  return ids.length <= 1 ? (ids[0] ?? '') : `${ids.slice(0, -1).join(', ')} and ${ids[ids.length - 1]}`
 }
 
 /**

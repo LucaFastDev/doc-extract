@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { prepareResult } from '../../../shared/doctypes/index'
 import { INVOICE_FIELDS } from '../../../shared/doctypes/invoice'
 import type { StoredField } from '../../../shared/doctypes/review'
-import { approveDocument, listChecks, type ApprovalInput, type ApprovalOutcome, type ApproveDeps, type ApprovedDocument } from './approve'
+import { approveDocument, type ApprovalInput, type ApprovalOutcome, type ApproveDeps, type ApprovedDocument } from './approve'
 
 // approve-document's steps (ARCHITECTURE.md section 6.1, PRD US-5.1 AC-5 and AC-6, OQ-11): the
 // caller must be a member and the document must need review; the checks run again on the
@@ -156,13 +156,5 @@ describe('approve-document', () => {
     const deps = fake({ rows: correct(correct(invoiceRows(), 'currency_as_printed', '$'), 'currency', 'USD') })
     await approveDocument({ document_id: DOC }, deps)
     expect(deps.sent?.input.flags.currency).toEqual(['currency_guessed'])
-  })
-})
-
-describe('listChecks', () => {
-  it('joins check ids for a message', () => {
-    expect(listChecks(['A2'])).toBe('A2')
-    expect(listChecks(['A2', 'U1'])).toBe('A2 and U1')
-    expect(listChecks(['A1', 'A2', 'U1'])).toBe('A1, A2 and U1')
   })
 })

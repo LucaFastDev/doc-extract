@@ -57,6 +57,11 @@ export function documentValues(def: DocTypeDef, rows: StoredField[]): DocumentVa
   return { fields, line_items: lines }
 }
 
+/** Check ids for a message: "A2", "A2 and U1", "A1, A2 and U1". */
+export function listChecks(ids: string[]): string {
+  return ids.length <= 1 ? (ids[0] ?? '') : `${ids.slice(0, -1).join(', ')} and ${ids[ids.length - 1]}`
+}
+
 export interface RecheckContext {
   /** app_config.amount_tolerance, as a decimal string (OQ-7). */
   amountTolerance: string
