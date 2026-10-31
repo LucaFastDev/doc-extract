@@ -48,6 +48,7 @@ import {
   type Review,
   type ReviewRow,
 } from '@/lib/documents/review'
+import { sectionHold } from '@/lib/documents/section-hold'
 import { DOC_TYPE_LABELS, STATUS_LABELS, type ListedStatus } from '@/lib/documents/upload'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -111,24 +112,43 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
     setTicks(new Set(fresh.ticks))
   }
 
+  // The sections follow the flags again once the focus has really left the fields and every change
+  // has finished; moving from one field to another, by click or Tab, keeps them held.
+  const [hold] = useState(() => sectionHold(inField, () => setLayout(null)))
+  useEffect(() => {
+    const press = () => hold.press()
+    const lift = () => hold.lift()
+    window.addEventListener('pointerdown', press, true)
+    window.addEventListener('pointerup', lift, true)
+    window.addEventListener('pointercancel', lift, true)
+    return () => {
+      window.removeEventListener('pointerdown', press, true)
+      window.removeEventListener('pointerup', lift, true)
+      window.removeEventListener('pointercancel', lift, true)
+    }
+  }, [hold])
+
   // Changes run one at a time, in the order they were made. A field's save on blur does not disable
   // the buttons: the click that blurred the field still lands, and its action runs after the save.
-  // Once every change has finished and the user is not in a field, the sections follow the flags.
   const [queue] = useState(() =>
     changeQueue(() => {
       setBusy(false)
-      if (!inField()) setLayout(null)
+      hold.idle()
     }),
   )
 
   /**
    * Runs one change after those before it; a refusal is shown, the changes waiting behind it are
-   * dropped, and the screen reloads so it shows what is stored. A clicked action disables the
-   * buttons until every change has finished.
+   * dropped, and the screen reloads so it shows what is stored. A dropped change puts the stored
+   * values back too, so a field left after the refusal does not keep an unsaved value. A clicked
+   * action disables the buttons until every change has finished.
    */
   function act(change: () => Promise<string | null>, { fromButton = true } = {}) {
     if (fromButton) setBusy(true)
+    hold.busy()
+    let ran = false
     return queue(async () => {
+      ran = true
       setError(null)
       try {
         const refused = await change()
@@ -143,6 +163,9 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
         setRevision((n) => n + 1)
       }
       return false
+    }).then((stored) => {
+      if (!ran) setRevision((n) => n + 1)
+      return stored
     })
   }
 
