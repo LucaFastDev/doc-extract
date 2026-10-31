@@ -374,7 +374,7 @@ never changes an existing role.
 | pages_period_start | date: the UTC month `reserve_pages` counted the pages against, which `release_pages` gives them back to (Lead ruling 2 on #24) |
 | processing_started_at | timestamptz |
 | duplicate_of | uuid references documents on delete set null: the earliest earlier duplicate (OQ-9) |
-| duplicate_key | text: the type name and the normalised U1 key fields, joined by `\|`, such as `invoice\|de123456789\|inv1042`; null when any key field is empty or the document is not extracted yet (Lead ruling 1 on #27) |
+| duplicate_key | text: the type name and the normalised U1 key fields, joined by `\|`, such as `invoice\|de123456789\|inv1042`; null when any key field is empty or the document is not extracted yet (Lead ruling 1 on #27). Names and numbers are lower cased and lose all whitespace and punctuation; an amount key part is the exact decimal with leading zeros and trailing fractional zeros dropped and the point kept, so 11.80 becomes 11.8 and 1180 stays 1180 (Lead ruling on amount key fields, [issuecomment-6543137847](https://github.com/LucaFastDev/doc-extract/issues/27#issuecomment-6543137847) on #27) |
 | created_at, processed_at, approved_at, file_deleted_at | timestamptz |
 | approved_by | uuid references profiles on delete set null |
 
@@ -687,7 +687,12 @@ AC-4). `src/lib/supabase/server.ts` throws when `NEXT_PUBLIC_SUPABASE_URL` or
    today's UTC date (OQ-6), compute flags (`low_confidence`, `check_failed`, and
    `currency_guessed` on `currency` when `currency_as_printed` is empty or only a symbol in
    `AMBIGUOUS_CURRENCY_SYMBOLS`, never for a delivery note, OQ-16), and the U1 key. U1 as the
-   function builds it passes, or is skipped when a key field is empty (OQ-43). The duplicate
+   function builds it passes, or is skipped when a key field is empty (OQ-43). In the key, names
+   and numbers are lower cased and lose all whitespace and punctuation, and an amount part is the
+   exact decimal with leading zeros and trailing fractional zeros dropped and the point kept
+   (11.80 becomes 11.8, 1180 stays 1180; Lead ruling on amount key fields,
+   [issuecomment-6543137847](https://github.com/LucaFastDev/doc-extract/issues/27#issuecomment-6543137847)
+   on #27). The duplicate
    query runs in `record_extraction` (step 8), in the same transaction: a document is a
    duplicate when an earlier document of the workspace has the same `sha256`, or the same
    `duplicate_key` (which holds the type). Earlier means created earlier, then by id (Lead ruling

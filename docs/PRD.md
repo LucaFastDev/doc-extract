@@ -586,7 +586,11 @@ above).
 
 Decided (**OQ-9**): two documents are duplicates when, within the same workspace, either the
 uploaded files are byte-identical (same SHA-256), or the type's U1 key matches after
-normalisation (case, whitespace and punctuation removed from names and numbers). A duplicate is
+normalisation (case, whitespace and punctuation removed from names and numbers; an amount is
+compared as its exact decimal with leading zeros and trailing fractional zeros dropped and the
+decimal point kept, so 11.80 becomes 11.8 and 1180 stays 1180, Lead ruling
+[issuecomment-6543137847](https://github.com/LucaFastDev/doc-extract/issues/27#issuecomment-6543137847)
+on #27). A duplicate is
 flagged, not refused, and links to the earlier document. There is no time window, and documents
 whose files were deleted still count, because their hash and fields are kept (F14).
 
