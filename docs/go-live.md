@@ -132,6 +132,24 @@ Google is the only sign-in method (OQ-19, OQ-21).
       their page limits while signed out (OQ-27).
 - [ ] `<site>/privacy` and `<site>/terms` load while signed out (OQ-30).
 
+## Invitation links
+
+An owner's invitation is a link `<site>/invite/<token>`, shown once and passed on by hand; the app
+sends no email (OQ-19). The server builds it from `SITE_URL` (section 12), so a wrong value hands
+out links to the wrong place, and an unset one makes creating an invitation fail.
+
+- [ ] Vercel → the doc-extract project → Settings → Environment Variables → Production:
+      `SITE_URL` is exactly `<site>`: `https://`, the production address, no path, and not a
+      preview or per-deployment `*.vercel.app` address, `localhost` or `127.0.0.1`. A changed value
+      takes effect on the next deployment. Pass: the value shown is `<site>`.
+- [ ] Pass: signed in on `<site>` as the owner of a test workspace, open the workspace menu →
+      Members → Invite, enter a Google address you control, and Create link. The link shown starts
+      with `<site>/invite/`. Open it in a private window: it goes to
+      `<site>/sign-in?next=%2Finvite%2F…`; "Continue with Google" as that address returns to the
+      invitation (this relies on the `<site>/auth/callback**` redirect URL above), and "Accept
+      invitation" lands on `<site>/documents` with the test workspace current. Then remove the
+      test member on the Members page.
+
 ## Claude API
 
 - [ ] Anthropic Console → Settings → Limits (for the workspace that holds the production key):

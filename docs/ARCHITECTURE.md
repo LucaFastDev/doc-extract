@@ -335,10 +335,13 @@ accept_invite(token)`, `rpc remove_member(ws, user)` and `rpc set_member_role(ws
 | expires_at | timestamptz not null (created_at + 7 days, OQ-18) |
 | accepted_at, revoked_at | timestamptz |
 
-RLS: select and update of `revoked_at` where `is_owner(workspace_id)`. Inserted only by `rpc
-create_invite` (section 4.1). The token is never stored; the owner copies the link
-`<site>/invite/<token>` once, when it is created (OQ-19). `accept_invite` matches `token_hash`, the
-caller's verified email (`auth.jwt() ->> 'email'`), not expired, not accepted, not revoked.
+RLS: select and update of `revoked_at` where `is_owner(workspace_id)`; the update applies only to
+a pending invitation (not accepted, not revoked) and must set `revoked_at`, so a revoked or accepted
+one cannot be brought back. Inserted only by `rpc create_invite` (section 4.1). The token is never
+stored; the owner copies the link `<site>/invite/<token>` once, when it is created (OQ-19).
+`accept_invite` matches `token_hash`, the caller's verified email (`auth.jwt() ->> 'email'`), not
+expired, not accepted, not revoked, and refuses a caller who is already a member, so an invitation
+never changes an existing role.
 
 **documents**
 
@@ -839,7 +842,7 @@ and zip libraries are chosen and justified in the export milestone.
 | `STRIPE_SECRET_KEY` | billing, webhook, workspace and account deletion route handlers (server only) | a test key (`sk_test_…`) or empty, Stripe mocked in tests | a test key (`sk_test_…`); Vercel, sensitive (secret) |
 | `STRIPE_WEBHOOK_SECRET` | webhook route handler (server only) | from `stripe listen` | the test-mode endpoint's signing secret; Vercel, sensitive (secret) |
 | `STRIPE_PRICE_PRO` | checkout route handler (server only) | a test price id | the test-mode Pro price id ($19 a month); Vercel |
-| `SITE_URL` | checkout and portal return URLs (server only) | `http://localhost:<port>` | `https://<project>.vercel.app`; Vercel |
+| `SITE_URL` | invitation links `<site>/invite/<token>` (`src/lib/site.ts`), checkout and portal return URLs (server only) | `http://localhost:<port>`; the e2e config gives its dev server its own address | `https://<project>.vercel.app`; Vercel |
 | `ANTHROPIC_API_KEY` | process-queue | a dummy value | the production key; Supabase function secrets (secret) |
 | `ANTHROPIC_BASE_URL` | process-queue | the mock server's URL | `https://api.anthropic.com`; function secrets |
 | `CLAUDE_MODEL` | process-queue locally, eval | `claude-sonnet-5-5` | `app_config.model` in the database |
