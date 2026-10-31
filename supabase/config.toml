@@ -74,6 +74,11 @@ skip_nonce_check = false
 enabled = true
 inspector_port = 12083
 
+# pg_cron calls process-queue with CRON_SECRET, not a user's JWT; the function checks the secret
+# itself (ARCHITECTURE.md section 6.1). Production deploys it with --no-verify-jwt (docs/go-live.md).
+[functions.process-queue]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 58327

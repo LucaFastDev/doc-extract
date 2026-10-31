@@ -6,3 +6,8 @@ export function requireEnv(name: string): string {
   if (!value) throw new Error(`${name} is not set`)
   return value
 }
+
+/** A setting that may be left unset, such as CLAUDE_MODEL (Lead ruling 4 on #24); null when it is. */
+export function optionalEnv(name: string): string | null {
+  return Deno.env.get(name) || null
+}

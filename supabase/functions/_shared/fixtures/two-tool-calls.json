@@ -1,0 +1,16 @@
+{
+  "status": 200,
+  "body": {
+    "id": "msg_fixture_two_tool_calls",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-5-5",
+    "content": [
+      { "type": "tool_use", "id": "toolu_fixture_a", "name": "record_not_supported", "input": { "reason": "Unclear." } },
+      { "type": "tool_use", "id": "toolu_fixture_b", "name": "record_not_supported", "input": { "reason": "Unclear." } }
+    ],
+    "stop_reason": "tool_use",
+    "stop_sequence": null,
+    "usage": { "input_tokens": 2400, "output_tokens": 50 }
+  }
+}

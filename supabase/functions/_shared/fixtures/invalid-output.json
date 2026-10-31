@@ -1,0 +1,23 @@
+{
+  "status": 200,
+  "body": {
+    "id": "msg_fixture_invalid_output",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-5-5",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_fixture_invalid_output",
+        "name": "record_invoice",
+        "input": {
+          "vendor_name": { "value": "Northwind", "confidence": 0.9 },
+          "total": { "value": 1440, "confidence": 0.9 }
+        }
+      }
+    ],
+    "stop_reason": "tool_use",
+    "stop_sequence": null,
+    "usage": { "input_tokens": 2400, "output_tokens": 60 }
+  }
+}
