@@ -1,8 +1,8 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
-// Unit tests. The access tests, which need the local stack, have their own config
-// (vitest.access.config.ts); the Playwright specs are in e2e/.
+// Unit tests, including the Edge Functions' pure modules. The access tests, which need the local
+// stack, have their own config (vitest.access.config.ts); the Playwright specs are in e2e/.
 export default defineConfig({
   resolve: {
     alias: {
@@ -12,7 +12,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['src/**/*.test.{ts,tsx}', 'shared/**/*.test.ts'],
+    include: ['src/**/*.test.{ts,tsx}', 'shared/**/*.test.ts', 'supabase/functions/**/*.test.ts'],
     environment: 'node',
   },
 })
