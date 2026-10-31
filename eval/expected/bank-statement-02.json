@@ -1,0 +1,321 @@
+{
+  "document": "bank-statement-02.pdf",
+  "doc_type": "bank_statement",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "en"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "GBP"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "GBP"
+    },
+    {
+      "path": "bank_name",
+      "kind": "text",
+      "value": "Kingsmere Building Society"
+    },
+    {
+      "path": "account_holder",
+      "kind": "text",
+      "value": "Larkspur Dental Practice"
+    },
+    {
+      "path": "account_number_last4",
+      "kind": "text",
+      "value": "0719"
+    },
+    {
+      "path": "iban_last4",
+      "kind": "text",
+      "value": "0719"
+    },
+    {
+      "path": "statement_period_start",
+      "kind": "date",
+      "value": "2026-09-01"
+    },
+    {
+      "path": "statement_period_end",
+      "kind": "date",
+      "value": "2026-09-30"
+    },
+    {
+      "path": "opening_balance",
+      "kind": "amount",
+      "value": "8412.07"
+    },
+    {
+      "path": "closing_balance",
+      "kind": "amount",
+      "value": "8925.56"
+    },
+    {
+      "path": "total_credits",
+      "kind": "amount",
+      "value": "7665.87"
+    },
+    {
+      "path": "total_debits",
+      "kind": "amount",
+      "value": "7152.38"
+    },
+    {
+      "path": "line_items[0].date",
+      "kind": "date",
+      "value": "2026-09-01"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Patient payments, card"
+    },
+    {
+      "path": "line_items[0].reference",
+      "kind": "text",
+      "value": "BATCH 0901"
+    },
+    {
+      "path": "line_items[0].amount",
+      "kind": "amount",
+      "value": "1840.00"
+    },
+    {
+      "path": "line_items[0].balance",
+      "kind": "amount",
+      "value": "10252.07"
+    },
+    {
+      "path": "line_items[1].date",
+      "kind": "date",
+      "value": "2026-09-02"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Dental supplies, Pearlwhite Ltd"
+    },
+    {
+      "path": "line_items[1].reference",
+      "kind": "text",
+      "value": "PW-55120"
+    },
+    {
+      "path": "line_items[1].amount",
+      "kind": "amount",
+      "value": "-612.48"
+    },
+    {
+      "path": "line_items[1].balance",
+      "kind": "amount",
+      "value": "9639.59"
+    },
+    {
+      "path": "line_items[2].date",
+      "kind": "date",
+      "value": "2026-09-05"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "Rent, Primrose Parade"
+    },
+    {
+      "path": "line_items[2].reference",
+      "kind": "text",
+      "value": "SO RENT"
+    },
+    {
+      "path": "line_items[2].amount",
+      "kind": "amount",
+      "value": "-1500.00"
+    },
+    {
+      "path": "line_items[2].balance",
+      "kind": "amount",
+      "value": "8139.59"
+    },
+    {
+      "path": "line_items[3].date",
+      "kind": "date",
+      "value": "2026-09-08"
+    },
+    {
+      "path": "line_items[3].description",
+      "kind": "text",
+      "value": "Patient payments, card"
+    },
+    {
+      "path": "line_items[3].reference",
+      "kind": "text",
+      "value": "BATCH 0908"
+    },
+    {
+      "path": "line_items[3].amount",
+      "kind": "amount",
+      "value": "2215.50"
+    },
+    {
+      "path": "line_items[3].balance",
+      "kind": "amount",
+      "value": "10355.09"
+    },
+    {
+      "path": "line_items[4].date",
+      "kind": "date",
+      "value": "2026-09-12"
+    },
+    {
+      "path": "line_items[4].description",
+      "kind": "text",
+      "value": "Lab work, Ivorycrest Lab"
+    },
+    {
+      "path": "line_items[4].reference",
+      "kind": "text",
+      "value": "ICL-2209"
+    },
+    {
+      "path": "line_items[4].amount",
+      "kind": "amount",
+      "value": "-845.00"
+    },
+    {
+      "path": "line_items[4].balance",
+      "kind": "amount",
+      "value": "9510.09"
+    },
+    {
+      "path": "line_items[5].date",
+      "kind": "date",
+      "value": "2026-09-15"
+    },
+    {
+      "path": "line_items[5].description",
+      "kind": "text",
+      "value": "Salaries"
+    },
+    {
+      "path": "line_items[5].reference",
+      "kind": "text",
+      "value": "BACS SAL"
+    },
+    {
+      "path": "line_items[5].amount",
+      "kind": "amount",
+      "value": "-4120.00"
+    },
+    {
+      "path": "line_items[5].balance",
+      "kind": "amount",
+      "value": "5390.09"
+    },
+    {
+      "path": "line_items[6].date",
+      "kind": "date",
+      "value": "2026-09-19"
+    },
+    {
+      "path": "line_items[6].description",
+      "kind": "text",
+      "value": "Patient payments, card"
+    },
+    {
+      "path": "line_items[6].reference",
+      "kind": "text",
+      "value": "BATCH 0919"
+    },
+    {
+      "path": "line_items[6].amount",
+      "kind": "amount",
+      "value": "1977.25"
+    },
+    {
+      "path": "line_items[6].balance",
+      "kind": "amount",
+      "value": "7367.34"
+    },
+    {
+      "path": "line_items[7].date",
+      "kind": "date",
+      "value": "2026-09-22"
+    },
+    {
+      "path": "line_items[7].description",
+      "kind": "text",
+      "value": "Waste collection, Medisweep"
+    },
+    {
+      "path": "line_items[7].reference",
+      "kind": "text",
+      "value": "DD MSW"
+    },
+    {
+      "path": "line_items[7].amount",
+      "kind": "amount",
+      "value": "-74.90"
+    },
+    {
+      "path": "line_items[7].balance",
+      "kind": "amount",
+      "value": "7292.44"
+    },
+    {
+      "path": "line_items[8].date",
+      "kind": "date",
+      "value": "2026-09-26"
+    },
+    {
+      "path": "line_items[8].description",
+      "kind": "text",
+      "value": "Patient payments, card"
+    },
+    {
+      "path": "line_items[8].reference",
+      "kind": "text",
+      "value": "BATCH 0926"
+    },
+    {
+      "path": "line_items[8].amount",
+      "kind": "amount",
+      "value": "1630.00"
+    },
+    {
+      "path": "line_items[8].balance",
+      "kind": "amount",
+      "value": "8922.44"
+    },
+    {
+      "path": "line_items[9].date",
+      "kind": "date",
+      "value": "2026-09-30"
+    },
+    {
+      "path": "line_items[9].description",
+      "kind": "text",
+      "value": "Interest"
+    },
+    {
+      "path": "line_items[9].reference",
+      "kind": "text",
+      "value": "INT"
+    },
+    {
+      "path": "line_items[9].amount",
+      "kind": "amount",
+      "value": "3.12"
+    },
+    {
+      "path": "line_items[9].balance",
+      "kind": "amount",
+      "value": "8925.56"
+    }
+  ]
+}

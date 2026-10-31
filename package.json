@@ -18,7 +18,9 @@
     "functions:env": "node e2e/mock-claude/functions-env.ts",
     "mock-claude": "node e2e/mock-claude/server.ts",
     "demo:samples": "node demo/make-samples.ts",
-    "demo:upload": "node demo/upload-local.ts"
+    "demo:upload": "node demo/upload-local.ts",
+    "eval": "node eval/run.ts",
+    "eval:documents": "node eval/make-documents.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

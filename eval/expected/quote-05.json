@@ -1,0 +1,171 @@
+{
+  "document": "quote-05.pdf",
+  "doc_type": "quote",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "en"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "GBP"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "£"
+    },
+    {
+      "path": "supplier_name",
+      "kind": "text",
+      "value": "Seabright Joinery"
+    },
+    {
+      "path": "supplier_address",
+      "kind": "text",
+      "value": "7 Driftwood Yard, Shingleton SH4 2WE, Examplia"
+    },
+    {
+      "path": "customer_name",
+      "kind": "text",
+      "value": "Larkspur Dental Practice"
+    },
+    {
+      "path": "customer_address",
+      "kind": "text",
+      "value": "12 Primrose Parade, Kingsmere KM1 6QD, Examplia"
+    },
+    {
+      "path": "quote_number",
+      "kind": "text",
+      "value": "SJ-0412"
+    },
+    {
+      "path": "payment_terms",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "quote_date",
+      "kind": "date",
+      "value": "2026-10-22"
+    },
+    {
+      "path": "valid_until",
+      "kind": "date",
+      "value": "2026-11-21"
+    },
+    {
+      "path": "subtotal",
+      "kind": "amount",
+      "value": "2546.00"
+    },
+    {
+      "path": "discount_total",
+      "kind": "amount",
+      "value": "0.00"
+    },
+    {
+      "path": "tax_total",
+      "kind": "amount",
+      "value": "509.20"
+    },
+    {
+      "path": "total",
+      "kind": "amount",
+      "value": "3055.20"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Reception desk, oak veneer"
+    },
+    {
+      "path": "line_items[0].item_code",
+      "kind": "text",
+      "value": "SJ-RD-1"
+    },
+    {
+      "path": "line_items[0].quantity",
+      "kind": "number",
+      "value": "1"
+    },
+    {
+      "path": "line_items[0].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[0].unit_price",
+      "kind": "amount",
+      "value": "1450.00"
+    },
+    {
+      "path": "line_items[0].amount",
+      "kind": "amount",
+      "value": "1450.00"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Wall shelving, 4 bays"
+    },
+    {
+      "path": "line_items[1].item_code",
+      "kind": "text",
+      "value": "SJ-SH-4"
+    },
+    {
+      "path": "line_items[1].quantity",
+      "kind": "number",
+      "value": "2"
+    },
+    {
+      "path": "line_items[1].unit",
+      "kind": "text",
+      "value": "set"
+    },
+    {
+      "path": "line_items[1].unit_price",
+      "kind": "amount",
+      "value": "380.00"
+    },
+    {
+      "path": "line_items[1].amount",
+      "kind": "amount",
+      "value": "760.00"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "Fitting"
+    },
+    {
+      "path": "line_items[2].item_code",
+      "kind": "text",
+      "value": "SJ-FT-0"
+    },
+    {
+      "path": "line_items[2].quantity",
+      "kind": "number",
+      "value": "8"
+    },
+    {
+      "path": "line_items[2].unit",
+      "kind": "text",
+      "value": "h"
+    },
+    {
+      "path": "line_items[2].unit_price",
+      "kind": "amount",
+      "value": "42.00"
+    },
+    {
+      "path": "line_items[2].amount",
+      "kind": "amount",
+      "value": "336.00"
+    }
+  ]
+}

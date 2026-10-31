@@ -1,0 +1,251 @@
+{
+  "document": "invoice-05.pdf",
+  "doc_type": "invoice",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "en"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "GBP"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "£"
+    },
+    {
+      "path": "vendor_name",
+      "kind": "text",
+      "value": "Pennywhistle Web Studio Ltd"
+    },
+    {
+      "path": "vendor_address",
+      "kind": "text",
+      "value": "5 Lantern Court, Mistlecombe MC9 4XE, Examplia"
+    },
+    {
+      "path": "vendor_tax_id",
+      "kind": "text",
+      "value": "EX912447108"
+    },
+    {
+      "path": "customer_name",
+      "kind": "text",
+      "value": "Old Ferry Guesthouse"
+    },
+    {
+      "path": "customer_address",
+      "kind": "text",
+      "value": "The Slipway, Gullhaven GH2 1PJ, Examplia"
+    },
+    {
+      "path": "customer_tax_id",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "invoice_number",
+      "kind": "text",
+      "value": "PWS-1093"
+    },
+    {
+      "path": "purchase_order_number",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "payment_terms",
+      "kind": "text",
+      "value": "Due on receipt"
+    },
+    {
+      "path": "invoice_date",
+      "kind": "date",
+      "value": "2026-10-12"
+    },
+    {
+      "path": "due_date",
+      "kind": "date",
+      "value": null
+    },
+    {
+      "path": "subtotal",
+      "kind": "amount",
+      "value": "1566.00"
+    },
+    {
+      "path": "tax_total",
+      "kind": "amount",
+      "value": "313.20"
+    },
+    {
+      "path": "shipping",
+      "kind": "amount",
+      "value": "0.00"
+    },
+    {
+      "path": "discount_total",
+      "kind": "amount",
+      "value": "0.00"
+    },
+    {
+      "path": "total",
+      "kind": "amount",
+      "value": "1879.20"
+    },
+    {
+      "path": "amount_paid",
+      "kind": "amount",
+      "value": "150.00"
+    },
+    {
+      "path": "amount_due",
+      "kind": "amount",
+      "value": "1729.20"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Website redesign, development"
+    },
+    {
+      "path": "line_items[0].item_code",
+      "kind": "text",
+      "value": "DEV"
+    },
+    {
+      "path": "line_items[0].quantity",
+      "kind": "number",
+      "value": "18"
+    },
+    {
+      "path": "line_items[0].unit",
+      "kind": "text",
+      "value": "h"
+    },
+    {
+      "path": "line_items[0].unit_price",
+      "kind": "amount",
+      "value": "55.00"
+    },
+    {
+      "path": "line_items[0].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[0].amount",
+      "kind": "amount",
+      "value": "990.00"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Design workshop"
+    },
+    {
+      "path": "line_items[1].item_code",
+      "kind": "text",
+      "value": "DES"
+    },
+    {
+      "path": "line_items[1].quantity",
+      "kind": "number",
+      "value": "6"
+    },
+    {
+      "path": "line_items[1].unit",
+      "kind": "text",
+      "value": "h"
+    },
+    {
+      "path": "line_items[1].unit_price",
+      "kind": "amount",
+      "value": "60.00"
+    },
+    {
+      "path": "line_items[1].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[1].amount",
+      "kind": "amount",
+      "value": "360.00"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "Hosting, 12 months"
+    },
+    {
+      "path": "line_items[2].item_code",
+      "kind": "text",
+      "value": "HOST"
+    },
+    {
+      "path": "line_items[2].quantity",
+      "kind": "number",
+      "value": "1"
+    },
+    {
+      "path": "line_items[2].unit",
+      "kind": "text",
+      "value": "yr"
+    },
+    {
+      "path": "line_items[2].unit_price",
+      "kind": "amount",
+      "value": "96.00"
+    },
+    {
+      "path": "line_items[2].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[2].amount",
+      "kind": "amount",
+      "value": "96.00"
+    },
+    {
+      "path": "line_items[3].description",
+      "kind": "text",
+      "value": "Search listing set-up"
+    },
+    {
+      "path": "line_items[3].item_code",
+      "kind": "text",
+      "value": "SEO"
+    },
+    {
+      "path": "line_items[3].quantity",
+      "kind": "number",
+      "value": "1"
+    },
+    {
+      "path": "line_items[3].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[3].unit_price",
+      "kind": "amount",
+      "value": "120.00"
+    },
+    {
+      "path": "line_items[3].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[3].amount",
+      "kind": "amount",
+      "value": "120.00"
+    }
+  ]
+}

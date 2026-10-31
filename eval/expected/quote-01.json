@@ -1,0 +1,201 @@
+{
+  "document": "quote-01.pdf",
+  "doc_type": "quote",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "en"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "supplier_name",
+      "kind": "text",
+      "value": "Brightfern Event Hire"
+    },
+    {
+      "path": "supplier_address",
+      "kind": "text",
+      "value": "14 Marquee Lane, Pennacombe PC2 5TT, Examplia"
+    },
+    {
+      "path": "customer_name",
+      "kind": "text",
+      "value": "Marrowfield Garden Centre Ltd"
+    },
+    {
+      "path": "customer_address",
+      "kind": "text",
+      "value": "1 Seedling Way, Furrowby FB8 3AA, Examplia"
+    },
+    {
+      "path": "quote_number",
+      "kind": "text",
+      "value": "BEH-Q-0619"
+    },
+    {
+      "path": "payment_terms",
+      "kind": "text",
+      "value": "30% deposit on booking"
+    },
+    {
+      "path": "quote_date",
+      "kind": "date",
+      "value": "2026-10-02"
+    },
+    {
+      "path": "valid_until",
+      "kind": "date",
+      "value": "2026-11-01"
+    },
+    {
+      "path": "subtotal",
+      "kind": "amount",
+      "value": "1046.00"
+    },
+    {
+      "path": "discount_total",
+      "kind": "amount",
+      "value": "0.00"
+    },
+    {
+      "path": "tax_total",
+      "kind": "amount",
+      "value": "198.74"
+    },
+    {
+      "path": "total",
+      "kind": "amount",
+      "value": "1244.74"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Marquee, 6 x 12 m"
+    },
+    {
+      "path": "line_items[0].item_code",
+      "kind": "text",
+      "value": "BEH-MQ-6"
+    },
+    {
+      "path": "line_items[0].quantity",
+      "kind": "number",
+      "value": "1"
+    },
+    {
+      "path": "line_items[0].unit",
+      "kind": "text",
+      "value": "day"
+    },
+    {
+      "path": "line_items[0].unit_price",
+      "kind": "amount",
+      "value": "640.00"
+    },
+    {
+      "path": "line_items[0].amount",
+      "kind": "amount",
+      "value": "640.00"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Trestle table, 1.8 m"
+    },
+    {
+      "path": "line_items[1].item_code",
+      "kind": "text",
+      "value": "BEH-TB-18"
+    },
+    {
+      "path": "line_items[1].quantity",
+      "kind": "number",
+      "value": "20"
+    },
+    {
+      "path": "line_items[1].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[1].unit_price",
+      "kind": "amount",
+      "value": "7.50"
+    },
+    {
+      "path": "line_items[1].amount",
+      "kind": "amount",
+      "value": "150.00"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "Folding chair"
+    },
+    {
+      "path": "line_items[2].item_code",
+      "kind": "text",
+      "value": "BEH-CH-F"
+    },
+    {
+      "path": "line_items[2].quantity",
+      "kind": "number",
+      "value": "120"
+    },
+    {
+      "path": "line_items[2].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[2].unit_price",
+      "kind": "amount",
+      "value": "1.40"
+    },
+    {
+      "path": "line_items[2].amount",
+      "kind": "amount",
+      "value": "168.00"
+    },
+    {
+      "path": "line_items[3].description",
+      "kind": "text",
+      "value": "String lights, 20 m"
+    },
+    {
+      "path": "line_items[3].item_code",
+      "kind": "text",
+      "value": "BEH-LT-S"
+    },
+    {
+      "path": "line_items[3].quantity",
+      "kind": "number",
+      "value": "4"
+    },
+    {
+      "path": "line_items[3].unit",
+      "kind": "text",
+      "value": "set"
+    },
+    {
+      "path": "line_items[3].unit_price",
+      "kind": "amount",
+      "value": "22.00"
+    },
+    {
+      "path": "line_items[3].amount",
+      "kind": "amount",
+      "value": "88.00"
+    }
+  ]
+}

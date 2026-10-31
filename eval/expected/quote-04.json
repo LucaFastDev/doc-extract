@@ -1,0 +1,171 @@
+{
+  "document": "quote-04.pdf",
+  "doc_type": "quote",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "de"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "CHF"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "CHF"
+    },
+    {
+      "path": "supplier_name",
+      "kind": "text",
+      "value": "Holzwerk Tannenhang GmbH"
+    },
+    {
+      "path": "supplier_address",
+      "kind": "text",
+      "value": "Sägereiweg 6, 7777 Harzbach, Examplien"
+    },
+    {
+      "path": "customer_name",
+      "kind": "text",
+      "value": "Alpenblick Hotel AG"
+    },
+    {
+      "path": "customer_address",
+      "kind": "text",
+      "value": "Gipfelweg 2, 3999 Wolkenried, Examplien"
+    },
+    {
+      "path": "quote_number",
+      "kind": "text",
+      "value": "OF-26-0145"
+    },
+    {
+      "path": "payment_terms",
+      "kind": "text",
+      "value": "50 % Anzahlung, Rest nach Montage"
+    },
+    {
+      "path": "quote_date",
+      "kind": "date",
+      "value": "2026-10-19"
+    },
+    {
+      "path": "valid_until",
+      "kind": "date",
+      "value": "2026-11-18"
+    },
+    {
+      "path": "subtotal",
+      "kind": "amount",
+      "value": "12214.00"
+    },
+    {
+      "path": "discount_total",
+      "kind": "amount",
+      "value": "300.00"
+    },
+    {
+      "path": "tax_total",
+      "kind": "amount",
+      "value": "965.03"
+    },
+    {
+      "path": "total",
+      "kind": "amount",
+      "value": "12879.03"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Terrassenboden Lärche, verlegt"
+    },
+    {
+      "path": "line_items[0].item_code",
+      "kind": "text",
+      "value": "HT-TF-01"
+    },
+    {
+      "path": "line_items[0].quantity",
+      "kind": "number",
+      "value": "64"
+    },
+    {
+      "path": "line_items[0].unit",
+      "kind": "text",
+      "value": "m2"
+    },
+    {
+      "path": "line_items[0].unit_price",
+      "kind": "amount",
+      "value": "118.00"
+    },
+    {
+      "path": "line_items[0].amount",
+      "kind": "amount",
+      "value": "7552.00"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Geländer Lärche"
+    },
+    {
+      "path": "line_items[1].item_code",
+      "kind": "text",
+      "value": "HT-GL-02"
+    },
+    {
+      "path": "line_items[1].quantity",
+      "kind": "number",
+      "value": "22"
+    },
+    {
+      "path": "line_items[1].unit",
+      "kind": "text",
+      "value": "m"
+    },
+    {
+      "path": "line_items[1].unit_price",
+      "kind": "amount",
+      "value": "145.00"
+    },
+    {
+      "path": "line_items[1].amount",
+      "kind": "amount",
+      "value": "3190.00"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "Montage"
+    },
+    {
+      "path": "line_items[2].item_code",
+      "kind": "text",
+      "value": "HT-MO-00"
+    },
+    {
+      "path": "line_items[2].quantity",
+      "kind": "number",
+      "value": "16"
+    },
+    {
+      "path": "line_items[2].unit",
+      "kind": "text",
+      "value": "h"
+    },
+    {
+      "path": "line_items[2].unit_price",
+      "kind": "amount",
+      "value": "92.00"
+    },
+    {
+      "path": "line_items[2].amount",
+      "kind": "amount",
+      "value": "1472.00"
+    }
+  ]
+}

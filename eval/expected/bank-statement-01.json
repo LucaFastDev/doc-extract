@@ -1,0 +1,621 @@
+{
+  "document": "bank-statement-01.pdf",
+  "doc_type": "bank_statement",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "en"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "bank_name",
+      "kind": "text",
+      "value": "Tidewater Cooperative Bank"
+    },
+    {
+      "path": "account_holder",
+      "kind": "text",
+      "value": "Marrowfield Garden Centre Ltd"
+    },
+    {
+      "path": "account_number_last4",
+      "kind": "text",
+      "value": "3390"
+    },
+    {
+      "path": "iban_last4",
+      "kind": "text",
+      "value": "9015"
+    },
+    {
+      "path": "statement_period_start",
+      "kind": "date",
+      "value": "2026-09-01"
+    },
+    {
+      "path": "statement_period_end",
+      "kind": "date",
+      "value": "2026-09-30"
+    },
+    {
+      "path": "opening_balance",
+      "kind": "amount",
+      "value": "5120.40"
+    },
+    {
+      "path": "closing_balance",
+      "kind": "amount",
+      "value": "3570.40"
+    },
+    {
+      "path": "total_credits",
+      "kind": "amount",
+      "value": "12291.30"
+    },
+    {
+      "path": "total_debits",
+      "kind": "amount",
+      "value": "13841.30"
+    },
+    {
+      "path": "line_items[0].date",
+      "kind": "date",
+      "value": "2026-09-01"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Card sales settlement"
+    },
+    {
+      "path": "line_items[0].reference",
+      "kind": "text",
+      "value": "SET-0901"
+    },
+    {
+      "path": "line_items[0].amount",
+      "kind": "amount",
+      "value": "1284.60"
+    },
+    {
+      "path": "line_items[0].balance",
+      "kind": "amount",
+      "value": "6405.00"
+    },
+    {
+      "path": "line_items[1].date",
+      "kind": "date",
+      "value": "2026-09-01"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Rent Furrowby Estates"
+    },
+    {
+      "path": "line_items[1].reference",
+      "kind": "text",
+      "value": "RENT-09"
+    },
+    {
+      "path": "line_items[1].amount",
+      "kind": "amount",
+      "value": "-1850.00"
+    },
+    {
+      "path": "line_items[1].balance",
+      "kind": "amount",
+      "value": "4555.00"
+    },
+    {
+      "path": "line_items[2].date",
+      "kind": "date",
+      "value": "2026-09-02"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "Supplier Greenvale Nurseries"
+    },
+    {
+      "path": "line_items[2].reference",
+      "kind": "text",
+      "value": "GVN-4471"
+    },
+    {
+      "path": "line_items[2].amount",
+      "kind": "amount",
+      "value": "-742.15"
+    },
+    {
+      "path": "line_items[2].balance",
+      "kind": "amount",
+      "value": "3812.85"
+    },
+    {
+      "path": "line_items[3].date",
+      "kind": "date",
+      "value": "2026-09-03"
+    },
+    {
+      "path": "line_items[3].description",
+      "kind": "text",
+      "value": "Card sales settlement"
+    },
+    {
+      "path": "line_items[3].reference",
+      "kind": "text",
+      "value": "SET-0903"
+    },
+    {
+      "path": "line_items[3].amount",
+      "kind": "amount",
+      "value": "936.25"
+    },
+    {
+      "path": "line_items[3].balance",
+      "kind": "amount",
+      "value": "4749.10"
+    },
+    {
+      "path": "line_items[4].date",
+      "kind": "date",
+      "value": "2026-09-04"
+    },
+    {
+      "path": "line_items[4].description",
+      "kind": "text",
+      "value": "Direct debit Furrowby Water"
+    },
+    {
+      "path": "line_items[4].reference",
+      "kind": "text",
+      "value": "DD-FW-221"
+    },
+    {
+      "path": "line_items[4].amount",
+      "kind": "amount",
+      "value": "-88.40"
+    },
+    {
+      "path": "line_items[4].balance",
+      "kind": "amount",
+      "value": "4660.70"
+    },
+    {
+      "path": "line_items[5].date",
+      "kind": "date",
+      "value": "2026-09-05"
+    },
+    {
+      "path": "line_items[5].description",
+      "kind": "text",
+      "value": "Card sales settlement"
+    },
+    {
+      "path": "line_items[5].reference",
+      "kind": "text",
+      "value": "SET-0905"
+    },
+    {
+      "path": "line_items[5].amount",
+      "kind": "amount",
+      "value": "1502.80"
+    },
+    {
+      "path": "line_items[5].balance",
+      "kind": "amount",
+      "value": "6163.50"
+    },
+    {
+      "path": "line_items[6].date",
+      "kind": "date",
+      "value": "2026-09-07"
+    },
+    {
+      "path": "line_items[6].description",
+      "kind": "text",
+      "value": "Payroll week 36"
+    },
+    {
+      "path": "line_items[6].reference",
+      "kind": "text",
+      "value": "PAY-W36"
+    },
+    {
+      "path": "line_items[6].amount",
+      "kind": "amount",
+      "value": "-2210.00"
+    },
+    {
+      "path": "line_items[6].balance",
+      "kind": "amount",
+      "value": "3953.50"
+    },
+    {
+      "path": "line_items[7].date",
+      "kind": "date",
+      "value": "2026-09-08"
+    },
+    {
+      "path": "line_items[7].description",
+      "kind": "text",
+      "value": "Supplier Peatless Compost Co"
+    },
+    {
+      "path": "line_items[7].reference",
+      "kind": "text",
+      "value": "PCC-0912"
+    },
+    {
+      "path": "line_items[7].amount",
+      "kind": "amount",
+      "value": "-416.00"
+    },
+    {
+      "path": "line_items[7].balance",
+      "kind": "amount",
+      "value": "3537.50"
+    },
+    {
+      "path": "line_items[8].date",
+      "kind": "date",
+      "value": "2026-09-09"
+    },
+    {
+      "path": "line_items[8].description",
+      "kind": "text",
+      "value": "Card sales settlement"
+    },
+    {
+      "path": "line_items[8].reference",
+      "kind": "text",
+      "value": "SET-0909"
+    },
+    {
+      "path": "line_items[8].amount",
+      "kind": "amount",
+      "value": "874.10"
+    },
+    {
+      "path": "line_items[8].balance",
+      "kind": "amount",
+      "value": "4411.60"
+    },
+    {
+      "path": "line_items[9].date",
+      "kind": "date",
+      "value": "2026-09-10"
+    },
+    {
+      "path": "line_items[9].description",
+      "kind": "text",
+      "value": "Insurance Bramblegate Mutual"
+    },
+    {
+      "path": "line_items[9].reference",
+      "kind": "text",
+      "value": "INS-BM-09"
+    },
+    {
+      "path": "line_items[9].amount",
+      "kind": "amount",
+      "value": "-133.75"
+    },
+    {
+      "path": "line_items[9].balance",
+      "kind": "amount",
+      "value": "4277.85"
+    },
+    {
+      "path": "line_items[10].date",
+      "kind": "date",
+      "value": "2026-09-12"
+    },
+    {
+      "path": "line_items[10].description",
+      "kind": "text",
+      "value": "Card sales settlement"
+    },
+    {
+      "path": "line_items[10].reference",
+      "kind": "text",
+      "value": "SET-0912"
+    },
+    {
+      "path": "line_items[10].amount",
+      "kind": "amount",
+      "value": "1690.45"
+    },
+    {
+      "path": "line_items[10].balance",
+      "kind": "amount",
+      "value": "5968.30"
+    },
+    {
+      "path": "line_items[11].date",
+      "kind": "date",
+      "value": "2026-09-14"
+    },
+    {
+      "path": "line_items[11].description",
+      "kind": "text",
+      "value": "Payroll week 38"
+    },
+    {
+      "path": "line_items[11].reference",
+      "kind": "text",
+      "value": "PAY-W38"
+    },
+    {
+      "path": "line_items[11].amount",
+      "kind": "amount",
+      "value": "-2210.00"
+    },
+    {
+      "path": "line_items[11].balance",
+      "kind": "amount",
+      "value": "3758.30"
+    },
+    {
+      "path": "line_items[12].date",
+      "kind": "date",
+      "value": "2026-09-15"
+    },
+    {
+      "path": "line_items[12].description",
+      "kind": "text",
+      "value": "Supplier Greenvale Nurseries"
+    },
+    {
+      "path": "line_items[12].reference",
+      "kind": "text",
+      "value": "GVN-4502"
+    },
+    {
+      "path": "line_items[12].amount",
+      "kind": "amount",
+      "value": "-1105.30"
+    },
+    {
+      "path": "line_items[12].balance",
+      "kind": "amount",
+      "value": "2653.00"
+    },
+    {
+      "path": "line_items[13].date",
+      "kind": "date",
+      "value": "2026-09-16"
+    },
+    {
+      "path": "line_items[13].description",
+      "kind": "text",
+      "value": "Card sales settlement"
+    },
+    {
+      "path": "line_items[13].reference",
+      "kind": "text",
+      "value": "SET-0916"
+    },
+    {
+      "path": "line_items[13].amount",
+      "kind": "amount",
+      "value": "958.90"
+    },
+    {
+      "path": "line_items[13].balance",
+      "kind": "amount",
+      "value": "3611.90"
+    },
+    {
+      "path": "line_items[14].date",
+      "kind": "date",
+      "value": "2026-09-18"
+    },
+    {
+      "path": "line_items[14].description",
+      "kind": "text",
+      "value": "Electricity Furrowby Power"
+    },
+    {
+      "path": "line_items[14].reference",
+      "kind": "text",
+      "value": "DD-FP-0918"
+    },
+    {
+      "path": "line_items[14].amount",
+      "kind": "amount",
+      "value": "-264.20"
+    },
+    {
+      "path": "line_items[14].balance",
+      "kind": "amount",
+      "value": "3347.70"
+    },
+    {
+      "path": "line_items[15].date",
+      "kind": "date",
+      "value": "2026-09-19"
+    },
+    {
+      "path": "line_items[15].description",
+      "kind": "text",
+      "value": "Card sales settlement"
+    },
+    {
+      "path": "line_items[15].reference",
+      "kind": "text",
+      "value": "SET-0919"
+    },
+    {
+      "path": "line_items[15].amount",
+      "kind": "amount",
+      "value": "2045.35"
+    },
+    {
+      "path": "line_items[15].balance",
+      "kind": "amount",
+      "value": "5393.05"
+    },
+    {
+      "path": "line_items[16].date",
+      "kind": "date",
+      "value": "2026-09-21"
+    },
+    {
+      "path": "line_items[16].description",
+      "kind": "text",
+      "value": "Payroll week 39"
+    },
+    {
+      "path": "line_items[16].reference",
+      "kind": "text",
+      "value": "PAY-W39"
+    },
+    {
+      "path": "line_items[16].amount",
+      "kind": "amount",
+      "value": "-2210.00"
+    },
+    {
+      "path": "line_items[16].balance",
+      "kind": "amount",
+      "value": "3183.05"
+    },
+    {
+      "path": "line_items[17].date",
+      "kind": "date",
+      "value": "2026-09-23"
+    },
+    {
+      "path": "line_items[17].description",
+      "kind": "text",
+      "value": "Card sales settlement"
+    },
+    {
+      "path": "line_items[17].reference",
+      "kind": "text",
+      "value": "SET-0923"
+    },
+    {
+      "path": "line_items[17].amount",
+      "kind": "amount",
+      "value": "1122.70"
+    },
+    {
+      "path": "line_items[17].balance",
+      "kind": "amount",
+      "value": "4305.75"
+    },
+    {
+      "path": "line_items[18].date",
+      "kind": "date",
+      "value": "2026-09-25"
+    },
+    {
+      "path": "line_items[18].description",
+      "kind": "text",
+      "value": "Delivery van lease"
+    },
+    {
+      "path": "line_items[18].reference",
+      "kind": "text",
+      "value": "LEASE-09"
+    },
+    {
+      "path": "line_items[18].amount",
+      "kind": "amount",
+      "value": "-389.00"
+    },
+    {
+      "path": "line_items[18].balance",
+      "kind": "amount",
+      "value": "3916.75"
+    },
+    {
+      "path": "line_items[19].date",
+      "kind": "date",
+      "value": "2026-09-26"
+    },
+    {
+      "path": "line_items[19].description",
+      "kind": "text",
+      "value": "Card sales settlement"
+    },
+    {
+      "path": "line_items[19].reference",
+      "kind": "text",
+      "value": "SET-0926"
+    },
+    {
+      "path": "line_items[19].amount",
+      "kind": "amount",
+      "value": "1876.15"
+    },
+    {
+      "path": "line_items[19].balance",
+      "kind": "amount",
+      "value": "5792.90"
+    },
+    {
+      "path": "line_items[20].date",
+      "kind": "date",
+      "value": "2026-09-28"
+    },
+    {
+      "path": "line_items[20].description",
+      "kind": "text",
+      "value": "Payroll week 40"
+    },
+    {
+      "path": "line_items[20].reference",
+      "kind": "text",
+      "value": "PAY-W40"
+    },
+    {
+      "path": "line_items[20].amount",
+      "kind": "amount",
+      "value": "-2210.00"
+    },
+    {
+      "path": "line_items[20].balance",
+      "kind": "amount",
+      "value": "3582.90"
+    },
+    {
+      "path": "line_items[21].date",
+      "kind": "date",
+      "value": "2026-09-30"
+    },
+    {
+      "path": "line_items[21].description",
+      "kind": "text",
+      "value": "Account fee"
+    },
+    {
+      "path": "line_items[21].reference",
+      "kind": "text",
+      "value": "FEE-09"
+    },
+    {
+      "path": "line_items[21].amount",
+      "kind": "amount",
+      "value": "-12.50"
+    },
+    {
+      "path": "line_items[21].balance",
+      "kind": "amount",
+      "value": "3570.40"
+    }
+  ]
+}

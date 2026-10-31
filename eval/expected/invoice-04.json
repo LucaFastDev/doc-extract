@@ -1,0 +1,216 @@
+{
+  "document": "invoice-04.pdf",
+  "doc_type": "invoice",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "fr"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "€"
+    },
+    {
+      "path": "vendor_name",
+      "kind": "text",
+      "value": "Atelier Verlaine Graphisme SARL"
+    },
+    {
+      "path": "vendor_address",
+      "kind": "text",
+      "value": "8 rue des Encriers, 45678 Plumeville, Exemplie"
+    },
+    {
+      "path": "vendor_tax_id",
+      "kind": "text",
+      "value": "EX47812309551"
+    },
+    {
+      "path": "customer_name",
+      "kind": "text",
+      "value": "Librairie du Héron Bleu"
+    },
+    {
+      "path": "customer_address",
+      "kind": "text",
+      "value": "31 quai des Lanternes, 23456 Roseval, Exemplie"
+    },
+    {
+      "path": "customer_tax_id",
+      "kind": "text",
+      "value": "EX90334118207"
+    },
+    {
+      "path": "invoice_number",
+      "kind": "text",
+      "value": "F-2026-0342"
+    },
+    {
+      "path": "purchase_order_number",
+      "kind": "text",
+      "value": "BC-1187"
+    },
+    {
+      "path": "payment_terms",
+      "kind": "text",
+      "value": "Paiement à 30 jours"
+    },
+    {
+      "path": "invoice_date",
+      "kind": "date",
+      "value": "2026-09-25"
+    },
+    {
+      "path": "due_date",
+      "kind": "date",
+      "value": "2026-10-25"
+    },
+    {
+      "path": "subtotal",
+      "kind": "amount",
+      "value": "1385.00"
+    },
+    {
+      "path": "tax_total",
+      "kind": "amount",
+      "value": "270.60"
+    },
+    {
+      "path": "shipping",
+      "kind": "amount",
+      "value": "18.00"
+    },
+    {
+      "path": "discount_total",
+      "kind": "amount",
+      "value": "50.00"
+    },
+    {
+      "path": "total",
+      "kind": "amount",
+      "value": "1623.60"
+    },
+    {
+      "path": "amount_paid",
+      "kind": "amount",
+      "value": null
+    },
+    {
+      "path": "amount_due",
+      "kind": "amount",
+      "value": "1623.60"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Création de logo et charte graphique"
+    },
+    {
+      "path": "line_items[0].item_code",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "line_items[0].quantity",
+      "kind": "number",
+      "value": "1"
+    },
+    {
+      "path": "line_items[0].unit",
+      "kind": "text",
+      "value": "forfait"
+    },
+    {
+      "path": "line_items[0].unit_price",
+      "kind": "amount",
+      "value": "850.00"
+    },
+    {
+      "path": "line_items[0].tax_rate",
+      "kind": "percent",
+      "value": "20"
+    },
+    {
+      "path": "line_items[0].amount",
+      "kind": "amount",
+      "value": "850.00"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Affiches A2, impression quadrichromie"
+    },
+    {
+      "path": "line_items[1].item_code",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "line_items[1].quantity",
+      "kind": "number",
+      "value": "150"
+    },
+    {
+      "path": "line_items[1].unit",
+      "kind": "text",
+      "value": "ex."
+    },
+    {
+      "path": "line_items[1].unit_price",
+      "kind": "amount",
+      "value": "2.40"
+    },
+    {
+      "path": "line_items[1].tax_rate",
+      "kind": "percent",
+      "value": "20"
+    },
+    {
+      "path": "line_items[1].amount",
+      "kind": "amount",
+      "value": "360.00"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "Marque-pages illustrés"
+    },
+    {
+      "path": "line_items[2].item_code",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "line_items[2].quantity",
+      "kind": "number",
+      "value": "500"
+    },
+    {
+      "path": "line_items[2].unit",
+      "kind": "text",
+      "value": "ex."
+    },
+    {
+      "path": "line_items[2].unit_price",
+      "kind": "amount",
+      "value": "0.35"
+    },
+    {
+      "path": "line_items[2].tax_rate",
+      "kind": "percent",
+      "value": "20"
+    },
+    {
+      "path": "line_items[2].amount",
+      "kind": "amount",
+      "value": "175.00"
+    }
+  ]
+}

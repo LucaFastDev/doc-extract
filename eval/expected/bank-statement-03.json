@@ -1,0 +1,371 @@
+{
+  "document": "bank-statement-03.pdf",
+  "doc_type": "bank_statement",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "de"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "bank_name",
+      "kind": "text",
+      "value": "Bank Nebelsee eG"
+    },
+    {
+      "path": "account_holder",
+      "kind": "text",
+      "value": "Fischer Gartenbau GmbH"
+    },
+    {
+      "path": "account_number_last4",
+      "kind": "text",
+      "value": "8826"
+    },
+    {
+      "path": "iban_last4",
+      "kind": "text",
+      "value": "8826"
+    },
+    {
+      "path": "statement_period_start",
+      "kind": "date",
+      "value": "2026-09-01"
+    },
+    {
+      "path": "statement_period_end",
+      "kind": "date",
+      "value": "2026-09-30"
+    },
+    {
+      "path": "opening_balance",
+      "kind": "amount",
+      "value": "3207.55"
+    },
+    {
+      "path": "closing_balance",
+      "kind": "amount",
+      "value": "4935.74"
+    },
+    {
+      "path": "total_credits",
+      "kind": "amount",
+      "value": null
+    },
+    {
+      "path": "total_debits",
+      "kind": "amount",
+      "value": null
+    },
+    {
+      "path": "line_items[0].date",
+      "kind": "date",
+      "value": "2026-09-01"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Miete Gewächshaus"
+    },
+    {
+      "path": "line_items[0].reference",
+      "kind": "text",
+      "value": "MIETE 09/2026"
+    },
+    {
+      "path": "line_items[0].amount",
+      "kind": "amount",
+      "value": "-950.00"
+    },
+    {
+      "path": "line_items[0].balance",
+      "kind": "amount",
+      "value": null
+    },
+    {
+      "path": "line_items[1].date",
+      "kind": "date",
+      "value": "2026-09-03"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Überweisung Blumenhaus Rosenrot"
+    },
+    {
+      "path": "line_items[1].reference",
+      "kind": "text",
+      "value": "RE 2026-311"
+    },
+    {
+      "path": "line_items[1].amount",
+      "kind": "amount",
+      "value": "1280.00"
+    },
+    {
+      "path": "line_items[1].balance",
+      "kind": "amount",
+      "value": null
+    },
+    {
+      "path": "line_items[2].date",
+      "kind": "date",
+      "value": "2026-09-04"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "Lastschrift Stadtwerke Grünau"
+    },
+    {
+      "path": "line_items[2].reference",
+      "kind": "text",
+      "value": "STROM 09"
+    },
+    {
+      "path": "line_items[2].amount",
+      "kind": "amount",
+      "value": "-214.36"
+    },
+    {
+      "path": "line_items[2].balance",
+      "kind": "amount",
+      "value": null
+    },
+    {
+      "path": "line_items[3].date",
+      "kind": "date",
+      "value": "2026-09-08"
+    },
+    {
+      "path": "line_items[3].description",
+      "kind": "text",
+      "value": "Kartenzahlung Baumarkt Hobelspan"
+    },
+    {
+      "path": "line_items[3].reference",
+      "kind": "text",
+      "value": "KA 0908"
+    },
+    {
+      "path": "line_items[3].amount",
+      "kind": "amount",
+      "value": "-87.90"
+    },
+    {
+      "path": "line_items[3].balance",
+      "kind": "amount",
+      "value": null
+    },
+    {
+      "path": "line_items[4].date",
+      "kind": "date",
+      "value": "2026-09-10"
+    },
+    {
+      "path": "line_items[4].description",
+      "kind": "text",
+      "value": "Überweisung Friedhofsgärtnerei Linde"
+    },
+    {
+      "path": "line_items[4].reference",
+      "kind": "text",
+      "value": "RE 2026-315"
+    },
+    {
+      "path": "line_items[4].amount",
+      "kind": "amount",
+      "value": "640.50"
+    },
+    {
+      "path": "line_items[4].balance",
+      "kind": "amount",
+      "value": null
+    },
+    {
+      "path": "line_items[5].date",
+      "kind": "date",
+      "value": "2026-09-12"
+    },
+    {
+      "path": "line_items[5].description",
+      "kind": "text",
+      "value": "Lohn August"
+    },
+    {
+      "path": "line_items[5].reference",
+      "kind": "text",
+      "value": "LOHN 08"
+    },
+    {
+      "path": "line_items[5].amount",
+      "kind": "amount",
+      "value": "-2380.00"
+    },
+    {
+      "path": "line_items[5].balance",
+      "kind": "amount",
+      "value": null
+    },
+    {
+      "path": "line_items[6].date",
+      "kind": "date",
+      "value": "2026-09-15"
+    },
+    {
+      "path": "line_items[6].description",
+      "kind": "text",
+      "value": "Überweisung Hotel Seeblick"
+    },
+    {
+      "path": "line_items[6].reference",
+      "kind": "text",
+      "value": "RE 2026-318"
+    },
+    {
+      "path": "line_items[6].amount",
+      "kind": "amount",
+      "value": "1955.00"
+    },
+    {
+      "path": "line_items[6].balance",
+      "kind": "amount",
+      "value": null
+    },
+    {
+      "path": "line_items[7].date",
+      "kind": "date",
+      "value": "2026-09-18"
+    },
+    {
+      "path": "line_items[7].description",
+      "kind": "text",
+      "value": "Lastschrift Versicherung Eichenhof"
+    },
+    {
+      "path": "line_items[7].reference",
+      "kind": "text",
+      "value": "VERS 2026"
+    },
+    {
+      "path": "line_items[7].amount",
+      "kind": "amount",
+      "value": "-312.40"
+    },
+    {
+      "path": "line_items[7].balance",
+      "kind": "amount",
+      "value": null
+    },
+    {
+      "path": "line_items[8].date",
+      "kind": "date",
+      "value": "2026-09-22"
+    },
+    {
+      "path": "line_items[8].description",
+      "kind": "text",
+      "value": "Kartenzahlung Tankstelle Am Ring"
+    },
+    {
+      "path": "line_items[8].reference",
+      "kind": "text",
+      "value": "KA 0922"
+    },
+    {
+      "path": "line_items[8].amount",
+      "kind": "amount",
+      "value": "-74.15"
+    },
+    {
+      "path": "line_items[8].balance",
+      "kind": "amount",
+      "value": null
+    },
+    {
+      "path": "line_items[9].date",
+      "kind": "date",
+      "value": "2026-09-25"
+    },
+    {
+      "path": "line_items[9].description",
+      "kind": "text",
+      "value": "Überweisung Gemeinde Grünau"
+    },
+    {
+      "path": "line_items[9].reference",
+      "kind": "text",
+      "value": "RE 2026-322"
+    },
+    {
+      "path": "line_items[9].amount",
+      "kind": "amount",
+      "value": "2310.00"
+    },
+    {
+      "path": "line_items[9].balance",
+      "kind": "amount",
+      "value": null
+    },
+    {
+      "path": "line_items[10].date",
+      "kind": "date",
+      "value": "2026-09-28"
+    },
+    {
+      "path": "line_items[10].description",
+      "kind": "text",
+      "value": "Saatgut Feldmann"
+    },
+    {
+      "path": "line_items[10].reference",
+      "kind": "text",
+      "value": "RE SF-881"
+    },
+    {
+      "path": "line_items[10].amount",
+      "kind": "amount",
+      "value": "-428.60"
+    },
+    {
+      "path": "line_items[10].balance",
+      "kind": "amount",
+      "value": null
+    },
+    {
+      "path": "line_items[11].date",
+      "kind": "date",
+      "value": "2026-09-30"
+    },
+    {
+      "path": "line_items[11].description",
+      "kind": "text",
+      "value": "Kontoführung"
+    },
+    {
+      "path": "line_items[11].reference",
+      "kind": "text",
+      "value": "ENTGELT 09"
+    },
+    {
+      "path": "line_items[11].amount",
+      "kind": "amount",
+      "value": "-9.90"
+    },
+    {
+      "path": "line_items[11].balance",
+      "kind": "amount",
+      "value": null
+    }
+  ]
+}

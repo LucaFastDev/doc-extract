@@ -1,0 +1,176 @@
+{
+  "document": "purchase-order-02.pdf",
+  "doc_type": "purchase_order",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "nl"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "€"
+    },
+    {
+      "path": "buyer_name",
+      "kind": "text",
+      "value": "Tulpenhof Bloemenkwekerij B.V."
+    },
+    {
+      "path": "buyer_address",
+      "kind": "text",
+      "value": "Kasweg 21, 1234 AB Bloemdijk, Exemplië"
+    },
+    {
+      "path": "supplier_name",
+      "kind": "text",
+      "value": "Glaswerk Van Duinen"
+    },
+    {
+      "path": "supplier_address",
+      "kind": "text",
+      "value": "Zandpad 5, 5678 CD Strandveen, Exemplië"
+    },
+    {
+      "path": "ship_to_address",
+      "kind": "text",
+      "value": "Kas 3, Kasweg 23, 1234 AB Bloemdijk, Exemplië"
+    },
+    {
+      "path": "po_number",
+      "kind": "text",
+      "value": "TH-2026-118"
+    },
+    {
+      "path": "payment_terms",
+      "kind": "text",
+      "value": "Betaling binnen 30 dagen"
+    },
+    {
+      "path": "order_date",
+      "kind": "date",
+      "value": "2026-09-22"
+    },
+    {
+      "path": "requested_delivery_date",
+      "kind": "date",
+      "value": "2026-10-13"
+    },
+    {
+      "path": "subtotal",
+      "kind": "amount",
+      "value": "521.30"
+    },
+    {
+      "path": "tax_total",
+      "kind": "amount",
+      "value": "113.57"
+    },
+    {
+      "path": "shipping",
+      "kind": "amount",
+      "value": "19.50"
+    },
+    {
+      "path": "total",
+      "kind": "amount",
+      "value": "654.37"
+    },
+    {
+      "path": "line_items[0].item_code",
+      "kind": "text",
+      "value": "GV-K120"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Kweekbak, 120 x 60 cm"
+    },
+    {
+      "path": "line_items[0].quantity",
+      "kind": "number",
+      "value": "12"
+    },
+    {
+      "path": "line_items[0].unit",
+      "kind": "text",
+      "value": "stuks"
+    },
+    {
+      "path": "line_items[0].unit_price",
+      "kind": "amount",
+      "value": "24.90"
+    },
+    {
+      "path": "line_items[0].amount",
+      "kind": "amount",
+      "value": "298.80"
+    },
+    {
+      "path": "line_items[1].item_code",
+      "kind": "text",
+      "value": "GV-S05"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Sproeikop, messing"
+    },
+    {
+      "path": "line_items[1].quantity",
+      "kind": "number",
+      "value": "30"
+    },
+    {
+      "path": "line_items[1].unit",
+      "kind": "text",
+      "value": "stuks"
+    },
+    {
+      "path": "line_items[1].unit_price",
+      "kind": "amount",
+      "value": "3.15"
+    },
+    {
+      "path": "line_items[1].amount",
+      "kind": "amount",
+      "value": "94.50"
+    },
+    {
+      "path": "line_items[2].item_code",
+      "kind": "text",
+      "value": "GV-T25"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "Tuinslang, 25 m"
+    },
+    {
+      "path": "line_items[2].quantity",
+      "kind": "number",
+      "value": "4"
+    },
+    {
+      "path": "line_items[2].unit",
+      "kind": "text",
+      "value": "rol"
+    },
+    {
+      "path": "line_items[2].unit_price",
+      "kind": "amount",
+      "value": "32.00"
+    },
+    {
+      "path": "line_items[2].amount",
+      "kind": "amount",
+      "value": "128.00"
+    }
+  ]
+}

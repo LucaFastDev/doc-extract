@@ -38,6 +38,20 @@ export const TARGETS: Record<DocType, { header: number; line_items: number }> = 
   quote: { header: 0.95, line_items: 0.9 },
 }
 
+/**
+ * Each type's totals and subtotals, for check usefulness (PRD section 10): a misread of one of
+ * these should be flagged by an arithmetic check. A delivery note's total is its total quantity; a
+ * bank statement's are its closing balance and its totals in and out.
+ */
+export const TOTALS: Record<DocType, string[]> = {
+  invoice: ['subtotal', 'total'],
+  receipt: ['subtotal', 'total'],
+  bank_statement: ['closing_balance', 'total_credits', 'total_debits'],
+  purchase_order: ['subtotal', 'total'],
+  delivery_note: ['total_quantity'],
+  quote: ['subtotal', 'total'],
+}
+
 /** A miss at or above this confidence is a confident miss (Lead ruling 4; app_config.confidence_threshold). */
 export const CONFIDENT = 0.8
 

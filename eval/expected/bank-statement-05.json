@@ -1,0 +1,421 @@
+{
+  "document": "bank-statement-05.pdf",
+  "doc_type": "bank_statement",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "en"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "USD"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "USD"
+    },
+    {
+      "path": "bank_name",
+      "kind": "text",
+      "value": "Prairie Lantern Savings & Loan"
+    },
+    {
+      "path": "account_holder",
+      "kind": "text",
+      "value": "Coyote Ridge Landscaping LLC"
+    },
+    {
+      "path": "account_number_last4",
+      "kind": "text",
+      "value": "2245"
+    },
+    {
+      "path": "iban_last4",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "statement_period_start",
+      "kind": "date",
+      "value": "2026-09-16"
+    },
+    {
+      "path": "statement_period_end",
+      "kind": "date",
+      "value": "2026-10-15"
+    },
+    {
+      "path": "opening_balance",
+      "kind": "amount",
+      "value": "12480.33"
+    },
+    {
+      "path": "closing_balance",
+      "kind": "amount",
+      "value": "13385.04"
+    },
+    {
+      "path": "total_credits",
+      "kind": "amount",
+      "value": "17445.00"
+    },
+    {
+      "path": "total_debits",
+      "kind": "amount",
+      "value": "16540.29"
+    },
+    {
+      "path": "line_items[0].date",
+      "kind": "date",
+      "value": "2026-09-16"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Deposit, Mesa Verde HOA"
+    },
+    {
+      "path": "line_items[0].reference",
+      "kind": "text",
+      "value": "CHK 1182"
+    },
+    {
+      "path": "line_items[0].amount",
+      "kind": "amount",
+      "value": "3400.00"
+    },
+    {
+      "path": "line_items[0].balance",
+      "kind": "amount",
+      "value": null
+    },
+    {
+      "path": "line_items[1].date",
+      "kind": "date",
+      "value": "2026-09-16"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Sagebrush Nursery supply"
+    },
+    {
+      "path": "line_items[1].reference",
+      "kind": "text",
+      "value": "ACH 55120"
+    },
+    {
+      "path": "line_items[1].amount",
+      "kind": "amount",
+      "value": "-1286.45"
+    },
+    {
+      "path": "line_items[1].balance",
+      "kind": "amount",
+      "value": "14593.88"
+    },
+    {
+      "path": "line_items[2].date",
+      "kind": "date",
+      "value": "2026-09-18"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "Fuel, Red Butte Gas"
+    },
+    {
+      "path": "line_items[2].reference",
+      "kind": "text",
+      "value": "POS 0918"
+    },
+    {
+      "path": "line_items[2].amount",
+      "kind": "amount",
+      "value": "-212.80"
+    },
+    {
+      "path": "line_items[2].balance",
+      "kind": "amount",
+      "value": "14381.08"
+    },
+    {
+      "path": "line_items[3].date",
+      "kind": "date",
+      "value": "2026-09-22"
+    },
+    {
+      "path": "line_items[3].description",
+      "kind": "text",
+      "value": "Payroll"
+    },
+    {
+      "path": "line_items[3].reference",
+      "kind": "text",
+      "value": "ACH PAYRL"
+    },
+    {
+      "path": "line_items[3].amount",
+      "kind": "amount",
+      "value": "-5640.00"
+    },
+    {
+      "path": "line_items[3].balance",
+      "kind": "amount",
+      "value": "8741.08"
+    },
+    {
+      "path": "line_items[4].date",
+      "kind": "date",
+      "value": "2026-09-24"
+    },
+    {
+      "path": "line_items[4].description",
+      "kind": "text",
+      "value": "Deposit, Juniper Hills Golf Club"
+    },
+    {
+      "path": "line_items[4].reference",
+      "kind": "text",
+      "value": "CHK 1190"
+    },
+    {
+      "path": "line_items[4].amount",
+      "kind": "amount",
+      "value": "4875.00"
+    },
+    {
+      "path": "line_items[4].balance",
+      "kind": "amount",
+      "value": null
+    },
+    {
+      "path": "line_items[5].date",
+      "kind": "date",
+      "value": "2026-09-24"
+    },
+    {
+      "path": "line_items[5].description",
+      "kind": "text",
+      "value": "Equipment rental, Dustdevil Rentals"
+    },
+    {
+      "path": "line_items[5].reference",
+      "kind": "text",
+      "value": "ACH 55188"
+    },
+    {
+      "path": "line_items[5].amount",
+      "kind": "amount",
+      "value": "-690.00"
+    },
+    {
+      "path": "line_items[5].balance",
+      "kind": "amount",
+      "value": "12926.08"
+    },
+    {
+      "path": "line_items[6].date",
+      "kind": "date",
+      "value": "2026-09-29"
+    },
+    {
+      "path": "line_items[6].description",
+      "kind": "text",
+      "value": "Truck loan payment"
+    },
+    {
+      "path": "line_items[6].reference",
+      "kind": "text",
+      "value": "ACH LOAN"
+    },
+    {
+      "path": "line_items[6].amount",
+      "kind": "amount",
+      "value": "-842.17"
+    },
+    {
+      "path": "line_items[6].balance",
+      "kind": "amount",
+      "value": "12083.91"
+    },
+    {
+      "path": "line_items[7].date",
+      "kind": "date",
+      "value": "2026-10-01"
+    },
+    {
+      "path": "line_items[7].description",
+      "kind": "text",
+      "value": "Deposit, City of Sagebrush Flats"
+    },
+    {
+      "path": "line_items[7].reference",
+      "kind": "text",
+      "value": "ACH CITY"
+    },
+    {
+      "path": "line_items[7].amount",
+      "kind": "amount",
+      "value": "6220.00"
+    },
+    {
+      "path": "line_items[7].balance",
+      "kind": "amount",
+      "value": null
+    },
+    {
+      "path": "line_items[8].date",
+      "kind": "date",
+      "value": "2026-10-01"
+    },
+    {
+      "path": "line_items[8].description",
+      "kind": "text",
+      "value": "Office rent"
+    },
+    {
+      "path": "line_items[8].reference",
+      "kind": "text",
+      "value": "ACH RENT"
+    },
+    {
+      "path": "line_items[8].amount",
+      "kind": "amount",
+      "value": "-1350.00"
+    },
+    {
+      "path": "line_items[8].balance",
+      "kind": "amount",
+      "value": "16953.91"
+    },
+    {
+      "path": "line_items[9].date",
+      "kind": "date",
+      "value": "2026-10-06"
+    },
+    {
+      "path": "line_items[9].description",
+      "kind": "text",
+      "value": "Payroll"
+    },
+    {
+      "path": "line_items[9].reference",
+      "kind": "text",
+      "value": "ACH PAYRL"
+    },
+    {
+      "path": "line_items[9].amount",
+      "kind": "amount",
+      "value": "-5640.00"
+    },
+    {
+      "path": "line_items[9].balance",
+      "kind": "amount",
+      "value": "11313.91"
+    },
+    {
+      "path": "line_items[10].date",
+      "kind": "date",
+      "value": "2026-10-08"
+    },
+    {
+      "path": "line_items[10].description",
+      "kind": "text",
+      "value": "Irrigation parts, Canyon Drip Supply"
+    },
+    {
+      "path": "line_items[10].reference",
+      "kind": "text",
+      "value": "POS 1008"
+    },
+    {
+      "path": "line_items[10].amount",
+      "kind": "amount",
+      "value": "-388.62"
+    },
+    {
+      "path": "line_items[10].balance",
+      "kind": "amount",
+      "value": "10925.29"
+    },
+    {
+      "path": "line_items[11].date",
+      "kind": "date",
+      "value": "2026-10-12"
+    },
+    {
+      "path": "line_items[11].description",
+      "kind": "text",
+      "value": "Deposit, Coyote Ridge HOA"
+    },
+    {
+      "path": "line_items[11].reference",
+      "kind": "text",
+      "value": "CHK 1201"
+    },
+    {
+      "path": "line_items[11].amount",
+      "kind": "amount",
+      "value": "2950.00"
+    },
+    {
+      "path": "line_items[11].balance",
+      "kind": "amount",
+      "value": "13875.29"
+    },
+    {
+      "path": "line_items[12].date",
+      "kind": "date",
+      "value": "2026-10-14"
+    },
+    {
+      "path": "line_items[12].description",
+      "kind": "text",
+      "value": "Insurance, Tumbleweed Mutual"
+    },
+    {
+      "path": "line_items[12].reference",
+      "kind": "text",
+      "value": "ACH INS"
+    },
+    {
+      "path": "line_items[12].amount",
+      "kind": "amount",
+      "value": "-475.25"
+    },
+    {
+      "path": "line_items[12].balance",
+      "kind": "amount",
+      "value": "13400.04"
+    },
+    {
+      "path": "line_items[13].date",
+      "kind": "date",
+      "value": "2026-10-15"
+    },
+    {
+      "path": "line_items[13].description",
+      "kind": "text",
+      "value": "Service charge"
+    },
+    {
+      "path": "line_items[13].reference",
+      "kind": "text",
+      "value": "FEE"
+    },
+    {
+      "path": "line_items[13].amount",
+      "kind": "amount",
+      "value": "-15.00"
+    },
+    {
+      "path": "line_items[13].balance",
+      "kind": "amount",
+      "value": "13385.04"
+    }
+  ]
+}
