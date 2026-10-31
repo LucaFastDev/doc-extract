@@ -1,0 +1,50 @@
+{
+  "status": 200,
+  "body": {
+    "id": "msg_fixture_delivery_note",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-5-5",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_fixture_delivery_note",
+        "name": "record_delivery_note",
+        "input": {
+          "language": { "value": "en", "confidence": 0.99 },
+          "currency": { "value": "", "confidence": 0.9 },
+          "currency_as_printed": { "value": "", "confidence": 0.9 },
+          "supplier_name": { "value": "Fictional Paper Co.", "confidence": 0.96 },
+          "customer_name": { "value": "Example Studio Ltd", "confidence": 0.96 },
+          "ship_to_address": { "value": "1 Sample Road, London", "confidence": 0.92 },
+          "delivery_note_number": { "value": "DN-5520", "confidence": 0.98 },
+          "po_number": { "value": "PO-7731", "confidence": 0.96 },
+          "carrier": { "value": "Sample Freight", "confidence": 0.93 },
+          "tracking_number": { "value": "SF000123", "confidence": 0.92 },
+          "delivery_date": { "value": "2026-10-24", "confidence": 0.97 },
+          "total_packages": { "value": "3", "confidence": 0.94 },
+          "total_quantity": { "value": "25", "confidence": 0.95 },
+          "line_items": [
+            {
+              "item_code": { "value": "A4-500", "confidence": 0.94 },
+              "description": { "value": "A4 paper, box of 5 reams", "confidence": 0.95 },
+              "quantity_ordered": { "value": "20", "confidence": 0.96 },
+              "quantity_delivered": { "value": "20", "confidence": 0.96 },
+              "unit": { "value": "boxes", "confidence": 0.92 }
+            },
+            {
+              "item_code": { "value": "TN-12", "confidence": 0.93 },
+              "description": { "value": "Toner cartridge", "confidence": 0.95 },
+              "quantity_ordered": { "value": "5", "confidence": 0.96 },
+              "quantity_delivered": { "value": "5", "confidence": 0.96 },
+              "unit": { "value": "pcs", "confidence": 0.92 }
+            }
+          ]
+        }
+      }
+    ],
+    "stop_reason": "tool_use",
+    "stop_sequence": null,
+    "usage": { "input_tokens": 2100, "output_tokens": 800 }
+  }
+}

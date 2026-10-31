@@ -1,5 +1,7 @@
 import { prepareResult, type DocType } from '../../../shared/doctypes/index.ts'
-import type { CheckResult, FieldRow } from '../../../shared/doctypes/fields.ts'
+import { utcDate } from '../../../shared/doctypes/checks.ts'
+import type { DuplicateKey } from '../../../shared/doctypes/duplicate.ts'
+import { redactLastFour, type CheckResult, type FieldRow } from '../../../shared/doctypes/fields.ts'
 import { ClaudeError, PROMPT_VERSION, type ClaudeClient, type ExtractResult, type Usage } from '../_shared/claude.ts'
 
 // process-queue's steps (ARCHITECTURE.md sections 6.3 and 6.4), with the queue, the database,
@@ -53,6 +55,8 @@ export interface ExtractionRecord {
   doc_type?: string
   fields?: FieldRow[]
   checks?: CheckResult[]
+  /** The U1 key, for the duplicate query record_extraction runs (OQ-9). */
+  duplicate?: Pick<DuplicateKey, 'key' | 'label'>
 }
 
 export interface ProcessDeps {
@@ -186,7 +190,8 @@ export async function processQueue(deps: ProcessDeps): Promise<ProcessOutcome> {
   await deps.startProcessing(doc.id, attempts)
 
   const finish = async (record: ExtractionRecord, final: boolean): Promise<ProcessOutcome> => {
-    const stored = await deps.record(doc.id, reservation, record)
+    // Claude's answer is kept for debugging, but never a full card, account or IBAN number (OQ-29).
+    const stored = await deps.record(doc.id, reservation, { ...record, raw_output: redactLastFour(record.raw_output ?? null) })
     // A retryable attempt leaves the message to reappear after its visibility timeout, unless the
     // document is gone or was moved on meanwhile.
     if (final || stored !== 'recorded') await deps.archive(msg.msg_id)
@@ -280,6 +285,7 @@ export async function processQueue(deps: ProcessDeps): Promise<ProcessOutcome> {
   const prepared = prepareResult(result.docType, result.input, {
     confidenceThreshold: Number(config.confidence_threshold),
     amountTolerance: String(config.amount_tolerance),
+    today: utcDate(deps.now()),
   })
   if (!prepared.ok) {
     return invalidOutput(result.usage, `The ${result.toolName} input did not match its schema: ${prepared.errors.join('; ')}`, result.input, result.toolName)
@@ -293,6 +299,7 @@ export async function processQueue(deps: ProcessDeps): Promise<ProcessOutcome> {
       doc_type: result.docType,
       fields: prepared.fields,
       checks: prepared.checks,
+      duplicate: { key: prepared.duplicate.key, label: prepared.duplicate.label },
     },
     true,
   )

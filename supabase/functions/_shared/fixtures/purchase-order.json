@@ -1,0 +1,55 @@
+{
+  "status": 200,
+  "body": {
+    "id": "msg_fixture_purchase_order",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-5-5",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_fixture_purchase_order",
+        "name": "record_purchase_order",
+        "input": {
+          "language": { "value": "en", "confidence": 0.99 },
+          "currency": { "value": "GBP", "confidence": 0.97 },
+          "currency_as_printed": { "value": "£", "confidence": 0.95 },
+          "buyer_name": { "value": "Example Studio Ltd", "confidence": 0.97 },
+          "buyer_address": { "value": "1 Sample Road, London", "confidence": 0.92 },
+          "supplier_name": { "value": "Fictional Paper Co.", "confidence": 0.96 },
+          "supplier_address": { "value": "8 Mill Lane, Exampleford", "confidence": 0.9 },
+          "ship_to_address": { "value": "1 Sample Road, London", "confidence": 0.9 },
+          "po_number": { "value": "PO-7731", "confidence": 0.98 },
+          "payment_terms": { "value": "Net 30", "confidence": 0.93 },
+          "order_date": { "value": "2026-10-12", "confidence": 0.97 },
+          "requested_delivery_date": { "value": "2026-10-26", "confidence": 0.95 },
+          "subtotal": { "value": "780.00", "confidence": 0.98 },
+          "tax_total": { "value": "160.00", "confidence": 0.97 },
+          "shipping": { "value": "20.00", "confidence": 0.95 },
+          "total": { "value": "960.00", "confidence": 0.98 },
+          "line_items": [
+            {
+              "item_code": { "value": "A4-500", "confidence": 0.94 },
+              "description": { "value": "A4 paper, box of 5 reams", "confidence": 0.95 },
+              "quantity": { "value": "20", "confidence": 0.97 },
+              "unit": { "value": "boxes", "confidence": 0.92 },
+              "unit_price": { "value": "24.00", "confidence": 0.96 },
+              "amount": { "value": "480.00", "confidence": 0.97 }
+            },
+            {
+              "item_code": { "value": "TN-12", "confidence": 0.93 },
+              "description": { "value": "Toner cartridge", "confidence": 0.95 },
+              "quantity": { "value": "5", "confidence": 0.97 },
+              "unit": { "value": "pcs", "confidence": 0.92 },
+              "unit_price": { "value": "60.00", "confidence": 0.96 },
+              "amount": { "value": "300.00", "confidence": 0.97 }
+            }
+          ]
+        }
+      }
+    ],
+    "stop_reason": "tool_use",
+    "stop_sequence": null,
+    "usage": { "input_tokens": 2300, "output_tokens": 950 }
+  }
+}

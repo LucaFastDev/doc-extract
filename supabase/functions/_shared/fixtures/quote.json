@@ -1,0 +1,54 @@
+{
+  "status": 200,
+  "body": {
+    "id": "msg_fixture_quote",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-5-5",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_fixture_quote",
+        "name": "record_quote",
+        "input": {
+          "language": { "value": "de", "confidence": 0.98 },
+          "currency": { "value": "CHF", "confidence": 0.98 },
+          "currency_as_printed": { "value": "CHF", "confidence": 0.97 },
+          "supplier_name": { "value": "Imaginary Builders AG", "confidence": 0.96 },
+          "supplier_address": { "value": "Musterweg 3, 8000 Beispielstadt", "confidence": 0.9 },
+          "customer_name": { "value": "Example Studio Ltd", "confidence": 0.96 },
+          "customer_address": { "value": "1 Sample Road, London", "confidence": 0.9 },
+          "quote_number": { "value": "Q-2026-118", "confidence": 0.98 },
+          "payment_terms": { "value": "30 Tage netto", "confidence": 0.92 },
+          "quote_date": { "value": "2026-10-05", "confidence": 0.97 },
+          "valid_until": { "value": "2026-11-04", "confidence": 0.96 },
+          "subtotal": { "value": "1550.00", "confidence": 0.98 },
+          "discount_total": { "value": "50.00", "confidence": 0.95 },
+          "tax_total": { "value": "300.00", "confidence": 0.96 },
+          "total": { "value": "1800.00", "confidence": 0.98 },
+          "line_items": [
+            {
+              "description": { "value": "Malerarbeiten", "confidence": 0.95 },
+              "item_code": { "value": "", "confidence": 0.9 },
+              "quantity": { "value": "3", "confidence": 0.96 },
+              "unit": { "value": "Tage", "confidence": 0.93 },
+              "unit_price": { "value": "400.00", "confidence": 0.96 },
+              "amount": { "value": "1200.00", "confidence": 0.97 }
+            },
+            {
+              "description": { "value": "Material", "confidence": 0.95 },
+              "item_code": { "value": "", "confidence": 0.9 },
+              "quantity": { "value": "1", "confidence": 0.96 },
+              "unit": { "value": "", "confidence": 0.9 },
+              "unit_price": { "value": "350.00", "confidence": 0.96 },
+              "amount": { "value": "350.00", "confidence": 0.97 }
+            }
+          ]
+        }
+      }
+    ],
+    "stop_reason": "tool_use",
+    "stop_sequence": null,
+    "usage": { "input_tokens": 2200, "output_tokens": 850 }
+  }
+}

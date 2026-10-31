@@ -24,6 +24,11 @@ describe('buildRequest', () => {
     })
     expect(request.tools.map((t) => [t.name, t.strict])).toEqual([
       ['record_invoice', true],
+      ['record_receipt', true],
+      ['record_bank_statement', true],
+      ['record_purchase_order', true],
+      ['record_delivery_note', true],
+      ['record_quote', true],
       ['record_not_supported', true],
     ])
   })
@@ -32,6 +37,9 @@ describe('buildRequest', () => {
     const request = buildRequest(PDF, 'invoice', OPTIONS)
     expect(request.tools.map((t) => t.name)).toEqual(['record_invoice'])
     expect(request.tool_choice).toEqual({ type: 'auto' })
+    for (const type of ['receipt', 'bank_statement', 'purchase_order', 'delivery_note', 'quote'] as const) {
+      expect(buildRequest(PDF, type, OPTIONS).tools.map((t) => t.name), type).toEqual([`record_${type}`])
+    }
   })
 
   it('tells Claude to call exactly one tool, read only what is printed and keep text as printed', () => {
@@ -69,6 +77,18 @@ describe('readResponse', () => {
     expect(result.toolName).toBe('record_invoice')
     expect((result.input as { invoice_number: { value: string } }).invoice_number.value).toBe('INV-1042')
     expect(result.usage).toEqual({ input_tokens: 2400, output_tokens: 1100 })
+  })
+
+  it.each([
+    ['receipt', 'record_receipt'],
+    ['bank-statement', 'record_bank_statement'],
+    ['purchase-order', 'record_purchase_order'],
+    ['delivery-note', 'record_delivery_note'],
+    ['quote', 'record_quote'],
+  ])('reads the %s fixture as its type', (fixture, tool) => {
+    const result = readResponse(fixtureResponse(fixture), null)
+    expect(result.toolName).toBe(tool)
+    expect(result.docType).toBe(tool.replace('record_', ''))
   })
 
   it('reads record_not_supported as not_supported', () => {

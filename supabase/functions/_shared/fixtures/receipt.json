@@ -1,0 +1,50 @@
+{
+  "status": 200,
+  "body": {
+    "id": "msg_fixture_receipt",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-5-5",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_fixture_receipt",
+        "name": "record_receipt",
+        "input": {
+          "language": { "value": "en", "confidence": 0.99 },
+          "currency": { "value": "USD", "confidence": 0.7 },
+          "currency_as_printed": { "value": "$", "confidence": 0.95 },
+          "merchant_name": { "value": "Lantern Street Café", "confidence": 0.96 },
+          "merchant_address": { "value": "12 Lantern Street, Sampleton", "confidence": 0.9 },
+          "merchant_tax_id": { "value": "", "confidence": 0.9 },
+          "receipt_number": { "value": "R-000381", "confidence": 0.94 },
+          "payment_method": { "value": "Visa", "confidence": 0.95 },
+          "card_last4": { "value": "**** **** **** 4417", "confidence": 0.93 },
+          "transaction_date": { "value": "2026-10-20", "confidence": 0.97 },
+          "transaction_time": { "value": "08:42", "confidence": 0.95 },
+          "subtotal": { "value": "9.80", "confidence": 0.97 },
+          "tax_total": { "value": "0.98", "confidence": 0.96 },
+          "tip": { "value": "1.00", "confidence": 0.92 },
+          "total": { "value": "11.78", "confidence": 0.98 },
+          "line_items": [
+            {
+              "description": { "value": "Flat white", "confidence": 0.96 },
+              "quantity": { "value": "2", "confidence": 0.97 },
+              "unit_price": { "value": "3.50", "confidence": 0.96 },
+              "amount": { "value": "7.00", "confidence": 0.97 }
+            },
+            {
+              "description": { "value": "Croissant", "confidence": 0.95 },
+              "quantity": { "value": "1", "confidence": 0.97 },
+              "unit_price": { "value": "2.80", "confidence": 0.96 },
+              "amount": { "value": "2.80", "confidence": 0.97 }
+            }
+          ]
+        }
+      }
+    ],
+    "stop_reason": "tool_use",
+    "stop_sequence": null,
+    "usage": { "input_tokens": 1900, "output_tokens": 700 }
+  }
+}
