@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { getWorkspaceContext } from '@/lib/workspace/server'
 import { signOut } from './actions'
-import { WorkspaceSwitcher } from './workspace-switcher'
+import { NoWorkspace, WorkspaceSwitcher } from './workspace-switcher'
 
 // Signed-in pages: the header with the workspace switcher and sign-out. The proxy has already
 // sent signed-out visitors to sign-in.
@@ -27,7 +27,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           </form>
         </div>
       </header>
-      <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</div>
+      <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{current ? children : <NoWorkspace />}</div>
     </div>
   )
 }

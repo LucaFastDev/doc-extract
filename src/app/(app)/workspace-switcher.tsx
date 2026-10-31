@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useEffect, useState, useTransition } from 'react'
+import { useActionState, useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { ChevronsUpDownIcon, PencilIcon, PlusIcon, UsersIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from '@/components/ui/dialog'
 import {
   DropdownMenu,
@@ -37,13 +38,14 @@ interface Workspace {
 export function WorkspaceSwitcher({ workspaces, current }: { workspaces: Workspace[]; current: Workspace }) {
   const [dialog, setDialog] = useState<'create' | 'rename' | null>(null)
   const [pending, startTransition] = useTransition()
+  const trigger = useRef<HTMLButtonElement>(null)
 
   return (
     <>
       {/* Not modal, so the dialogs it opens get the pointer back when it closes. */}
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="max-w-full min-w-0 justify-between" disabled={pending}>
+          <Button ref={trigger} variant="outline" className="max-w-full min-w-0 justify-between" disabled={pending}>
             <span className="sr-only">Workspace: </span>
             <span className="truncate">{current.name}</span>
             <ChevronsUpDownIcon className="text-muted-foreground" />
@@ -82,12 +84,35 @@ export function WorkspaceSwitcher({ workspaces, current }: { workspaces: Workspa
       </DropdownMenu>
 
       <Dialog open={dialog !== null} onOpenChange={(open) => !open && setDialog(null)}>
-        <DialogContent>
+        {/* The dialogs open from menu items, not from a trigger of their own, so on close focus
+            is sent back to the switcher's button rather than left on <body>. */}
+        <DialogContent
+          onCloseAutoFocus={(event) => {
+            event.preventDefault()
+            trigger.current?.focus()
+          }}
+        >
           {dialog === 'create' && <CreateForm onDone={() => setDialog(null)} />}
           {dialog === 'rename' && <RenameForm workspace={current} onDone={() => setDialog(null)} />}
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+// What a user in no workspace sees in place of the page (PRD US-8.1 AC-3): the way to create one.
+export function NoWorkspace() {
+  const [open, setOpen] = useState(false)
+  return (
+    <main className="flex flex-col items-start gap-4">
+      <p>You are not in any workspace.</p>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button>Create workspace</Button>
+        </DialogTrigger>
+        <DialogContent>{open && <CreateForm onDone={() => setOpen(false)} />}</DialogContent>
+      </Dialog>
+    </main>
   )
 }
 
