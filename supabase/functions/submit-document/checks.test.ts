@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   allowanceRefusal,
   countPages,
+  imageSizeRefusal,
   magicBytesRefusal,
   pageLimitRefusal,
   pagesRemaining,
@@ -58,6 +59,28 @@ describe('magicBytesRefusal', () => {
   it('refuses content that is none of the accepted types', () => {
     expect(magicBytesRefusal('anim.gif', GIF, 'image/png')).not.toBeNull()
     expect(magicBytesRefusal('notes.pdf', new TextEncoder().encode('just text'), 'application/pdf')).not.toBeNull()
+  })
+})
+
+// Issue #28: an image's stored object may be at most 7,500,000 bytes; a PDF keeps the 10 MB limit.
+describe('imageSizeRefusal', () => {
+  it('accepts a JPEG, PNG or WebP of exactly 7,500,000 bytes', () => {
+    for (const type of ['image/jpeg', 'image/png', 'image/webp']) {
+      expect(imageSizeRefusal('photo', type, 7_500_000), type).toBeNull()
+    }
+  })
+
+  it('refuses a JPEG, PNG or WebP of 7,500,001 bytes, naming the image limit', () => {
+    for (const type of ['image/jpeg', 'image/png', 'image/webp']) {
+      expect(imageSizeRefusal('Receipt.jpg', type, 7_500_001), type).toBe(
+        'Receipt.jpg is over the 7.5 MB limit for images.',
+      )
+    }
+  })
+
+  it('accepts a PDF over 7.5 MB and up to 10 MB', () => {
+    expect(imageSizeRefusal('a.pdf', 'application/pdf', 7_500_001)).toBeNull()
+    expect(imageSizeRefusal('a.pdf', 'application/pdf', 10 * 1024 * 1024)).toBeNull()
   })
 })
 

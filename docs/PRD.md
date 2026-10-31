@@ -69,8 +69,9 @@ gets read without my retyping it.
   drag and drop.
 - AC-2: A file of any other type is refused before upload with a message naming the accepted
   types, and no document is created.
-- AC-3 (**OQ-4**): A file over 10 MB is refused before upload with a message naming the limit. A
-  PDF of more than 10 pages is refused with a message naming the limit, and no pages are counted.
+- AC-3 (**OQ-4**): A PDF over 10 MB, or a JPEG, PNG or WebP image over 7.5 MB (7,500,000 bytes), is
+  refused before upload with a message naming the limit. A PDF of more than 10 pages is refused
+  with a message naming the limit, and no pages are counted.
 - AC-4 (**OQ-42**): A user can upload up to 10 files in one action; each becomes its own document.
   Choosing more than 10 files is refused with a message naming the limit, and none is uploaded.
 - AC-5: After a successful upload the document appears in the workspace's document list with
@@ -601,7 +602,7 @@ whose files were deleted still count, because their hash and fields are kept (F1
 | Free plan | 20 pages per workspace per month | issue; OQ-2, OQ-3 |
 | Pro plan | 500 pages per workspace per month; $19 a month in USD, test mode, no trial | issue; OQ-2, OQ-3, OQ-24 |
 | Own uploads per account | 10 pages for the account's lifetime, on any plan, on the deployed site | issue; OQ-2 |
-| One document | at most 10 MB and 10 pages; PDF, JPEG, PNG or WebP | OQ-4 |
+| One document | PDF, JPEG, PNG or WebP; a PDF at most 10 MB, an image at most 7.5 MB; 10 pages | OQ-4 |
 | One upload | at most 10 files | OQ-42 |
 | AI spend, whole deployed app | $10 a calendar month, hard stop | issue; OQ-22 |
 | AI spend, whole deployed app, per day | $2 a UTC day, under the monthly cap | OQ-33 |
@@ -707,8 +708,9 @@ directed. Each entry gives the answer and where it is applied.
    site limits each account to 10 pages for its lifetime, on any plan. An image file is one page.
    Applied: US-1.1 AC-6, US-11.1 AC-2, US-13.2, section 5.
 3. **OQ-3 Plan scope.** Per workspace. Applied: US-1.1 AC-6, US-11.1 AC-2, section 5.
-4. **OQ-4 Accepted files.** PDF, JPEG, PNG and WebP; at most 10 MB and 10 pages per document.
-   Applied: US-1.1 AC-1 and AC-3, section 5.
+4. **OQ-4 Accepted files.** PDF, JPEG, PNG and WebP; at most 10 pages per document; a PDF at most
+   10 MB, an image at most 7.5 MB (7,500,000 bytes, which base64-encode to the Claude API's 10 MB
+   image limit; operator's decision of 2026-10-31, #28). Applied: US-1.1 AC-1 and AC-3, section 5.
 5. **OQ-5 Several documents in one file.** One file is one document; splitting is out of scope.
    Applied: US-2.1 AC-8, section 9.
 6. **OQ-6 Date sanity rules.** As drafted: more than one day in the future, before 2000-01-01, or

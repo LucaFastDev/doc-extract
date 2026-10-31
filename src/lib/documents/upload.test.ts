@@ -53,6 +53,41 @@ describe('checkSelection', () => {
   })
 })
 
+// Issue #28: an image may be at most 7,500,000 bytes, which base64-encode to the API's 10 MB image
+// limit; a PDF keeps the 10 MB limit.
+describe('checkSelection and the image limit', () => {
+  it('accepts a JPEG, PNG or WebP of exactly 7,500,000 bytes', () => {
+    for (const type of ['image/jpeg', 'image/png', 'image/webp']) {
+      expect(checkSelection([file('photo', type, 7_500_000)]), type).toEqual([])
+    }
+  })
+
+  it('refuses a JPEG, PNG or WebP of 7,500,001 bytes, naming the image limit', () => {
+    expect(
+      checkSelection([
+        file('a.jpg', 'image/jpeg', 7_500_001),
+        file('b.png', 'image/png', 7_500_001),
+        file('c.webp', 'image/webp', 7_500_001),
+      ]),
+    ).toEqual([
+      'a.jpg is over the 7.5 MB limit for images.',
+      'b.png is over the 7.5 MB limit for images.',
+      'c.webp is over the 7.5 MB limit for images.',
+    ])
+  })
+
+  it('names the image limit for an image over 10 MB too', () => {
+    expect(checkSelection([file('big.png', 'image/png', 10 * 1024 * 1024 + 1)])).toEqual([
+      'big.png is over the 7.5 MB limit for images.',
+    ])
+  })
+
+  it('accepts a PDF over 7.5 MB and up to 10 MB', () => {
+    expect(checkSelection([file('a.pdf', 'application/pdf', 7_500_001)])).toEqual([])
+    expect(checkSelection([file('b.pdf', 'application/pdf', 9 * 1024 * 1024)])).toEqual([])
+  })
+})
+
 describe('labels', () => {
   it('names every listed status as PRD US-10.1 AC-1 does', () => {
     expect(STATUS_LABELS).toEqual({

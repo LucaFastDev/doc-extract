@@ -184,7 +184,7 @@ shared/doctypes/               one module per type (invoice, receipt, bank-state
                                Schema, checks, U1 key; checks.ts (shared check kinds, dates),
                                duplicate.ts (U1), currency.ts (OQ-16), index.ts (the registry and
                                prepareResult); no imports outside shared/
-shared/limits.ts               accepted MIME types, 10 MB, 10 pages, 10 files per upload
+shared/limits.ts               accepted MIME types, 10 MB (PDF), 7.5 MB (image), 10 pages, 10 files per upload
 supabase/
   config.toml
   migrations/                  forward-only SQL
@@ -245,7 +245,7 @@ A function not in this table is added to it, by the same rule, in the milestone 
 | `accept_invite(token text) → uuid` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | reads `workspace_invites`, which the invitee cannot select, and inserts the membership |
 | `remove_member(ws uuid, member uuid)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | deletes from `workspace_members`, which has no client delete |
 | `set_member_role(ws uuid, member uuid, role text)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | updates `workspace_members`, which has no client update |
-| `create_document(ws uuid, file_name text, mime_type text, byte_size bigint) → (id uuid, storage_path text)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | inserts into `documents`, which has no client insert; refuses a MIME type outside OQ-4's list or a size over 10 MB |
+| `create_document(ws uuid, file_name text, mime_type text, byte_size bigint) → (id uuid, storage_path text)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | inserts into `documents`, which has no client insert; refuses a MIME type outside OQ-4's list, a size over 10 MB, or a JPEG, PNG or WebP over 7.5 MB (7,500,000 bytes, #28) |
 | `get_page_allowance(ws uuid) → (workspace_used int, workspace_limit int, account_used int, account_cap int)`, `stable` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | checks `is_member`; reads `plan_limits` and `app_config`, which have no client grants (OQ-2) |
 | `add_line_item(document_id uuid, after_position int)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | inserts into `extraction_fields`, which has no client insert (OQ-44) |
 | `delete_line_item(document_id uuid, position int)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | deletes from `extraction_fields`, which has no client delete (OQ-44) |
@@ -605,7 +605,9 @@ its storage state.
 | `demo` | no | `{slug}.{ext}` | select: `anon` and `authenticated`, where `bucket_id = 'demo'` and a published `demo_documents` row has that object's name as its `file_path`; no client writes |
 
 The `documents` bucket sets `file_size_limit` to 10 MB and `allowed_mime_types` to
-`application/pdf`, `image/jpeg`, `image/png` and `image/webp` (OQ-4). The review screen, and the
+`application/pdf`, `image/jpeg`, `image/png` and `image/webp` (OQ-4). The 10 MB is the PDF limit;
+a bucket has one size limit for every type, so the 7.5 MB image limit is held by `create_document`
+and `submit-document` instead (#28). The review screen, and the
 demo's review screen, show a file through a signed URL valid for 10 minutes. The `demo` bucket is
 not public, because a public bucket serves every object by URL whatever the policies say, including
 the files of unpublished samples. Objects are deleted only through the Storage API with the service
@@ -617,7 +619,7 @@ role: by `purge-files` (section 8) and by the deletion route handlers (section 6
 
 | Function | Caller | Auth | Does |
 |---|---|---|---|
-| `submit-document` | browser | user JWT | Checks membership and status `uploading`; downloads the object; checks magic bytes match the MIME type; counts pages (PDF via pdf-lib; image = 1, OQ-2) and refuses more than 10 (OQ-4); computes SHA-256; `reserve_pages(document)` (atomic; refuses over the workspace's monthly allowance or the account's lifetime cap); sets status `queued`; `extract_send(document)`, which sends `{document_id}` to the queue `extract`. A refusal sets status `rejected` with the reason and returns 409. If setting `queued` or the send fails, it calls `release_pages`, sets status `rejected` ("could not be queued") and returns 500, so no document holds pages without a message (Lead ruling on #20). It does not check the spend cap: work at the cap waits (OQ-23). |
+| `submit-document` | browser | user JWT | Checks membership and status `uploading`; downloads the object; checks magic bytes match the MIME type; refuses an image whose object is over 7.5 MB (7,500,000 bytes, #28); counts pages (PDF via pdf-lib; image = 1, OQ-2) and refuses more than 10 (OQ-4); computes SHA-256; `reserve_pages(document)` (atomic; refuses over the workspace's monthly allowance or the account's lifetime cap); sets status `queued`; `extract_send(document)`, which sends `{document_id}` to the queue `extract`. A refusal sets status `rejected` with the reason and returns 409. If setting `queued` or the send fails, it calls `release_pages`, sets status `rejected` ("could not be queued") and returns 500, so no document holds pages without a message (Lead ruling on #20). It does not check the spend cap: work at the cap waits (OQ-23). |
 | `process-queue` | pg_cron via pg_net | shared secret header `x-cron-secret`, checked against `CRON_SECRET`; JWT verification off | Reads one message (`extract_read(vt => 300, qty => 1)`), extracts it (6.3), archives it or delays it. Answers 401 without the right header. |
 | `approve-document` | browser | user JWT | Checks membership and status `needs_review`; re-runs the checks on the corrected values and upserts them; refuses with 409, naming them, while any failed check has no tick (OQ-11); sets `approved`, `approved_by`, `approved_at`; writes an `approved` event. |
 | `purge-files` | pg_cron via pg_net | shared secret header | Section 8. |
@@ -827,9 +829,10 @@ retried or change type. The `demo` bucket is never touched. The function's run i
 - **Input**: one Messages API call per document. A PDF is sent as a base64 `document` content
   block; an image as an `image` content block. Checked against Anthropic's documentation on
   2026-10-31: a request may be 128 MB and a PDF 100 pages (600 with a 1M-token context), so a
-  10 MB, 10-page PDF fits; an image may be 10 MB **base64-encoded**, about 7.5 MB of file, so an
-  accepted image of 7.5 to 10 MB is refused with a 400 and ends as Failed (recorded in the
-  milestone 5 PR; the upload limit is unchanged).
+  10 MB, 10-page PDF fits; an image may be 10 MB **base64-encoded**, about 7.5 MB of file. The
+  image upload limit matches it (#28): 7,500,000 bytes, which base64-encode to exactly 10,000,000,
+  within the API's limit whether its MB is 10^6 bytes or MiB, so no accepted image is too large
+  for the API. PDFs keep the 10 MB upload limit.
 - **Type detection and structured output in one call** (OQ-1): each type's JSON Schema in
   `shared/doctypes/<type>.ts` is the input schema of a tool `record_<type>` with `strict: true`,
   and a seventh tool, `record_not_supported`, also strict, takes a short reason. Sonnet 5.5 refuses

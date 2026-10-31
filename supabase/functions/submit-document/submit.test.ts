@@ -148,6 +148,26 @@ describe('submitDocument', () => {
     expect(deps.calls).toEqual(['reject'])
   })
 
+  // Issue #28: a client that sent create_document a smaller byte_size than it uploaded.
+  it('rejects an image whose stored object is over 7,500,000 bytes, counting no pages', async () => {
+    const big = new Uint8Array(7_500_001)
+    big.set(PNG)
+    deps = fake({ file: big, doc: { mime_type: 'image/png', file_name: 'receipt.png' } })
+    const result = await submitDocument({ document_id: DOC }, deps)
+    expect(result).toEqual({ status: 409, body: { error: 'receipt.png is over the 7.5 MB limit for images.' } })
+    expect(deps.rejected?.reason).toBe('receipt.png is over the 7.5 MB limit for images.')
+    expect(deps.status).toBe('rejected')
+    expect(deps.calls).toEqual(['reject'])
+    expect(deps.reserved).toBe(0)
+  })
+
+  it('accepts an image of exactly 7,500,000 bytes', async () => {
+    const limit = new Uint8Array(7_500_000)
+    limit.set(PNG)
+    deps = fake({ file: limit, doc: { mime_type: 'image/png', file_name: 'receipt.png' } })
+    expect((await submitDocument({ document_id: DOC }, deps)).status).toBe(202)
+  })
+
   it('rejects a PDF it cannot read, counting no pages', async () => {
     deps = fake({ file: new TextEncoder().encode('%PDF-1.7\nbroken') })
     const result = await submitDocument({ document_id: DOC }, deps)

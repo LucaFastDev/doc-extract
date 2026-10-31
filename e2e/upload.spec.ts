@@ -136,6 +136,24 @@ test('a file over 10 MB is refused before upload, naming the limit', async ({ pa
   expect(await documents(ws)).toEqual([])
 })
 
+// Issue #28: an image may be at most 7,500,000 bytes, which base64-encode to the API's image limit.
+test('an image over 7.5 MB is refused before upload, naming the image limit', async ({ page, context, baseURL }) => {
+  const { ws } = await openDocuments(page, context, baseURL!)
+  await expect(
+    page.getByText(
+      'Drop up to 10 files here, or choose them. PDF, JPEG, PNG or WebP. PDFs at most 10 MB, images at most 7.5 MB, and 10 pages each.',
+    ),
+  ).toBeVisible()
+  const big = Buffer.alloc(7_500_001)
+  Buffer.from([0xff, 0xd8, 0xff, 0xe0]).copy(big)
+  await picker(page).setInputFiles({ name: 'big photo.jpg', mimeType: 'image/jpeg', buffer: big })
+  await expect(refusal(page)).toContainText('big photo.jpg is over the 7.5 MB limit for images.')
+  await expect(refusal(page)).toContainText('Nothing was uploaded.')
+  expect(await documents(ws)).toEqual([])
+  const objects = await sql("select 1 from storage.objects where bucket_id = 'documents' and name like $1 || '/%'", [ws])
+  expect(objects).toEqual([])
+})
+
 test('more than 10 files are refused, naming the limit, and none is uploaded', async ({ page, context, baseURL }) => {
   const { ws } = await openDocuments(page, context, baseURL!)
   await picker(page).setInputFiles(Array.from({ length: 11 }, (_, i) => pngFile(`photo ${i + 1}.png`)))

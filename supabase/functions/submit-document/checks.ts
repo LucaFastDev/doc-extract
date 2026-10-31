@@ -1,5 +1,13 @@
 import { PDFDocument } from 'pdf-lib'
-import { ACCEPTED_TYPES_LABEL, MAX_PAGES, pages, type AcceptedMimeType } from '../../../shared/limits.ts'
+import {
+  ACCEPTED_TYPES_LABEL,
+  isImageMimeType,
+  MAX_IMAGE_BYTES,
+  MAX_IMAGE_LABEL,
+  MAX_PAGES,
+  pages,
+  type AcceptedMimeType,
+} from '../../../shared/limits.ts'
 
 // The checks submit-document makes on an uploaded file (ARCHITECTURE.md section 6.1), as pure
 // functions so the unit tests import them without the Deno runtime.
@@ -23,6 +31,15 @@ export function sniffType(bytes: Uint8Array): AcceptedMimeType | null {
 export function magicBytesRefusal(fileName: string, bytes: Uint8Array, declared: string): string | null {
   if (sniffType(bytes) === declared) return null
   return `${fileName} is not a PDF, JPEG, PNG or WebP file, or its content does not match its type. Accepted types: ${ACCEPTED_TYPES_LABEL}.`
+}
+
+/**
+ * A refusal for an image whose stored object is over the image limit (issue #28), which
+ * create_document refuses too, so only a client that sent a smaller byte_size gets here.
+ */
+export function imageSizeRefusal(fileName: string, type: string, byteSize: number): string | null {
+  if (!isImageMimeType(type) || byteSize <= MAX_IMAGE_BYTES) return null
+  return `${fileName} is over the ${MAX_IMAGE_LABEL} limit for images.`
 }
 
 /** A PDF's page count, or 1 for an image (OQ-2); null for a PDF that cannot be read. */
