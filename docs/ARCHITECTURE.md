@@ -189,10 +189,12 @@ shared/limits.ts               accepted MIME types, 10 MB (PDF), 7.5 MB (image),
 supabase/
   config.toml
   migrations/                  forward-only SQL
-  seed.sql                     local and CI data, including demo rows
+  seed.sql                     local and CI data; no demo rows, which arrive by migration (section 10)
   functions/
     _shared/                   Claude client, env, errors, fixtures
     submit-document/ process-queue/ approve-document/ purge-files/
+demo/                          the demo's samples: samples/ (the committed files), samples.ts (their
+                               values), make-samples.ts (the generator), upload.ts (to the local bucket)
 tests/access/                  Vitest access tests against the local stack
 e2e/                           Playwright specs; mock Claude server
 eval/                          eval documents, expected results, runner, results
@@ -580,16 +582,19 @@ RLS: enabled, no client grants.
 | Column | Type |
 |---|---|
 | id | uuid PK |
-| slug | text unique |
-| doc_type | text |
-| title | text |
-| file_path | text (object in the `demo` bucket) |
-| page_count | int |
-| result | jsonb: fields, confidences, line items, check results, flags |
-| sort_order | int |
-| published | boolean default false |
+| slug | text not null unique, lower-case words joined by `-` |
+| doc_type | text not null, one of the six types |
+| title | text not null |
+| summary | text not null: what the sample shows, one line on `/demo`, such as "a failed total check" |
+| file_path | text not null unique (object in the `demo` bucket, `{slug}.{ext}`; also the file name the demo shows and exports) |
+| page_count | int not null, 1 to 10 |
+| result | jsonb not null: `doc_type` (the detected type), `amount_tolerance` (the tolerance its checks ran with), `fields` (`path`, `kind`, `extracted_value`, `confidence`, `flags` as `extraction_fields` stores them; the line items are the `line_items[i].…` paths and the currency is the `currency` field) and `checks` (`check_id`, `status`, `field_paths`, `message` as `check_results` stores them) |
+| sort_order | int not null |
+| published | boolean not null default false |
 
-RLS: select for `anon` and `authenticated` using `(published)`; no client writes.
+RLS: select for `anon` and `authenticated` using `(published)`; no client writes (milestone 11's
+migration revokes all and grants select only). The rows arrive by that migration everywhere
+(section 10).
 
 ### 4.3 Realtime
 
@@ -626,9 +631,9 @@ its storage state.
 The `documents` bucket sets `file_size_limit` to 10 MB and `allowed_mime_types` to
 `application/pdf`, `image/jpeg`, `image/png` and `image/webp` (OQ-4). The 10 MB is the PDF limit;
 a bucket has one size limit for every type, so the 7.5 MB image limit is held by `create_document`
-and `submit-document` instead (#28). The review screen, and the
-demo's review screen, show a file through a signed URL valid for 10 minutes, made in the browser
-as the member. An image is shown as is; every page of a PDF is drawn on a canvas by pdf.js
+and `submit-document` instead (#28). The `demo` bucket has the same size limit and MIME types. The
+review screen shows a file through a signed URL valid for 10 minutes, made in the browser as the
+member; the demo's review screen makes it the same way as `anon`. An image is shown as is; every page of a PDF is drawn on a canvas by pdf.js
 (`pdfjs-dist`, milestone 7), which runs on the main thread: a document has at most 10 pages, and
 no worker file needs to be served. Zoom scales the pages inside a frame that scrolls. The `demo` bucket is
 not public, because a public bucket serves every object by URL whatever the policies say, including
@@ -909,18 +914,44 @@ retried or change type. The `demo` bucket is never touched. The function's run i
 
 - Sample files live in the `demo` bucket; their rows, with their stored `result` JSON, live in
   `demo_documents`. There is one sample per type, plus a second invoice that duplicates the first,
-  so the samples together show every kind of flag (OQ-38).
+  so the samples together show every kind of flag (OQ-38): the first invoice fails A3 (its printed
+  total), the second fails U1 against it, the quote fails D2 (valid until before its date), and
+  the receipt, a photographed PNG, has two faded fields below the 0.8 confidence threshold.
 - A worker makes the samples, fictitious, and writes each stored `result` by hand in the format
   `process-queue` stores, with confidences chosen so a low-confidence flag appears; the PR reviewer
-  checks the results against the documents (OQ-25, following OQ-26).
-- Locally and in CI, `supabase/seed.sql` inserts the rows and the e2e setup uploads the files.
-  In production they arrive in a data migration (rows) and a one-off upload by the operator
-  (files), listed in docs/go-live.md; seed.sql never runs in production.
-- `/demo` and `/demo/[slug]` are public routes. Their server components read `demo_documents` with
-  the server client and no session, so as `anon`, and render the review screen in demo mode from
-  `result`. No Edge Function and no route handler is called, so the demo can never call Claude (an
-  e2e test asserts that no request goes to `/functions/v1/` or `/api/` from a demo page).
-- Demo mode keeps a visitor's edits and exports in browser memory only (OQ-25).
+  checks the results against the documents (OQ-25, following OQ-26). The files are committed in
+  `demo/samples/`, named `{slug}.{ext}` as their `file_path`, and made by `demo/make-samples.ts`
+  (`npm run demo:samples`) from the values in `demo/samples.ts`: PDFs with pdf-lib and the receipt
+  as a PNG, the same bytes on every run (Lead ruling 2 on #41). `demo/samples.test.ts` checks that
+  the committed files are what the script makes, that each result holds the values its document
+  prints, and that its checks and flags are what the shared checks give.
+- **Rows by migration, everywhere** (Lead ruling 1 on #41). One migration,
+  `20261031193713_demo.sql`, creates `demo_documents`, the `demo` bucket and its policy, and
+  inserts the seven rows with `published = true`; it runs locally, in CI and in production alike,
+  and `supabase/seed.sql` inserts no demo rows. The files are uploaded separately: locally and in
+  CI by the e2e setup (`e2e/setup/demo-files.setup.ts`) with the local service role key, by
+  `npm run demo:upload` for `npm run dev`, both through `demo/upload.ts`, which refuses any stack
+  but the local one; in production once by the operator (docs/go-live.md).
+- `/demo` and `/demo/[slug]` (`src/app/(public)/demo/`) are public routes, for signed-in users
+  too. Their server components read `demo_documents` with a server client that has no session
+  (`createAnonClient` in `src/lib/supabase/server.ts`), so as `anon` whoever is signed in, and
+  render the review screen in demo mode from `result`; an unknown or unpublished slug gets the
+  not-found page. The document viewer signs its URL in the browser as `anon` too
+  (`createAnonClient` in `src/lib/supabase/client.ts`). No Edge Function and no route handler is
+  called, so the demo can never call Claude (an e2e test asserts that no request goes to
+  `/functions/v1/` or `/api/` from a demo page, and that the spend tables are unchanged).
+- **Demo mode** (Lead ruling 3 on #41) is the milestone 7 review screen with a `demo` prop: the
+  document viewer with all pages and zoom, flagged fields first, corrections, check ticks and
+  line-item add and delete, all kept in browser memory, so a reload shows the stored result again
+  (OQ-25). After each edit the browser re-runs the type's checks with the same pure functions from
+  `shared/doctypes/` (`liveReview`), with the tolerance stored in `result.amount_tolerance`, since
+  `get_amount_tolerance` is not granted to `anon`; U1 is not re-run and keeps its stored result.
+  It shows no delete, approve, reopen, type change or history (F14 AC-3, F19 AC-7).
+- **Export in demo** (F13 AC-5, Lead ruling 4 on #41): Export with XLSX or CSV builds the file
+  from the sample as currently edited with `src/lib/export/files.ts`, loaded by a dynamic import on
+  Download, with milestone 8's columns and rules. `document_id` is the sample's
+  `demo_documents.id`, `file_name` its `file_path`, and `approved_at` is empty; the file is named
+  `<type>-export-<yyyy-mm-dd>` as in milestone 8.
 
 ## 11. Export
 
@@ -1121,9 +1152,12 @@ needed. It does not add secrets to CI.
 10. **Retention and budget display**: `purge-files` and its cron job, stale-row and reservation
     sweep, `get_budget_status`, "$x of $10 used this month" and the waiting notice for signed-in
     users.
-11. **Demo**: `demo_documents`, `demo` bucket, the samples and their hand-written results, seed
-    rows and sample files, data migration for production, public demo routes, demo mode of the
-    review screen.
+11. **Demo**: `demo_documents`, `demo` bucket, the samples, their generator and their
+    hand-written results; one migration that creates the table, the bucket and its policy and
+    inserts the rows everywhere, with no seed rows (Lead ruling 1 on #41); the files committed and
+    uploaded by the e2e setup and `npm run demo:upload` locally, by the operator in production
+    (ruling 2); public demo routes; demo mode of the review screen, re-running the checks in the
+    browser (ruling 3), with export (ruling 4).
 12. **Landing page and legal pages**: `/` with the copy the Lead provides, demo and sign-in
     buttons, plans and limits from `get_plan_limits` as `anon`, accuracy table from the latest
     committed eval results, the 7-day and test-mode notices, links to the repo and the portfolio;

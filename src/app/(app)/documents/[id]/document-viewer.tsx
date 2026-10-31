@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MinusIcon, PlusIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { createClient } from '@/lib/supabase/client'
+import { createAnonClient, createClient } from '@/lib/supabase/client'
 
 // The original document beside its fields (PRD US-5.1 AC-1, OQ-44): every page of a PDF, or the
 // image, through a signed URL valid for 10 minutes (ARCHITECTURE.md section 5), and zoom in and
@@ -16,8 +16,19 @@ const FIT = ZOOM_LEVELS.indexOf(1)
 /** PDF pages are drawn at twice their size in points, so zooming in stays sharp. */
 const RENDER_SCALE = 2
 
-export function DocumentViewer({ storagePath, mimeType, fileName }: { storagePath: string; mimeType: string; fileName: string }) {
-  const supabase = useMemo(() => createClient(), [])
+export function DocumentViewer({
+  storagePath,
+  mimeType,
+  fileName,
+  bucket = 'documents',
+}: {
+  storagePath: string
+  mimeType: string
+  fileName: string
+  /** The demo's samples are signed as anon, whoever is signed in (ARCHITECTURE.md section 10). */
+  bucket?: 'documents' | 'demo'
+}) {
+  const supabase = useMemo(() => (bucket === 'demo' ? createAnonClient() : createClient()), [bucket])
   const [url, setUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [zoom, setZoom] = useState(FIT)
@@ -25,7 +36,7 @@ export function DocumentViewer({ storagePath, mimeType, fileName }: { storagePat
   useEffect(() => {
     let cancelled = false
     supabase.storage
-      .from('documents')
+      .from(bucket)
       .createSignedUrl(storagePath, SIGNED_URL_SECONDS)
       .then(({ data, error }) => {
         if (cancelled) return
@@ -39,7 +50,7 @@ export function DocumentViewer({ storagePath, mimeType, fileName }: { storagePat
     return () => {
       cancelled = true
     }
-  }, [supabase, storagePath])
+  }, [supabase, bucket, storagePath])
 
   return (
     <section aria-label="Document" className="flex min-w-0 flex-col rounded-lg border">

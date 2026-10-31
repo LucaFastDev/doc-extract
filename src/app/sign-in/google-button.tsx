@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 
 // Google is the only sign-in method (PRD US-9.1 AC-1, OQ-21). Supabase Auth sends the user to
 // Google and back to /auth/callback, which returns them to `next` (OQ-34).
-export function GoogleSignInButton({ next }: { next: string }) {
+export function GoogleSignInButton({ next, label = 'Continue with Google' }: { next: string; label?: string }) {
   const [pending, setPending] = useState(false)
   const [failed, setFailed] = useState(false)
 
@@ -28,7 +28,7 @@ export function GoogleSignInButton({ next }: { next: string }) {
   return (
     <div className="grid gap-3">
       <Button type="button" size="lg" className="w-full" onClick={signIn} disabled={pending}>
-        Continue with Google
+        {label}
       </Button>
       {failed && (
         <p role="alert" className="text-sm text-destructive">

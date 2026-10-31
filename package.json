@@ -16,7 +16,9 @@
     "test:access": "vitest run --config vitest.access.config.ts",
     "test:e2e": "playwright test",
     "functions:env": "node e2e/mock-claude/functions-env.ts",
-    "mock-claude": "node e2e/mock-claude/server.ts"
+    "mock-claude": "node e2e/mock-claude/server.ts",
+    "demo:samples": "node demo/make-samples.ts",
+    "demo:upload": "node demo/upload-local.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

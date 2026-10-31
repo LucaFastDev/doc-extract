@@ -110,7 +110,8 @@ domain (OQ-27). `<site>` below means that address.
       no captcha (OQ-19, OQ-33).
 - [ ] Storage: dashboard → Storage shows bucket `documents` (**not public**, file size limit 10 MB,
       allowed MIME types `application/pdf`, `image/jpeg`, `image/png`, `image/webp`; OQ-4) and
-      bucket `demo` (**not public**; read through its select policy). Pass: opening a `documents`
+      bucket `demo` (**not public**, the same limits; read through its select policy
+      `demo_objects_select` only, with no insert, update or delete policy). Pass: opening a `documents`
       or `demo` object URL without a signed token returns an error.
 - [ ] Storage: the `demo` bucket holds one file per published `demo_documents` row (`select slug,
       file_path from demo_documents where published`). Pass: every sample's file opens on its
@@ -204,6 +205,30 @@ a Vercel route handler that uses `SUPABASE_SERVICE_ROLE_KEY` (sections 4.1, 5, 6
       URL says "This document does not exist", Storage → `documents` no longer holds
       `<workspace>/<document>/original`, and `select pages_used from page_usage` is the same as
       before (PRD US-19.1 AC-4).
+
+## Demo
+
+Milestone 11: `/demo` and `/demo/<slug>` show seven fictitious samples on the review screen, read
+as anon from `demo_documents` and the private `demo` bucket (sections 4.2, 5 and 10). The rows
+arrive with the migration `20261031193713_demo.sql`; the files do not, so the operator uploads them
+once (Lead ruling 2 on #41).
+
+- [ ] **Upload the sample files**: from the release's commit, upload the seven files in the repo
+      folder `demo/samples/` to the production `demo` bucket, each at its own name, which is its
+      `file_path` (`invoice-total-mismatch.pdf`, `invoice-duplicate.pdf`, `receipt-photo.png`,
+      `bank-statement.pdf`, `purchase-order.pdf`, `delivery-note.pdf`, `quote-date-error.pdf`):
+      dashboard → Storage → `demo` → Upload files, at the bucket's top level, no folder. Never
+      run `npm run demo:upload` for this: it refuses any stack but the local one. Where to check:
+      SQL editor, `select d.file_path, o.name is not null as uploaded from demo_documents d left
+      join storage.objects o on o.bucket_id = 'demo' and o.name = d.file_path where d.published
+      order by d.sort_order`. Pass: seven rows, every `uploaded` true; the bucket shows **not
+      public** with a 10 MB limit; and in a private window, signed out, `<site>/demo` lists the
+      seven samples and each `<site>/demo/<slug>` shows its document (both pages of the bank
+      statement, the receipt photo) beside its fields, with no "could not be shown" message.
+- [ ] Pass: on `<site>/demo/invoice-total-mismatch`, signed out, check A3 is Failed; correcting
+      Total to 303.43 makes it pass; Export → CSV downloads a zip whose `documents.csv` has total
+      303.43; a reload shows 313.43 again; and `select spent_usd, reserved_usd from
+      ai_spend_periods order by period_start desc limit 1` is the same before and after (F13 AC-4).
 
 ## Google sign-in
 

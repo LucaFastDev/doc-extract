@@ -36,6 +36,11 @@ export async function createClient() {
   })
 }
 
+/** A client with no session, whoever is signed in: the anon role, for the public demo (section 10). */
+export function createAnonClient() {
+  return createSupabaseClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } })
+}
+
 /**
  * The service-role client, for the route handlers that must bypass RLS (ARCHITECTURE.md section
  * 6.2). It holds no session and throws when SUPABASE_SERVICE_ROLE_KEY is unset.

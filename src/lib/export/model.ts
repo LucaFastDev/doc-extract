@@ -13,8 +13,8 @@ import { currentValue, parseLinePath, type StoredField } from '@shared/doctypes/
 export interface ExportDocument {
   id: string
   fileName: string
-  /** The approval time, as Postgres returns it (ISO 8601 with an offset). */
-  approvedAt: string
+  /** The approval time, as Postgres returns it (ISO 8601 with an offset); null for a demo sample, never approved. */
+  approvedAt: string | null
   /** Every header field of the type; null or '' when it has no value. */
   fields: Record<string, string | null>
   /** The lines (a bank statement's transactions) in the order the review screen shows them. */
@@ -71,7 +71,7 @@ export function exportTables(input: ExportInput): { documents: ExportTable; line
     rows: input.documents.map((d) => [
       text(d.id),
       text(d.fileName),
-      { type: 'datetime', iso: d.approvedAt },
+      d.approvedAt === null ? null : { type: 'datetime', iso: d.approvedAt },
       ...def.fields.map((f) => cellFor(f.kind, d.fields[f.name] ?? null)),
     ]),
   }
@@ -96,7 +96,7 @@ export function exportTables(input: ExportInput): { documents: ExportTable; line
  */
 export function exportDocument(
   docType: DocType,
-  doc: { id: string; file_name: string; approved_at: string },
+  doc: { id: string; file_name: string; approved_at: string | null },
   rows: Pick<StoredField, 'path' | 'extracted_value' | 'corrected_value'>[],
 ): ExportDocument {
   const def = DOC_TYPES[docType]
