@@ -38,6 +38,7 @@
     "@types/react-dom": "^19.3.0",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.4.3",
+    "pdf-lib": "1.17.1",
     "pg": "^8.23.1",
     "supabase": "^2.122.0",
     "tailwindcss": "^4.3.3",
