@@ -1,0 +1,984 @@
+# doc-extract: architecture
+
+Status: for the operator's review (issue #1). Requirements are in [PRD.md](PRD.md); this document
+says how they are built. Every open question is answered (PRD.md, "Open questions and answers");
+where a design follows from an answer, it names the question (OQ-n).
+
+## 1. Stack
+
+| Layer | Choice |
+|---|---|
+| Web app | Next.js (App Router), TypeScript, Tailwind, shadcn/ui, on Vercel |
+| Server code in the web app | Next.js route handlers on Vercel: Stripe checkout, customer portal and webhook; document, workspace and account deletion; the OAuth callback |
+| Backend | Supabase: Postgres with RLS, Auth (Google only), Storage, Realtime, pgmq + pg_cron + pg_net, Edge Functions (Deno) for the extraction pipeline |
+| Supabase clients | `@supabase/ssr` with cookie sessions: one browser module, one server module |
+| AI | Claude API, called only from the `process-queue` Edge Function |
+| Billing | Stripe, test mode only |
+| Tests | Vitest (unit and access tests), Playwright (e2e); Claude is mocked everywhere |
+
+**Why the pipeline stays on Supabase.** An extraction (a Claude call on a 10-page PDF, with
+retries) can outlast a Vercel function's time limit. The queue, the cron job and the function that
+calls Claude therefore run in Supabase, next to the data, and the web app never waits on Claude.
+Everything else server-side is either Postgres (functions, policies, cron) or a short Next.js route
+handler.
+
+## 2. Components and document flow
+
+```mermaid
+flowchart LR
+  subgraph Browser
+    UI["Next.js pages<br/>(client components)"]
+  end
+  subgraph Vercel
+    SC["Server components,<br/>middleware"]
+    RH["Route handlers<br/>/auth/callback<br/>/api/billing/*<br/>/api/stripe/webhook<br/>/api/documents/[id]<br/>/api/workspaces/[id]<br/>/api/account"]
+  end
+  subgraph Supabase
+    Auth["Auth<br/>Google"]
+    DB[("Postgres<br/>RLS, RPCs")]
+    ST[("Storage<br/>documents, demo")]
+    RT["Realtime"]
+    Q[["pgmq queue<br/>extract"]]
+    CRON["pg_cron + pg_net"]
+    subgraph EF["Edge Functions"]
+      SUB["submit-document"]
+      PQ["process-queue"]
+      APR["approve-document"]
+      PUR["purge-files"]
+    end
+  end
+  Claude["Claude API"]
+  Google["Google OAuth"]
+  Stripe["Stripe (test mode)"]
+
+  UI -- sign in --> Auth -- OAuth --> Google
+  Auth -- code --> RH
+  UI -- upload file --> ST
+  UI -- read rows, RPCs --> DB
+  UI -- subscribe --> RT
+  UI --> SUB & APR
+  UI --> RH
+  SC -- read rows as the user --> DB
+  RH -- checkout, portal, cancel --> Stripe
+  Stripe -- events --> RH
+  RH -- plan, deletions (service role) --> DB
+  RH -- remove files --> ST
+  SUB -- pages, allowances --> DB
+  SUB -- enqueue --> Q
+  CRON -- every 10 s --> PQ
+  CRON -- daily --> PUR
+  PQ -- read / archive / delay --> Q
+  PQ -- reserve and settle spend --> DB
+  PQ -- PDF or image + tools --> Claude
+  PQ -- type, fields, checks, status --> DB
+  DB -- row changes --> RT
+  PUR -- delete files --> ST
+```
+
+How one document goes from upload to export:
+
+```mermaid
+sequenceDiagram
+  actor U as User
+  participant UI as Browser
+  participant DB as Postgres
+  participant ST as Storage
+  participant SUB as submit-document
+  participant Q as pgmq
+  participant PQ as process-queue
+  participant C as Claude API
+
+  U->>UI: choose up to 10 files
+  UI->>UI: check count, type and size
+  UI->>DB: rpc create_document(workspace, name, mime, size)
+  DB-->>UI: document id, storage path (status uploading)
+  UI->>ST: upload to documents/{workspace}/{document}/original
+  UI->>SUB: POST {document_id}
+  SUB->>ST: download, check magic bytes, count pages, SHA-256
+  SUB->>DB: reserve_pages(document): workspace month + account lifetime
+  alt over an allowance, over 10 pages, bad file
+    SUB->>DB: status rejected, reason
+    SUB-->>UI: 409 with message
+  else accepted
+    SUB->>Q: send extract {document_id}
+    SUB->>DB: status queued
+    SUB-->>UI: 202
+  end
+  loop every 10 s (pg_cron)
+    PQ->>Q: read 1 message, visibility 300 s
+    PQ->>DB: reserve_spend(estimate): month and day
+    alt budget reached
+      PQ->>DB: status waiting_budget
+      PQ->>Q: delay message 600 s
+    else reserved
+      PQ->>DB: status processing
+      PQ->>C: messages.create(document + one tool per type)
+      C-->>PQ: tool call (type and fields) + usage
+      PQ->>DB: record_extraction: settle spend, fields, checks, status needs_review or unsupported
+      PQ->>Q: archive
+    end
+  end
+  DB-->>UI: Realtime: status changes
+  U->>UI: review, correct fields, tick failed checks
+  UI->>DB: update corrected values (RLS), rpc set_check_ticked
+  U->>UI: approve
+  UI->>APR: POST {document_id}
+  APR->>DB: re-run checks, all failed checks ticked?, status approved
+  U->>UI: export CSV / XLSX for one type
+  UI->>DB: read approved fields (RLS)
+  UI->>UI: build file in the browser, download
+```
+
+Document status:
+
+```mermaid
+stateDiagram-v2
+  [*] --> uploading
+  uploading --> queued: submit accepted
+  uploading --> rejected: allowance, size, pages, bad file
+  queued --> waiting_budget: monthly cap or daily ceiling reached
+  waiting_budget --> processing: budget available
+  queued --> processing: spend reserved
+  processing --> needs_review: result stored
+  processing --> unsupported: none of the six types
+  processing --> queued: retryable error, attempts < 3
+  processing --> failed: attempts exhausted or not retryable
+  failed --> queued: user retries
+  unsupported --> queued: user picks a type
+  needs_review --> queued: user changes the type
+  needs_review --> approved: every failed check ticked
+  approved --> needs_review: reopen
+```
+
+The UI shows `unsupported` as "Not supported" and `waiting_budget` as "Waiting for budget".
+`uploading` rows that never get submitted (the browser closed mid-upload) are removed after one
+hour by the daily purge job, with their file if any. `rejected` rows are not listed. A member can
+delete a document in any listed status (section 6.2); it then leaves the diagram.
+
+## 3. Repository layout
+
+```
+src/
+  app/                         Next.js App Router
+    (public)/                  /, /demo, /demo/[slug], /sign-in, /privacy, /terms
+    (app)/                     signed-in pages: documents, review, export, members, billing, settings
+    invite/[token]/            accept an invitation (sign-in first)
+    auth/callback/route.ts     exchanges Google's code for a session cookie
+    api/billing/checkout/route.ts, api/billing/portal/route.ts
+    api/stripe/webhook/route.ts
+    api/documents/[id]/route.ts    DELETE: delete one document
+    api/workspaces/[id]/route.ts   DELETE: delete a workspace
+    api/account/route.ts           DELETE: delete the signed-in account
+    layout.tsx                 root layout; imports ../index.css
+  middleware.ts                refreshes the session cookie; sends signed-out visitors to /sign-in
+  lib/supabase/client.ts       the browser client (createBrowserClient); throws if NEXT_PUBLIC_SUPABASE_URL is unset
+  lib/supabase/server.ts       the server client (createServerClient + cookies), the service-role
+                               client and the middleware helper; `import 'server-only'`; throws if unset
+  lib/stripe.ts                server-only Stripe client; throws unless the key starts with sk_test_
+  index.css                    design tokens (CSS variables on :root), shadcn layout
+  features/…                   upload, documents, review, export, billing, workspace, demo
+shared/doctypes/               per-type field sets, JSON Schemas, tool descriptions, checks; no imports
+shared/limits.ts               accepted MIME types, 10 MB, 10 pages, 10 files per upload
+supabase/
+  config.toml
+  migrations/                  forward-only SQL
+  seed.sql                     local and CI data, including demo rows
+  functions/
+    _shared/                   Claude client, env, errors, fixtures
+    submit-document/ process-queue/ approve-document/ purge-files/
+tests/access/                  Vitest access tests against the local stack
+e2e/                           Playwright specs; mock Claude server
+eval/                          eval documents, expected results, runner, results
+```
+
+`shared/` is plain TypeScript with no dependencies, so the Next.js app and the Deno functions
+import the same definitions (Next.js through a `tsconfig` path alias, Deno by relative import, which
+the function bundler follows). Files in it import each other with explicit `.ts` extensions, which
+Deno needs. The scaffold milestone proves both builds can import it.
+
+**Where code runs.** Pages are server components by default and read data with the server client,
+as the signed-in user, through RLS. The document list and the review screen are client components
+because they subscribe to Realtime and edit fields; they use the browser client. Nothing that holds
+a secret is imported by a client component: every module that reads a server-only variable starts
+with `import 'server-only'`, so such an import fails the build.
+
+## 4. Database schema
+
+All tables are in `public`, have RLS enabled, and start with `revoke all … from anon,
+authenticated`; each grant below is explicit. No policy is open to every row: a table that clients
+read in full is read through a function instead (see `plan_limits`). Timestamps are `timestamptz`,
+ids are `uuid` with `gen_random_uuid()`. A column that references `profiles` for audit (who uploaded,
+approved, corrected, ticked, invited) is `on delete set null`, so deleting an account (F18) keeps
+the work it did in workspaces that remain.
+
+### 4.1 Database functions
+
+**Rule for every function**, here and in every later milestone. Its migration and its row in the
+table below state all three:
+
+1. **Security**: `security invoker`, unless the function must bypass RLS to do its job; then
+   `security definer`, owned by `postgres`, and it checks the caller itself (`auth.uid()`,
+   `is_member`, `is_owner`, the invite) before it reads or writes anything.
+2. **Search path**: `set search_path = ''`, with every name in the body schema-qualified
+   (`public.documents`, `auth.uid()`, `extensions.gen_random_bytes()`).
+3. **Grants**: `revoke execute on function … from public, anon, authenticated, service_role`, then
+   `grant execute … to` exactly the roles in its row: `authenticated` for a client RPC, `anon` as
+   well only when it must be called signed out, `service_role` for a server-only function, and none
+   for a trigger function. Supabase's default privileges grant execute on new functions to `anon`,
+   `authenticated` and `service_role` by name, so revoking from `public` alone would leave those
+   grants in place.
+
+A function not in this table is added to it, by the same rule, in the milestone that creates it.
+
+| Function | Called by | Security | Search path | Grants | Why this security mode |
+|---|---|---|---|---|---|
+| `is_member(ws uuid) → boolean`, `stable`: the caller has a row in `workspace_members` | RLS and Storage policies, RPCs, route handlers | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | reads `workspace_members` without recursing into that table's own policy |
+| `is_owner(ws uuid) → boolean`, `stable`: that row has role `owner` | RLS policies, RPCs, route handlers | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | as `is_member` |
+| `create_workspace(name text) → uuid` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | inserts into `workspaces` and `workspace_members`, which clients cannot insert into |
+| `create_invite(ws uuid, email text, role text) → text` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | checks `is_owner`; stores the SHA-256 of a random 32-byte token with `expires_at = now() + 7 days` (OQ-18) in `workspace_invites`, which clients cannot insert into; returns the token once, for the copy-link (OQ-19) |
+| `accept_invite(token text) → uuid` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | reads `workspace_invites`, which the invitee cannot select, and inserts the membership |
+| `remove_member(ws uuid, member uuid)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | deletes from `workspace_members`, which has no client delete |
+| `set_member_role(ws uuid, member uuid, role text)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | updates `workspace_members`, which has no client update |
+| `create_document(ws uuid, file_name text, mime_type text, byte_size bigint) → (id uuid, storage_path text)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | inserts into `documents`, which has no client insert; refuses a MIME type outside OQ-4's list or a size over 10 MB |
+| `get_page_allowance(ws uuid) → (workspace_used int, workspace_limit int, account_used int, account_cap int)`, `stable` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | checks `is_member`; reads `plan_limits` and `app_config`, which have no client grants (OQ-2) |
+| `add_line_item(document_id uuid, after_position int)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | inserts into `extraction_fields`, which has no client insert (OQ-44) |
+| `delete_line_item(document_id uuid, position int)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | deletes from `extraction_fields`, which has no client delete (OQ-44) |
+| `set_check_ticked(document_id uuid, check_id text, ticked boolean)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | checks `is_member` and status `needs_review`; writes `check_ticks`, which has no client writes (OQ-11) |
+| `reopen_document(document_id uuid)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | checks `is_member` and status `approved`; clears the approval and writes `document_events`, neither of which clients may do (OQ-12) |
+| `change_document_type(document_id uuid, doc_type text)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | checks `is_member`, status `needs_review` or `unsupported` and that the file is not deleted; deletes the document's fields, checks and ticks, reserves pages for an `unsupported` document, sends it to the queue (OQ-1) |
+| `retry_document(document_id uuid)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | checks `is_member`, status `failed` and that the file is not deleted; resets `attempts`, reserves pages and sends to the queue, none of which clients may do (OQ-10) |
+| `get_budget_status() → (spent_usd numeric, cap_usd numeric, daily_reached boolean, monthly_reached boolean, resumes_at timestamptz)` | browser, signed in | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | reads `ai_spend_periods`, `ai_spend_days` and `app_config`, which have no client grants; signed-in users only (OQ-22) |
+| `get_plan_limits() → table (plan text, pages_per_period int, monthly_price_usd numeric)`, `stable` | browser and server components, signed in or not | definer | `set search_path = ''` | revoke execute from public; grant execute to `anon`, `authenticated` | reads `plan_limits`, which has RLS and no select policy; `anon` because the landing page shows the plans to visitors who are not signed in (OQ-27) |
+| `reserve_pages(document_id uuid) → boolean` | `submit-document` (service role), `retry_document`, `change_document_type` | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | `service_role` bypasses RLS, so definer is not needed |
+| `release_pages(document_id uuid)` | `process-queue` (service role), `delete_document` | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
+| `reserve_spend(document_id uuid, estimate numeric) → (reservation uuid, refused_by text)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
+| `settle_spend(reservation uuid, actual_cost numeric)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
+| `release_stale_spend_reservations() → int` | `purge-files` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
+| `record_extraction(…)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
+| `delete_document(document_id uuid)` | `DELETE /api/documents/[id]` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages`; the route handler checks `is_member` before calling it (section 6.2) |
+| `handle_new_user()`, trigger after insert on `auth.users` | Auth, through the trigger | definer | `set search_path = ''` | revoke execute from public; no grant | inserts into `public.profiles`, and creates the personal workspace with the user as owner (OQ-17), as Auth's own role, which has no grant on them |
+| `set_correction_audit()`, trigger before update on `extraction_fields` | the trigger | invoker | `set search_path = ''` | revoke execute from public; no grant | only sets `corrected_by = auth.uid()` and `corrected_at = now()` on the row being updated |
+
+"revoke execute from public" in the table is short for the full revoke in rule 3. When
+`retry_document` or `change_document_type` calls `reserve_pages` or `pgmq.send`, it runs as its
+owner, `postgres`, which owns `reserve_pages`, the tables and the queue, so that call needs no
+further grant.
+
+Workspace deletion, account deletion and the Stripe webhook are not database functions: they run in
+Next.js route handlers with the service-role client (section 6.2), because they also call Stripe
+and the Storage API. Document deletion runs in a route handler for the same reason, because it
+removes the file through the Storage API; its database part is `delete_document`.
+
+### 4.2 Tables
+
+**profiles**: one row per auth user, created by the trigger `handle_new_user()` on `auth.users`
+(section 4.1).
+
+| Column | Type |
+|---|---|
+| id | uuid PK, references auth.users on delete cascade |
+| email | text not null (the Google account's verified address) |
+| display_name | text |
+| created_at | timestamptz default now() |
+
+RLS: select where `id = auth.uid()` or the row's user shares a workspace with the caller; update
+of `display_name` where `id = auth.uid()` (column grant). No insert or delete by clients.
+
+**workspaces**
+
+| Column | Type |
+|---|---|
+| id | uuid PK |
+| name | text not null |
+| plan | text not null default 'free', check in ('free','pro') |
+| stripe_customer_id | text unique |
+| stripe_subscription_id | text |
+| plan_period_end | timestamptz |
+| created_by | uuid references profiles on delete set null |
+| created_at | timestamptz |
+
+RLS: select where `is_member(id)`; update of `name` only where `is_owner(id)` (column grant on
+`name`, OQ-17). `plan` and the Stripe columns are written only by the Stripe webhook route handler
+with the service role. Creation through `rpc create_workspace(name)` (section 4.1) and, for the
+personal workspace, the `handle_new_user()` trigger (OQ-17). No client delete: an owner deletes a
+workspace through `DELETE /api/workspaces/[id]` (section 6.2, OQ-30). Every table that holds a
+workspace's data references `workspaces` `on delete cascade`, so deleting the row deletes them.
+
+**workspace_members**
+
+| Column | Type |
+|---|---|
+| workspace_id | uuid references workspaces on delete cascade |
+| user_id | uuid references profiles on delete cascade |
+| role | text not null check in ('owner','member') |
+| created_at | timestamptz |
+| | PK (workspace_id, user_id) |
+
+RLS: select where `is_member(workspace_id)`. No direct insert, update or delete: `rpc
+accept_invite(token)`, `rpc remove_member(ws, user)` and `rpc set_member_role(ws, user, role)`
+(section 4.1) check `is_owner` (or the invite) and refuse to leave a workspace without an owner
+(OQ-20).
+
+**workspace_invites**
+
+| Column | Type |
+|---|---|
+| id | uuid PK |
+| workspace_id | uuid references workspaces on delete cascade |
+| email | text not null (lower-cased) |
+| role | text check in ('owner','member') |
+| token_hash | text not null unique (SHA-256 of a random 32-byte token) |
+| invited_by | uuid references profiles on delete set null |
+| created_at | timestamptz default now() |
+| expires_at | timestamptz not null (created_at + 7 days, OQ-18) |
+| accepted_at, revoked_at | timestamptz |
+
+RLS: select and update of `revoked_at` where `is_owner(workspace_id)`. Inserted only by `rpc
+create_invite` (section 4.1). The token is never stored; the owner copies the link
+`<site>/invite/<token>` once, when it is created (OQ-19). `accept_invite` matches `token_hash`, the
+caller's verified email (`auth.jwt() ->> 'email'`), not expired, not accepted, not revoked.
+
+**documents**
+
+| Column | Type |
+|---|---|
+| id | uuid PK |
+| workspace_id | uuid references workspaces on delete cascade |
+| uploaded_by | uuid references profiles on delete set null |
+| doc_type | text check in the six types; null until detected or chosen |
+| doc_type_source | text check in ('detected','user'); null until set (OQ-1) |
+| status | text check in ('uploading','queued','waiting_budget','processing','needs_review','approved','failed','unsupported','rejected') |
+| status_reason | text (user-readable) |
+| file_name, mime_type | text |
+| byte_size | bigint |
+| page_count | int |
+| sha256 | text |
+| storage_path | text |
+| attempts | int default 0 |
+| pages_reserved | boolean default false |
+| processing_started_at | timestamptz |
+| duplicate_of | uuid references documents on delete set null |
+| created_at, processed_at, approved_at, file_deleted_at | timestamptz |
+| approved_by | uuid references profiles on delete set null |
+
+Index on `(workspace_id, created_at desc)` and `(workspace_id, sha256)`.
+
+RLS: select where `is_member(workspace_id)`. Insert only through `rpc create_document` (section
+4.1; checks `is_member`, sets status `uploading` and the storage path). No client update: type
+changes, retries and reopening go through the RPCs in section 4.1, and every other change is made
+by Edge Functions with the service role. No client delete: a member deletes a document through
+`DELETE /api/documents/[id]` (section 6.2, OQ-20), and every document goes with its workspace
+(OQ-30). The tables that hold its results (`extraction_fields`, `check_results`, `check_ticks`,
+`document_events`, `extractions`) reference `documents` `on delete cascade`, so deleting the row
+deletes them.
+
+**document_events**: the document's history: approvals, reopens, type changes and retries (OQ-12,
+OQ-44).
+
+| Column | Type |
+|---|---|
+| id | uuid PK |
+| document_id | uuid references documents on delete cascade |
+| workspace_id | uuid |
+| kind | text check in ('approved','reopened','type_changed','retried') |
+| actor | uuid references profiles on delete set null |
+| created_at | timestamptz default now() |
+
+RLS: select where `is_member(workspace_id)`. Written only by `approve-document` (service role) and
+the RPCs `reopen_document`, `change_document_type` and `retry_document`.
+
+**extraction_fields**: one row per field or line-item cell.
+
+| Column | Type |
+|---|---|
+| id | uuid PK |
+| document_id | uuid references documents on delete cascade |
+| workspace_id | uuid (copied from the document, for RLS without a join) |
+| path | text: `total`, or `line_items[3].amount` |
+| kind | text: text, date, amount, number, percent |
+| extracted_value | text |
+| confidence | numeric(4,3) |
+| corrected_value | text |
+| corrected_by | uuid references profiles on delete set null |
+| corrected_at | timestamptz |
+| flags | text[]: low_confidence, check_failed, duplicate, currency_guessed |
+| | unique (document_id, path) |
+
+RLS: select where `is_member(workspace_id)`. Update of `corrected_value` only (column grant),
+where `is_member(workspace_id)` and the document's status is `needs_review`; the trigger
+`set_correction_audit()` sets `corrected_by` and `corrected_at`. Insert of a new line-item row, and
+delete of a line item, through `rpc add_line_item` / `rpc delete_line_item` (section 4.1) with the
+same conditions (OQ-44). Extracted values are never changed by clients.
+
+**check_results**
+
+| Column | Type |
+|---|---|
+| id | uuid PK |
+| document_id | uuid references documents on delete cascade |
+| workspace_id | uuid |
+| check_id | text: `A1`, `D2`, `U1` … |
+| status | text check in ('pass','fail','skipped') |
+| field_paths | text[] |
+| message | text |
+| evaluated_at | timestamptz |
+| | unique (document_id, check_id) |
+
+RLS: select where `is_member(workspace_id)`. Written only by `process-queue` and
+`approve-document`, which upsert by `(document_id, check_id)`. While a user edits, the browser
+re-runs the same checks from `shared/doctypes/` to update flags live (PRD US-4.1 AC-7, OQ-44); the
+stored rows are the server's result.
+
+**check_ticks**: the user's tick on a failed check (OQ-11).
+
+| Column | Type |
+|---|---|
+| document_id | uuid references documents on delete cascade |
+| workspace_id | uuid |
+| check_id | text |
+| ticked_by | uuid references profiles on delete set null |
+| ticked_at | timestamptz default now() |
+| | PK (document_id, check_id) |
+
+RLS: select where `is_member(workspace_id)`. Written only through `rpc set_check_ticked`; deleted
+by `change_document_type`. A tick is kept while the check keeps failing after a correction, and is
+irrelevant once it passes. `approve-document` refuses when any stored `fail` row has no tick.
+
+**extractions**: one row per Claude call, for cost and debugging.
+
+| Column | Type |
+|---|---|
+| id | uuid PK |
+| document_id | uuid references documents on delete cascade |
+| workspace_id | uuid |
+| model | text |
+| prompt_version | text |
+| tool_name | text: `record_invoice` … or `record_not_supported` |
+| outcome | text check in ('ok','unsupported','retryable_error','fatal_error','invalid_output') |
+| error | text |
+| raw_output | jsonb |
+| input_tokens, output_tokens | int |
+| cost_usd | numeric(10,6) |
+| created_at | timestamptz |
+
+RLS: enabled, no client grants. Service role only.
+
+**page_usage**: pages per workspace per calendar month (OQ-2, OQ-3).
+
+| Column | Type |
+|---|---|
+| workspace_id | uuid references workspaces on delete cascade |
+| period_start | date (first day of the UTC month) |
+| pages_used | int not null default 0 |
+| | PK (workspace_id, period_start) |
+
+**account_page_usage**: pages per account for its lifetime (OQ-2).
+
+| Column | Type |
+|---|---|
+| user_id | uuid PK references profiles on delete cascade |
+| pages_used | int not null default 0 |
+
+RLS on both: select where `is_member(workspace_id)` and where `user_id = auth.uid()` respectively.
+Written only by `reserve_pages` / `release_pages`. The UI reads the limits through `rpc
+get_page_allowance`.
+
+**plan_limits**: configuration.
+
+| Column | Type |
+|---|---|
+| plan | text PK ('free','pro') |
+| pages_per_period | int |
+| monthly_price_usd | numeric(6,2) |
+
+Seeded by migration with (free, 20, 0) and (pro, 500, 19.00) (OQ-24). RLS: enabled, no policies and
+no client grants (the `revoke all` baseline). Clients read the limits only through `rpc
+get_plan_limits()` (section 4.1), granted to `anon` and `authenticated` (OQ-27). The Stripe price
+in `STRIPE_PRICE_PRO` must match `monthly_price_usd` (go-live).
+
+**ai_spend_periods** (one row per UTC month) and **ai_spend_days** (one row per UTC day, OQ-33)
+
+| Column | Type |
+|---|---|
+| period_start (month) / day (day) | date PK |
+| cap_usd | numeric(10,2) not null |
+| spent_usd | numeric(10,6) default 0 |
+| reserved_usd | numeric(10,6) default 0 |
+
+**ai_spend_reservations**
+
+| Column | Type |
+|---|---|
+| id | uuid PK |
+| document_id | uuid references documents on delete set null |
+| period_start, day | date |
+| estimate_usd | numeric(10,6) |
+| created_at, settled_at | timestamptz |
+
+**app_config**: single-row configuration (`id boolean PK default true check (id)`):
+`spend_cap_usd` (10.00), `daily_cap_usd` (2.00, OQ-33), `account_page_cap` (10, OQ-2; null turns
+the cap off), `model`, `input_usd_per_mtok`, `output_usd_per_mtok`, `base_input_tokens`,
+`max_input_tokens_per_page`, `max_output_tokens`, `confidence_threshold` (0.80, OQ-8),
+`amount_tolerance` (0.01, OQ-7). The migration inserts the row with these values; the local seed
+keeps them, so tests cover the account cap and the daily ceiling.
+
+RLS on the spend tables and `app_config`: enabled, no client grants. Signed-in clients learn the
+budget only through `rpc get_budget_status()` (section 4.1).
+
+**stripe_events**: webhook idempotency.
+
+| Column | Type |
+|---|---|
+| id | text PK (Stripe event id) |
+| type | text |
+| received_at, processed_at | timestamptz |
+
+RLS: enabled, no client grants.
+
+**demo_documents**
+
+| Column | Type |
+|---|---|
+| id | uuid PK |
+| slug | text unique |
+| doc_type | text |
+| title | text |
+| file_path | text (object in the `demo` bucket) |
+| page_count | int |
+| result | jsonb: fields, confidences, line items, check results, flags |
+| sort_order | int |
+| published | boolean default false |
+
+RLS: select for `anon` and `authenticated` using `(published)`; no client writes.
+
+### 4.3 Realtime
+
+`documents` is in the `supabase_realtime` publication. The browser subscribes to `postgres_changes`
+on `documents` filtered by `workspace_id=eq.<current>`; Realtime applies the table's select policy,
+so a client receives only rows it can read (PRD US-10.1 AC-3, covered by an access test and an e2e
+test). The browser client passes the session from its cookie to Realtime, so the subscription runs
+as the signed-in user.
+
+### 4.4 Access tests
+
+`tests/access/` holds a Vitest file per table, run by `npm run test:access` (its own Vitest config)
+against the local stack, in CI after `supabase db reset`. Each signs in, through `supabase-js` with
+the anon key, as `anon`, as a member of workspace A and as a member of workspace B, and checks what
+each can select, insert, update and delete, including the RPCs and the server-only functions being
+refused to clients. For every function in section 4.1 they also check, through a direct connection
+to the local database (`SUPABASE_DB_URL`) and `has_function_privilege`, that exactly the roles in
+its row can execute it.
+
+**Signing in test users.** Tests cannot drive Google's consent screen. The local `config.toml`
+therefore enables the email provider with passwords, for tests only: setup creates users with the
+admin API (local service role key) and signs them in with a password through the API. The app's UI
+has no email form, and production has the email provider disabled (docs/go-live.md). Playwright's
+global setup signs in the same way with `@supabase/ssr` in Node and saves the session cookies as
+its storage state.
+
+## 5. Storage
+
+| Bucket | Public | Path | Policies on `storage.objects` |
+|---|---|---|---|
+| `documents` | no | `{workspace_id}/{document_id}/original` | insert: `authenticated`, where `is_member` of the first path segment and a `documents` row with that id, status `uploading` and that path exists; select: `authenticated`, where `is_member` of the first segment; no update; no client delete |
+| `demo` | no | `{slug}.{ext}` | select: `anon` and `authenticated`, where `bucket_id = 'demo'` and a published `demo_documents` row has that object's name as its `file_path`; no client writes |
+
+The `documents` bucket sets `file_size_limit` to 10 MB and `allowed_mime_types` to
+`application/pdf`, `image/jpeg`, `image/png` and `image/webp` (OQ-4). The review screen, and the
+demo's review screen, show a file through a signed URL valid for 10 minutes. The `demo` bucket is
+not public, because a public bucket serves every object by URL whatever the policies say, including
+the files of unpublished samples. Objects are deleted only through the Storage API with the service
+role: by `purge-files` (section 8) and by the deletion route handlers (section 6.2).
+
+## 6. Server code
+
+### 6.1 Edge Functions
+
+| Function | Caller | Auth | Does |
+|---|---|---|---|
+| `submit-document` | browser | user JWT | Checks membership and status `uploading`; downloads the object; checks magic bytes match the MIME type; counts pages (PDF via pdf-lib; image = 1, OQ-2) and refuses more than 10 (OQ-4); computes SHA-256; `reserve_pages(document)` (atomic; refuses over the workspace's monthly allowance or the account's lifetime cap); sets status `queued`; `pgmq.send('extract', {document_id})`. A refusal sets status `rejected` with the reason and returns 409. It does not check the spend cap: work at the cap waits (OQ-23). |
+| `process-queue` | pg_cron via pg_net | shared secret header | Reads one message (`pgmq.read('extract', vt => 300, qty => 1)`), extracts it (6.3), archives it or delays it. |
+| `approve-document` | browser | user JWT | Checks membership and status `needs_review`; re-runs the checks on the corrected values and upserts them; refuses with 409, naming them, while any failed check has no tick (OQ-11); sets `approved`, `approved_by`, `approved_at`; writes an `approved` event. |
+| `purge-files` | pg_cron via pg_net | shared secret header | Section 8. |
+
+Every function reads its settings through `_shared/env.ts`, which throws at startup when a required
+variable is unset; nothing has a default that points at a real service. Stripe is not used by any
+Edge Function.
+
+### 6.2 Next.js route handlers and middleware
+
+All run on the Node.js runtime and are short; none calls Claude.
+
+| Route | Caller | Auth | Does |
+|---|---|---|---|
+| `GET /auth/callback` | Google, through Supabase Auth | OAuth code (PKCE) | `exchangeCodeForSession`, which sets the session cookie; redirects to `next` if it is a path on this site, else to the document list (OQ-34). |
+| `POST /api/billing/checkout` | browser | session cookie | Server client; checks `is_owner` (OQ-20); creates a Stripe Checkout session in subscription mode for `STRIPE_PRICE_PRO`, with no trial (OQ-24), the workspace id as metadata; returns its URL. |
+| `POST /api/billing/portal` | browser | session cookie | Checks `is_owner`; creates a customer portal session; returns its URL (OQ-37). |
+| `POST /api/stripe/webhook` | Stripe | Stripe signature, no session | Reads the raw body (`request.text()`), verifies it with `stripe.webhooks.constructEvent` and `STRIPE_WEBHOOK_SECRET`; inserts the event id into `stripe_events` with the service-role client (a duplicate is acknowledged and skipped); on `checkout.session.completed` and `customer.subscription.updated` sets the workspace's plan, customer, subscription and period end; on `customer.subscription.deleted`, which Stripe sends at the end of a cancelled period, sets the plan to `free` (OQ-24, OQ-37). |
+| `DELETE /api/documents/[id]` | browser, after the user confirms (PRD US-19.1) | session cookie | Reads the document with the server client, as the caller, so RLS returns it only to a member of its workspace; otherwise 404, and nothing changes. Checks `is_member(workspace_id)`; any member, owner or member, may delete any document of the workspace (OQ-20). With the service-role client: unless `file_deleted_at` is set, removes the object at `storage_path` in `documents` through the Storage API (an object already gone counts as removed); then `rpc delete_document(id)`, which in one transaction locks the row `for update`, calls `release_pages` if the status is `queued`, `waiting_budget` or `processing` (pages held, not yet used, PRD US-19.1 AC-5), and deletes the row, which cascades to its fields, check results, ticks, history and extractions. Pages already counted stay in `page_usage` and `account_page_usage`, which are not keyed by document, so they are not refunded (PRD US-19.1 AC-4); spend already recorded in `ai_spend_periods` and `ai_spend_days` stays too, and `ai_spend_reservations.document_id` and a later document's `duplicate_of` become null. If removing the file fails, it stops before deleting the row and returns 500, so it is safe to run again. Returns 204. |
+| `DELETE /api/workspaces/[id]` | browser | session cookie | Checks `is_owner`. With the service-role client: cancels an active subscription at once in Stripe; removes every object under `{id}/` in `documents` through the Storage API, in batches of 100; then deletes the `workspaces` row, which cascades. If removing files fails, it stops before deleting the row and returns 500, so it is safe to run again (OQ-17, OQ-30). |
+| `DELETE /api/account` | browser | session cookie | Refuses with 409 while the caller is the only owner of a workspace that has other members (OQ-20). Deletes, as above, every workspace where the caller is the only member; then `auth.admin.deleteUser(caller)`, which cascades to `profiles`, memberships and `account_page_usage`, and sets the caller's audit columns elsewhere to null (OQ-30). |
+
+`src/middleware.ts` refreshes the session cookie on each request (the `@supabase/ssr` pattern),
+and sends a signed-out visitor who opens a page outside the public list (`/`, `/demo…`,
+`/sign-in`, `/privacy`, `/terms`, `/auth/callback`, `/api/stripe/webhook`) to
+`/sign-in?next=<path>`.
+
+`src/lib/stripe.ts` throws if `STRIPE_SECRET_KEY` does not start with `sk_test_` (PRD US-11.1
+AC-4). `src/lib/supabase/server.ts` throws when `NEXT_PUBLIC_SUPABASE_URL` or
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` is unset, and its service-role client throws when
+`SUPABASE_SERVICE_ROLE_KEY` is unset.
+
+### 6.3 Extraction in process-queue
+
+1. Load the document. Go on if its status is `queued` or `waiting_budget`, or `processing` with
+   `processing_started_at` more than 10 minutes ago (an earlier run was killed); otherwise
+   (already done, deleted, or retried by hand) archive the message and stop.
+2. `reserve_spend(document_id, estimate)` (section 7). If it is refused by the monthly cap or the
+   daily ceiling, set status `waiting_budget` with a `status_reason` naming which one and when it
+   resets, delay the message with `pgmq.set_vt(…, 600)`, and stop. No attempt is counted (OQ-23).
+3. Set status `processing`, `processing_started_at = now()`, `attempts = attempts + 1`.
+4. Call Claude (section 9) with the file from Storage: with every type's tool and `tool_choice`
+   `any` when the type is to be detected, or with the chosen type's tool forced when
+   `doc_type_source` is `user` (OQ-1).
+5. If Claude called `record_not_supported`: in `record_extraction`, settle spend, store the
+   `extractions` row, set status `unsupported`; then `release_pages` (0 pages, OQ-1); archive;
+   stop.
+6. Validate the tool input against the type's JSON Schema again, in the function.
+7. Normalise values, run the type's checks and the duplicate query, compute flags (including
+   `currency_guessed`, OQ-16).
+8. In one transaction (`record_extraction`): `settle_spend` with the actual usage, the
+   `extractions` row, the `extraction_fields` and `check_results` rows, `doc_type` and
+   `doc_type_source = 'detected'` when it was detected, status `needs_review`. It locks the
+   document row first; if a member deleted the document during the call (section 6.2), it only
+   settles spend and the message is archived.
+9. `pgmq.archive`.
+
+A document's pages stay reserved from `submit-document` until the extraction succeeds, when they
+are counted for good, or fails or is not supported, when `release_pages` gives them back (OQ-10).
+
+### 6.4 Failures and retries
+
+| Failure | Treatment |
+|---|---|
+| Monthly cap or daily ceiling reached | Not a failure: status `waiting_budget`, message delayed 600 s, no attempt counted (step 2). |
+| Claude 429, 500, 529 (overloaded), network error, timeout | Retryable. Settle spend with any usage reported (none if the call failed before a response), record the attempt, set status back to `queued`, do not archive: the message reappears after its 300 s visibility timeout. |
+| Output fails schema validation | Retried once as above; a second invalid output is fatal. |
+| Claude 400 (for example an unreadable or encrypted PDF), refusal | Fatal at once. |
+| Edge Function killed mid-call (wall-clock limit, deploy) | The message reappears after the visibility timeout; step 1 sees status `processing` with a stale `processing_started_at` and continues as a retry. The purge job's sweep releases spend reservations older than 15 minutes. |
+| Attempts reach 3 (`documents.attempts`) | Fatal. |
+
+Fatal: status `failed` with a user-readable `status_reason`, `release_pages` (a failure counts 0
+pages, OQ-10), archive the message. The user's retry (`rpc retry_document`, section 4.1) resets
+`attempts`, reserves the pages again (refused like an upload if they no longer fit), writes a
+`retried` event and re-enqueues; it is refused once the file is deleted.
+
+`process-queue` handles one document per call, and a document has at most 10 pages, so a long bank
+statement fits in one Edge Function run. The cron job fires every 10 seconds and sends up to
+`EXTRACT_CONCURRENCY` (default 2) requests each time, so at most that many documents are processed
+at once; pgmq's visibility timeout stops two runs from taking the same message.
+
+## 7. Spend cap and page allowances, server-side
+
+Both are enforced in Postgres functions called only with the service role (or by `postgres` from a
+definer RPC), inside a transaction that locks the rows with `select … for update`, so concurrent
+calls cannot both pass a limit.
+
+**Page allowances** (OQ-2, OQ-3). `reserve_pages(document_id)` reads the document's workspace,
+uploader and `page_count`; finds the workspace's `page_usage` row for the current UTC month and the
+uploader's `account_page_usage` row (inserting either if missing); reads the plan's
+`pages_per_period` and `app_config.account_page_cap`; refuses if either
+`pages_used + pages` would pass its limit; otherwise adds the pages to both and sets
+`pages_reserved`. Called by `submit-document` before anything is queued, and by `retry_document`
+and `change_document_type`. `release_pages(document_id)` subtracts them from both rows when the
+document fails or is not supported, and clears `pages_reserved`. The client reads what is left
+through `get_page_allowance`; it cannot change it. Usage is per calendar month whatever the plan,
+so a change of plan does not reset it (PRD US-11.1 AC-7).
+
+**Spend cap and daily ceiling** (OQ-22, OQ-33). Before each Claude call,
+`reserve_spend(document_id, estimate)`:
+
+```
+estimate = (base_input_tokens + pages × max_input_tokens_per_page) × input_usd_per_mtok / 1e6
+         + max_output_tokens × output_usd_per_mtok / 1e6
+```
+
+It locks the current UTC month's `ai_spend_periods` row and the current UTC day's `ai_spend_days`
+row (inserting either with `cap_usd` from `app_config` if missing). It refuses, returning
+`refused_by` `monthly` or `daily`, if `spent_usd + reserved_usd + estimate > cap_usd` for either;
+otherwise it adds the estimate to `reserved_usd` on both, inserts an `ai_spend_reservations` row and
+returns its id. After the call, `settle_spend(reservation, actual_cost)` moves the estimate out of
+`reserved_usd` on both rows and adds the actual cost from the response's `usage` to `spent_usd` on
+both. Because the reserved amount is an upper bound, both limits hold even with concurrent calls.
+`max_output_tokens` is also sent as the call's `max_tokens`, so the output part of the bound is a
+limit, not a guess. The input part rests on `base_input_tokens` (system prompt and tool
+definitions) and `max_input_tokens_per_page`, set above the largest values the eval measures;
+`settle_spend` logs any call whose actual input passed its estimate, so a wrong setting is visible.
+
+The prices in `app_config` are copied from Anthropic's pricing page for the configured model when
+the queue milestone is built, and checked in docs/go-live.md. As a second guard, the Anthropic
+Console's monthly spend limit for the production key is $10 (go-live), so an error in our own
+accounting cannot spend more. The eval (F16) uses the operator's own key and never touches these
+tables (OQ-26).
+
+`get_budget_status()` returns this month's `spent_usd` and `cap_usd` for "$x of $10 used this
+month", and whether the daily ceiling or the monthly cap is reached, meaning the budget left is
+below the estimate for a one-page document, with the time waiting work resumes: the next UTC
+midnight, or the first day of the next UTC month (OQ-22, OQ-23).
+
+## 8. 7-day deletion
+
+A pg_cron job (`purge-files`, daily at 03:00 UTC) calls the `purge-files` function through pg_net.
+The function:
+
+1. Selects documents with `created_at < now() - interval '7 days'` and `file_deleted_at is null`,
+   on every plan (OQ-14), in batches of 100.
+2. Removes their objects with the Storage API (`storage.from('documents').remove(paths)`); direct
+   deletes from `storage.objects` leave the files behind and are not used.
+3. Sets `file_deleted_at` for each object that was removed. One that failed keeps
+   `file_deleted_at` null and is retried on the next run. Running daily keeps every file under
+   8 days old, the bound in PRD US-14.1 AC-1 (OQ-39).
+4. Removes `uploading` rows older than one hour and their objects, and calls
+   `release_stale_spend_reservations()` (section 6.4).
+
+Only files are deleted: fields, checks, ticks and history stay until the document, the workspace
+or the account is deleted (OQ-14, OQ-20, OQ-30). A document whose file is deleted cannot be
+retried or change type. The `demo` bucket is never touched. The function's run is logged in
+`cron.job_run_details`, and the function returns how many files it removed and how many failed.
+
+## 9. Calling Claude
+
+- **Model**: `claude-sonnet-5-5` by default, set in `app_config.model` (and `CLAUDE_MODEL` locally).
+  The eval (F16) also runs `claude-haiku-5-5`; if Haiku meets the accuracy targets it becomes the
+  default, because the $10 cap buys several times more pages with it. The choice and the measured
+  numbers are recorded with each eval run.
+- **Input**: one Messages API call per document. A PDF is sent as a base64 `document` content
+  block; an image as an `image` content block. OQ-4's limits (10 MB, 10 pages) are well inside the
+  API's request size and PDF page limits; the queue milestone confirms this against Anthropic's
+  current documentation.
+- **Type detection and structured output in one call** (OQ-1): each type's JSON Schema in
+  `shared/doctypes/<type>.ts` is the input schema of a tool `record_<type>` with strict schema
+  validation, and a seventh tool, `record_not_supported`, takes a short reason. To detect the type,
+  all seven tools are sent with `tool_choice: { type: "any" }`, so Claude must call exactly one;
+  the tool it calls is the type. When the user has chosen the type, only that type's tool is sent,
+  forced with `tool_choice: { type: "tool", name }`. The function validates the tool input again
+  before storing it. Every field in a schema is an object `{ value: string | null, confidence:
+  number }`; line items are arrays of such objects. Values are strings so amounts keep their exact
+  decimals.
+- **Prompt per type**: a system prompt shared by all types (read only what is printed, never
+  invent, return null for an absent field, give dates as YYYY-MM-DD and amounts as plain decimals,
+  keep text as printed and do not translate (OQ-15), report the currency as an ISO 4217 code and as
+  printed, and when none is printed give the most likely one from context (OQ-16), give a
+  confidence for each value, call `record_not_supported` for anything that is not one of the six
+  types) plus each tool's description and field descriptions, which name the type's fields, their
+  meaning and the usual labels in several languages. Each prompt has a `prompt_version`, stored on
+  every extraction and every eval run.
+- **Temperature**: 0.
+- **Client**: `_shared/claude.ts` wraps the official TypeScript SDK in an interface
+  `ClaudeClient.extract(file, docType | null) → { docType | 'not_supported', result, usage }`.
+
+### How tests mock Claude
+
+- **Unit tests (Vitest)** inject a fake `ClaudeClient` returning fixtures from
+  `supabase/functions/_shared/fixtures/`, one or more per type, including `record_not_supported`,
+  invalid output and error responses, so detection, retries, validation and checks are tested
+  without the network.
+- **End-to-end (Playwright) and local development** run the real Edge Functions against a small
+  mock HTTP server (`e2e/mock-claude/`), started by Playwright's `webServer` next to `next dev`.
+  The functions reach it because `ANTHROPIC_BASE_URL` points at it in the local functions env file.
+  It answers the Messages API with recorded tool-call responses chosen by the SHA-256 of the
+  uploaded file, and can be told to return 429 or 529 to test retries.
+- `ANTHROPIC_BASE_URL` and `ANTHROPIC_API_KEY` are both required with no default, so a function
+  that is missing them fails at startup instead of reaching the real API. CI sets a dummy key and
+  the mock URL, and holds no real key.
+
+## 10. The demo
+
+- Sample files live in the `demo` bucket; their rows, with their stored `result` JSON, live in
+  `demo_documents`. There is one sample per type, plus a second invoice that duplicates the first,
+  so the samples together show every kind of flag (OQ-38).
+- A worker makes the samples, fictitious, and writes each stored `result` by hand in the format
+  `process-queue` stores, with confidences chosen so a low-confidence flag appears; the PR reviewer
+  checks the results against the documents (OQ-25, following OQ-26).
+- Locally and in CI, `supabase/seed.sql` inserts the rows and the e2e setup uploads the files.
+  In production they arrive in a data migration (rows) and a one-off upload by the operator
+  (files), listed in docs/go-live.md; seed.sql never runs in production.
+- `/demo` and `/demo/[slug]` are public routes. Their server components read `demo_documents` with
+  the server client and no session, so as `anon`, and render the review screen in demo mode from
+  `result`. No Edge Function and no route handler is called, so the demo can never call Claude (an
+  e2e test asserts that no request goes to `/functions/v1/` or `/api/` from a demo page).
+- Demo mode keeps a visitor's edits and exports in browser memory only (OQ-25).
+
+## 11. Export
+
+Export runs in the browser: it reads the chosen approved documents of one type through RLS and
+builds the file locally, so no server code and no extra secret is needed (OQ-13). XLSX has two
+sheets, "Documents" and "Line items"; CSV is the same two tables as `documents.csv` and
+`line_items.csv` in one zip. The CSV writer is our own small, tested function (RFC 4180). The XLSX
+and zip libraries are chosen and justified in the export milestone.
+
+## 12. Environment variables and secrets
+
+| Name | Used by | Local value | Production value, where it is set |
+|---|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | browser and server modules | `http://127.0.0.1:54321` (from `supabase status`) | the production project URL; Vercel, Production env |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | browser and server modules | local anon key | the production anon (publishable) key; Vercel |
+| `SUPABASE_SERVICE_ROLE_KEY` | route handlers: Stripe webhook, document, workspace and account deletion (server only) | local service role key | the production service role key; Vercel, Production env, sensitive (secret) |
+| `STRIPE_SECRET_KEY` | billing, webhook, workspace and account deletion route handlers (server only) | a test key (`sk_test_…`) or empty, Stripe mocked in tests | a test key (`sk_test_…`); Vercel, sensitive (secret) |
+| `STRIPE_WEBHOOK_SECRET` | webhook route handler (server only) | from `stripe listen` | the test-mode endpoint's signing secret; Vercel, sensitive (secret) |
+| `STRIPE_PRICE_PRO` | checkout route handler (server only) | a test price id | the test-mode Pro price id ($19 a month); Vercel |
+| `SITE_URL` | checkout and portal return URLs (server only) | `http://localhost:<port>` | `https://<project>.vercel.app`; Vercel |
+| `ANTHROPIC_API_KEY` | process-queue | a dummy value | the production key; Supabase function secrets (secret) |
+| `ANTHROPIC_BASE_URL` | process-queue | the mock server's URL | `https://api.anthropic.com`; function secrets |
+| `CLAUDE_MODEL` | process-queue locally, eval | `claude-sonnet-5-5` | `app_config.model` in the database |
+| `CRON_SECRET` | process-queue, purge-files (checked) and pg_cron (sent) | any random string | random 32 bytes; function secrets and Supabase Vault (secret) |
+| `EXTRACT_CONCURRENCY` | pg_cron job | 1 | 2 |
+| Google OAuth client id and secret | Supabase Auth | `env()` in `config.toml`, from `supabase/.env` | Supabase dashboard → Auth → Providers → Google (secret) |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | all Edge Functions | provided by the local runtime | provided by Supabase |
+| `SUPABASE_DB_URL` | access tests only | from `supabase status` | never set |
+
+Only the two `NEXT_PUBLIC_` variables reach the browser; Next.js inlines them at build time. Every
+server-only name is read only in modules that import `server-only`, and none has a `NEXT_PUBLIC_`
+prefix. The Stripe variables are no longer Edge Function secrets: Stripe runs only in route
+handlers.
+
+pg_cron jobs read the functions' base URL and `CRON_SECRET` from Supabase Vault
+(`vault.decrypted_secrets`), so neither is written in a migration.
+
+Files: `.env.example` lists every Next.js variable above (the `NEXT_PUBLIC_` ones and the
+server-only ones) without values; `supabase/functions/.env.example` lists every function variable
+without values. `.env.local` (local stack values only) and `supabase/functions/.env` are
+gitignored, and `.worktreeinclude` lists `.env.local` only. Production values live only in Vercel
+and Supabase, never in a file in the repo or a worktree. `src/lib/supabase/client.ts` and
+`src/lib/supabase/server.ts` throw at load when `NEXT_PUBLIC_SUPABASE_URL` or
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` is unset.
+
+## 13. Milestone plan
+
+Each milestone is one issue for one worker. Days are working days for one worker; the total is
+about 13.5. A milestone starts when the ones it depends on are merged. Every open question is
+answered; the last column names the answers each milestone applies, so its worker reads them in
+PRD.md.
+
+| # | Milestone | Days | Depends on | Decisions it applies |
+|---|---|---|---|---|
+| 1 | Scaffold: agent-ready Next.js repo | 1 | this PR, and the ai-hq change below | OQ-40, OQ-41 |
+| 2 | Google sign-in, profiles, personal workspace, workspace switch, create and rename, RLS helpers, middleware | 1 | 1 | OQ-17, OQ-19, OQ-21, OQ-34 |
+| 3 | Copy-link invitations and roles | 1 | 2 | OQ-18, OQ-19, OQ-20 |
+| 4 | Upload, Storage, `submit-document`, page allowances, document list with live status | 1 | 2 | OQ-2, OQ-3, OQ-4, OQ-5, OQ-27, OQ-35, OQ-42, OQ-45 |
+| 5 | Queue, `process-queue`, Claude client with type detection, mock server, spend cap and daily ceiling, waiting for budget, retries (invoice type only) | 1.5 | 4 | OQ-1, OQ-7, OQ-8, OQ-10, OQ-22, OQ-23, OQ-33, OQ-43 |
+| 6 | The other five types: field sets, schemas, tools, checks, duplicate detection, currency rule | 1.5 | 5 | OQ-6, OQ-9, OQ-15, OQ-16, OQ-28, OQ-29, OQ-43 |
+| 7 | Review screen, corrections, check ticks, approval, reopen, type change, history, single-document delete | 1.5 | 6 | OQ-1, OQ-11, OQ-12, OQ-20, OQ-40, OQ-44 |
+| 8 | Export CSV (zip) and XLSX | 0.5 | 7 | OQ-13 |
+| 9 | Billing in Stripe test mode, as route handlers | 1 | 2 | OQ-20, OQ-24, OQ-36, OQ-37, OQ-45 |
+| 10 | 7-day purge job and budget display in the UI | 0.5 | 5 | OQ-14, OQ-22, OQ-23, OQ-39 |
+| 11 | Public demo | 1 | 7 | OQ-25, OQ-38 |
+| 12 | Landing page, privacy and terms pages | 0.5 | 11, 13 | OQ-27, OQ-30, OQ-32, OQ-45 |
+| 13 | Eval set and accuracy runner | 1 | 6 | OQ-26, OQ-32 |
+| 14 | Account and workspace deletion | 0.5 | 3, 9 | OQ-17, OQ-20, OQ-30 |
+
+Total: 13.5 days. Milestone 9 needs only milestone 2, milestone 10 only milestone 5, milestone 13
+only milestone 6, and milestone 14 only milestones 3 and 9, so with two workers they run beside the
+main line (1 → 2 → 4 → 5 → 6 → 7 → 11 → 12).
+
+### Milestone 1: scaffold
+
+Goal: the repo passes every check of `~/work/ai-hq/scripts/agent-ready.sh`, and CI runs the
+checks it cannot. No feature code. Done when `agent-ready.sh` prints `AGENT-READY` and CI is green
+on the PR.
+
+**Before it starts (ai-hq, not this repo).** `agent-ready.sh`'s check "backend target from the
+environment" looks for `import.meta.env.VITE_SUPABASE_URL` in `src/`, and for `createClient(` and a
+`throw` in the same file. A Next.js app with `@supabase/ssr` reads
+`process.env.NEXT_PUBLIC_SUPABASE_URL` and calls `createBrowserClient(` / `createServerClient(`, so
+the check must also accept that form before this milestone can print `AGENT-READY`. That change is
+made in ai-hq; this milestone does not start until it is merged, and does not add the old string to
+any file to pass the check.
+
+| agent-ready.sh check | What the scaffold adds |
+|---|---|
+| `.env.example committed` | `.env.example` at the root with `NEXT_PUBLIC_SUPABASE_URL=`, `NEXT_PUBLIC_SUPABASE_ANON_KEY=` and every server-only name in section 12, no values; `supabase/functions/.env.example` likewise |
+| backend target from the environment, failing loudly when unset | `src/lib/supabase/client.ts` and `src/lib/supabase/server.ts`: each reads `process.env.NEXT_PUBLIC_SUPABASE_URL` (and the anon key), `throw`s at load if unset, and builds its client with `@supabase/ssr` in the same file; no Supabase URL literal anywhere in `src/`; a unit test for each throw |
+| `.worktreeinclude lists an env file` | `.worktreeinclude` containing the line `.env.local` |
+| `supabase db reset in CI` | `supabase init` (`supabase/config.toml`, with Google configured through `env()` and the email provider enabled for tests only, section 4.4), `supabase/migrations/` with a first migration (extensions pgmq, pg_cron, pg_net), and a workflow in `.github/workflows/` that runs `supabase start` and `supabase db reset` |
+| `supabase/seed.sql present` | `supabase/seed.sql`, nearly empty |
+| `Vitest installed, with a test` | `vitest` in `package.json`, at least one `*.test.ts`; a second Vitest config for `tests/access/` |
+| `Playwright installed, with a test` | `@playwright/test` in `package.json`, at least one `*.spec.ts` that loads the home page |
+| `CLAUDE.md present` | `CLAUDE.md`: commands, layout, the rules above (Claude mocked, no production URLs, RLS on every table, tokens in `src/index.css`, server-only secrets never `NEXT_PUBLIC_` and only in `server-only` modules, the extraction pipeline stays in Edge Functions) |
+| `gitignored: .env.local`, `gitignored: supabase/.branches` | `.gitignore` entries `.env.local`, `.env*.local`, `supabase/.branches`, `supabase/.temp`, `supabase/.env`, `supabase/functions/.env`, `node_modules`, `.next`, `out` (checked with `git check-ignore`) |
+| `design tokens in src/index.css` | shadcn/ui set up, CSS variables on `:root` in `src/index.css` (`--background`, `--foreground`, `--primary`, …), imported by `src/app/layout.tsx` and consumed by Tailwind |
+| `e2e server port per checkout` | `playwright.config.ts` setting `E2E_PORT` from the hash of `process.cwd()` as in ai-hq's `docs/03-workers.md` ("Tests"), no hardcoded `localhost:<port>`, `reuseExistingServer: true`; its `webServer` runs `npm run dev -- --port ${PORT}`, without `--strictPort`, which is not a `next dev` option |
+
+The scaffold's CI workflow runs typecheck, lint, unit tests, `supabase db reset`, the access tests,
+`next build` and the Playwright suite. Vercel builds with its Next.js preset; no `vercel.json` is
+needed. It does not add secrets to CI.
+
+### Milestones 2 to 14
+
+2. **Auth and workspaces**: `profiles`, `workspaces`, `workspace_members`, `is_member`,
+   `is_owner`, `create_workspace`, `handle_new_user` creating the personal workspace; Google
+   sign-in only (Google configured from `config.toml` `env()`), the sign-in page, `/auth/callback`,
+   `middleware.ts` with the return-to path; workspace switcher, create and rename; access tests for
+   every table.
+3. **Invitations and roles**: `workspace_invites`, `create_invite` with the copy-link,
+   `/invite/[token]` and `accept_invite`, revoke, `remove_member`, `set_member_role`; members page;
+   7-day expiry; last-owner rule; access tests.
+4. **Upload**: `documents`, `page_usage`, `account_page_usage`, `plan_limits` with its prices,
+   `get_plan_limits` (granted to `anon` and `authenticated`), `get_page_allowance`, `documents`
+   bucket and policies, `create_document`, `submit-document` (page count, 10-page limit, magic
+   bytes, SHA-256, `reserve_pages`), upload UI with up to 10 files, the 7-day notice, document list,
+   Realtime subscription.
+5. **Queue and extraction**: pgmq queue `extract`, cron job, `process-queue`, `extractions`,
+   `extraction_fields`, `check_results`, `document_events`, `ai_spend_periods`, `ai_spend_days`,
+   `ai_spend_reservations`, `app_config`, spend functions, `waiting_budget`, `ClaudeClient` with the
+   invoice tool and `record_not_supported`, the mock server, retries and failure states,
+   `retry_document`, the invoice type end to end.
+6. **Document types**: receipts, bank statements, purchase orders, delivery notes and quotes in
+   `shared/doctypes/` and as tools; all checks as pure functions with unit tests per check; the
+   tolerance rule; duplicate detection; the currency rule and its flag.
+7. **Review**: the review screen (document viewer through a signed URL, all pages and zoom, fields
+   flagged first, corrections, line-item add and delete, live re-check), `check_ticks` and
+   `set_check_ticked`, `approve-document`, `reopen_document`, `change_document_type`, the document
+   history, phone layout; single-document delete (`DELETE /api/documents/[id]`, `delete_document`,
+   the confirmation on the document list and the review screen, none in demo mode), with tests
+   that the row, the object and every result row are gone, that page usage is unchanged, and that a
+   non-member is refused.
+8. **Export**: CSV writer with tests; zip of the two CSV files; XLSX with two sheets; export UI
+   choosing a type, then approved documents of that type.
+9. **Billing**: `/api/billing/checkout`, `/api/billing/portal`, `/api/stripe/webhook`,
+   `src/lib/stripe.ts` with the live-key refusal, `stripe_events`; billing page with the plan, its
+   limits and price from `get_plan_limits`, pages left and the test-mode notice; webhook tested with
+   signed fixture events (`stripe.webhooks.generateTestHeaderString`).
+10. **Retention and budget display**: `purge-files` and its cron job, stale-row and reservation
+    sweep, `get_budget_status`, "$x of $10 used this month" and the waiting notice for signed-in
+    users.
+11. **Demo**: `demo_documents`, `demo` bucket, the samples and their hand-written results, seed
+    rows and sample files, data migration for production, public demo routes, demo mode of the
+    review screen.
+12. **Landing page and legal pages**: `/` with the copy the Lead provides, demo and sign-in
+    buttons, plans and limits from `get_plan_limits` as `anon`, accuracy table from the latest
+    committed eval results, the 7-day and test-mode notices, links to the repo and the portfolio;
+    `/privacy` and `/terms`.
+13. **Eval**: `eval/` with 5 fictitious documents per type and their expected results, scoring with
+    unit tests, a runner the operator starts on their laptop with their own key, results written to
+    `eval/results/` and committed.
+14. **Deletion**: `DELETE /api/workspaces/[id]` and `DELETE /api/account` with their confirmations
+    in the UI, Stripe cancellation, Storage removal, the last-owner refusal; tests that every row
+    and object of a deleted workspace is gone and that a remaining workspace keeps a deleted
+    user's documents.
+
+## 14. Risks
+
+- **Edge Function run time**: a document has at most 10 pages (OQ-4), and `process-queue` handles
+  one per call with a capped output size; the visibility-timeout retry bounds the damage of a run
+  that is killed.
+- **Budget drain by sign-ups**: there is no captcha (OQ-33). Each account can use at most 10 pages,
+  and all AI use is held to $2 a day, so a burst of new accounts can make everyone's documents wait
+  until the next UTC day, but cannot spend more than $2 a day or $10 a month. Deleting an account
+  and signing in again with the same Google account starts a new 10-page lifetime; the daily
+  ceiling bounds that too.
+- **Email provider enabled locally**: the local `config.toml` enables email sign-in so tests can
+  create users (section 4.4). Pushing that config to production would enable it there; go-live
+  checks that the email provider is disabled in production.
+- **Route handler time on Vercel**: deleting a large workspace removes its files in batches, and
+  the handler is safe to run again if it is cut short.
