@@ -1,4 +1,7 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
+import { DownloadIcon } from 'lucide-react'
+import { buttonVariants } from '@/components/ui/button'
 import { LISTED_STATUSES, type PageAllowance } from '@/lib/documents/upload'
 import { getWorkspaceContext } from '@/lib/workspace/server'
 import { DocumentsView, type DocumentItem } from './documents-view'
@@ -27,7 +30,14 @@ export default async function DocumentsPage() {
 
   return (
     <main className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Documents</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight">Documents</h1>
+        {/* Export of approved documents (PRD US-6.1). */}
+        <Link href="/documents/export" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+          <DownloadIcon aria-hidden />
+          Export
+        </Link>
+      </div>
       <DocumentsView
         key={current.id}
         workspace={{ id: current.id, name: current.name }}
