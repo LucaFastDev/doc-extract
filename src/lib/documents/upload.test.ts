@@ -6,6 +6,7 @@ import {
   checkSelection,
   DOC_TYPE_LABELS,
   isListed,
+  isReviewable,
   STATUS_LABELS,
   statusReason,
   systemLiveState,
@@ -190,6 +191,15 @@ describe('canRetry', () => {
     expect(canRetry({ status: 'failed', file_deleted_at: '2026-10-30T00:00:00Z' })).toBe(false)
     for (const status of ['queued', 'processing', 'waiting_budget', 'needs_review', 'approved', 'unsupported'] as const) {
       expect(canRetry({ status, file_deleted_at: null }), status).toBe(false)
+    }
+  })
+})
+
+describe('isReviewable', () => {
+  it('opens the review screen for Needs review, Approved and Not supported only (Lead ruling 3 on #32)', () => {
+    for (const status of ['needs_review', 'approved', 'unsupported']) expect(isReviewable(status), status).toBe(true)
+    for (const status of ['queued', 'waiting_budget', 'processing', 'failed', 'uploading', 'rejected']) {
+      expect(isReviewable(status), status).toBe(false)
     }
   })
 })
