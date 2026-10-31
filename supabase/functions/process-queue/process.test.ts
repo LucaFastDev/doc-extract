@@ -226,9 +226,100 @@ describe('processQueue', () => {
       ['A2', 'pass'],
       ['A3', 'pass'],
       ['A4', 'skipped'],
+      ['D1', 'pass'],
+      ['D2', 'pass'],
+      ['U1', 'pass'],
     ])
     expect(record.fields?.find((r) => r.path === 'vendor_name')?.flags).toEqual(['low_confidence'])
     expect(record.fields?.find((r) => r.path === 'line_items[1].amount')?.extracted_value).toBe('200.00')
+    // "€" names one currency: not guessed. The U1 key goes to record_extraction (OQ-9).
+    expect(record.fields?.find((r) => r.path === 'currency')?.flags).toEqual([])
+    expect(record.duplicate).toEqual({ key: 'invoice|de123456789|inv1042', label: 'vendor and invoice number' })
+  })
+
+  it.each([
+    {
+      fixture: 'receipt',
+      docType: 'receipt',
+      fields: { merchant_name: 'Lantern Street Café', transaction_time: '08:42', 'line_items[1].amount': '2.80' },
+      checks: [['A1', 'pass'], ['A2', 'pass'], ['A3', 'pass'], ['D1', 'pass'], ['U1', 'pass']],
+      key: 'receipt|lanternstreetcafé|20261020|0842|11.78',
+    },
+    {
+      fixture: 'bank-statement',
+      docType: 'bank_statement',
+      fields: { bank_name: 'Example Mutual Bank', closing_balance: '2614.60', 'line_items[2].amount': '-85.40', 'line_items[2].balance': '2614.60' },
+      checks: [['A1', 'pass'], ['A2', 'pass'], ['A3', 'pass'], ['D1', 'pass'], ['D2', 'pass'], ['U1', 'pass']],
+      key: 'bank_statement|examplemutualbank|7781|20260901|20260930',
+    },
+    {
+      fixture: 'purchase-order',
+      docType: 'purchase_order',
+      fields: { po_number: 'PO-7731', requested_delivery_date: '2026-10-26', 'line_items[0].unit': 'boxes' },
+      checks: [['A1', 'pass'], ['A2', 'pass'], ['A3', 'pass'], ['D1', 'pass'], ['D2', 'pass'], ['U1', 'pass']],
+      key: 'purchase_order|examplestudioltd|po7731',
+    },
+    {
+      fixture: 'delivery-note',
+      docType: 'delivery_note',
+      fields: { delivery_note_number: 'DN-5520', currency: null, total_quantity: '25', 'line_items[1].quantity_delivered': '5' },
+      checks: [['A1', 'pass'], ['A2', 'pass'], ['D1', 'pass'], ['U1', 'pass']],
+      key: 'delivery_note|fictionalpaperco|dn5520',
+    },
+    {
+      fixture: 'quote',
+      docType: 'quote',
+      fields: { quote_number: 'Q-2026-118', valid_until: '2026-11-04', 'line_items[0].description': 'Malerarbeiten' },
+      checks: [['A1', 'pass'], ['A2', 'pass'], ['A3', 'pass'], ['D1', 'pass'], ['D2', 'pass'], ['U1', 'pass']],
+      key: 'quote|imaginarybuildersag|q2026118',
+    },
+  ])('stores a $docType with its type, fields and check results', async ({ fixture, docType, fields, checks, key }) => {
+    const deps = fake({ claude: [fixture] })
+    expect(await processQueue(deps)).toEqual({ outcome: 'needs_review', document_id: DOC })
+    const [record] = deps.records
+    expect(record).toMatchObject({ outcome: 'ok', status: 'needs_review', doc_type: docType, tool_name: `record_${docType}` })
+    const byPath = Object.fromEntries((record.fields ?? []).map((r) => [r.path, r.extracted_value]))
+    expect(byPath).toMatchObject(fields)
+    expect(record.checks?.map((c) => [c.check_id, c.status])).toEqual(checks)
+    expect(record.duplicate?.key).toBe(key)
+  })
+
+  it('flags a receipt’s currency as guessed when it prints only "$" (OQ-16), and not a delivery note’s', async () => {
+    const receipt = fake({ claude: ['receipt'] })
+    await processQueue(receipt)
+    expect(receipt.records[0].fields?.find((r) => r.path === 'currency')).toMatchObject({ extracted_value: 'USD', flags: ['currency_guessed'] })
+    expect(receipt.records[0].fields?.filter((r) => r.flags.includes('currency_guessed')).map((r) => r.path)).toEqual(['currency'])
+
+    const note = fake({ claude: ['delivery-note'] })
+    await processQueue(note)
+    expect(note.records[0].fields?.find((r) => r.path === 'currency')).toMatchObject({ extracted_value: null, flags: [] })
+  })
+
+  it('stores only the last four characters of card, account and IBAN numbers, in the fields and the raw output (OQ-29)', async () => {
+    const receipt = fake({ claude: ['receipt'] })
+    await processQueue(receipt)
+    expect(receipt.records[0].fields?.find((r) => r.path === 'card_last4')?.extracted_value).toBe('4417')
+    expect(JSON.stringify(receipt.records[0].raw_output)).not.toContain('**** **** ****')
+
+    const bank = fake({ claude: ['bank-statement'] })
+    await processQueue(bank)
+    const fields = Object.fromEntries((bank.records[0].fields ?? []).map((r) => [r.path, r.extracted_value]))
+    expect(fields.account_number_last4).toBe('7781')
+    expect(fields.iban_last4).toBe('4321')
+    const raw = bank.records[0].raw_output as { iban_last4: { value: string }; account_number_last4: { value: string } }
+    expect(raw.iban_last4.value).toBe('4321')
+    expect(raw.account_number_last4.value).toBe('7781')
+  })
+
+  it('runs the date checks against today (OQ-6)', async () => {
+    const deps = fake({ claude: ['receipt'] })
+    deps.now = () => new Date('2026-10-18T12:00:00Z')
+    await processQueue(deps)
+    expect(deps.records[0].checks?.find((c) => c.check_id === 'D1')).toMatchObject({
+      status: 'fail',
+      message: 'Transaction date 2026-10-20 is in the future',
+    })
+    expect(deps.records[0].fields?.find((r) => r.path === 'transaction_date')?.flags).toContain('check_failed')
   })
 
   it('uses CLAUDE_MODEL over app_config.model when it is set (Lead ruling 4)', async () => {

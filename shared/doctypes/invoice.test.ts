@@ -6,15 +6,19 @@ import {
   checkA2,
   checkA3,
   checkA4,
+  checkD1,
+  checkD2,
   INVOICE_FIELDS,
   INVOICE_LINE_ITEM_FIELDS,
   invoiceChecks,
+  invoiceDuplicateKey,
   RECORD_INVOICE,
   type InvoiceValues,
 } from './invoice'
+import { checkU1 } from './duplicate'
 
-// The invoice type (PRD section 4.1 Invoice) and its arithmetic checks A1 to A4 (US-4.1 AC-1 to
-// AC-4, OQ-7, OQ-43). D1, D2 and U1 are milestone 6 (Lead ruling 5 on #24).
+// The invoice type (PRD section 4.1 Invoice) and its checks: A1 to A4 (US-4.1 AC-1 to AC-4, OQ-7,
+// OQ-43), D1 and D2 (OQ-6, Lead ruling 5 on #27) and U1 (OQ-9, Lead rulings 1 and 3 on #27).
 
 const CENT = parseDecimal('0.01') as Decimal
 
@@ -266,8 +270,124 @@ describe('A4: total − amount_paid = amount_due', () => {
   })
 })
 
+const TODAY = '2026-10-31'
+
+describe('D1: invoice_date is not in the future', () => {
+  it('passes for a date up to one day after today (UTC)', () => {
+    for (const invoice_date of ['2026-10-01', TODAY, '2026-11-01']) {
+      expect(checkD1(invoice({ invoice_date }), TODAY), invoice_date).toEqual({
+        check_id: 'D1',
+        status: 'pass',
+        field_paths: ['invoice_date'],
+        message: null,
+      })
+    }
+  })
+
+  it('fails a date more than a day ahead, before 2000-01-01, or not a date (OQ-6)', () => {
+    expect(checkD1(invoice({ invoice_date: '2026-11-02' }), TODAY)).toEqual({
+      check_id: 'D1',
+      status: 'fail',
+      field_paths: ['invoice_date'],
+      message: 'Invoice date 2026-11-02 is in the future',
+    })
+    expect(checkD1(invoice({ invoice_date: '1999-12-31' }), TODAY).message).toBe('Invoice date 1999-12-31 is before 2000-01-01')
+    expect(checkD1(invoice({ invoice_date: '31/10/2026' }), TODAY).message).toBe('Invoice date "31/10/2026" is not a date')
+    expect(checkD1(invoice({ invoice_date: '2026-02-30' }), TODAY).status).toBe('fail')
+  })
+
+  it('is skipped when no invoice date is printed (OQ-43)', () => {
+    expect(checkD1(invoice({ invoice_date: null }), TODAY)).toEqual({
+      check_id: 'D1',
+      status: 'skipped',
+      field_paths: ['invoice_date'],
+      message: 'Skipped: no invoice date is printed.',
+    })
+  })
+})
+
+describe('D2: due_date ≥ invoice_date', () => {
+  it('passes when the due date is on or after the invoice date, even in the future', () => {
+    expect(checkD2(invoice({ invoice_date: '2026-10-01', due_date: '2026-10-01' }), TODAY).status).toBe('pass')
+    expect(checkD2(invoice({ invoice_date: '2026-10-01', due_date: '2027-01-31' }), TODAY)).toEqual({
+      check_id: 'D2',
+      status: 'pass',
+      field_paths: ['invoice_date', 'due_date'],
+      message: null,
+    })
+  })
+
+  it('fails a due date before the invoice date, saying both', () => {
+    expect(checkD2(invoice({ invoice_date: '2026-10-01', due_date: '2026-09-30' }), TODAY)).toEqual({
+      check_id: 'D2',
+      status: 'fail',
+      field_paths: ['invoice_date', 'due_date'],
+      message: 'Due date 2026-09-30 is before invoice date 2026-10-01',
+    })
+  })
+
+  it('checks the date that is printed when the other is not, and is skipped when neither is (Lead ruling 5)', () => {
+    expect(checkD2(invoice({ invoice_date: null, due_date: '1998-01-01' }), TODAY)).toMatchObject({
+      status: 'fail',
+      message: 'Due date 1998-01-01 is before 2000-01-01',
+    })
+    expect(checkD2(invoice({ invoice_date: '2026-10-01', due_date: null }), TODAY).status).toBe('pass')
+    expect(checkD2(invoice({ invoice_date: null, due_date: null }), TODAY)).toMatchObject({
+      status: 'skipped',
+      message: 'Skipped: neither invoice date nor due date is printed.',
+    })
+  })
+})
+
+describe('U1: same vendor (tax id, else name) and invoice number', () => {
+  const values = (fields: Record<string, string | null>) => invoice({ vendor_name: null, vendor_tax_id: null, invoice_number: null, ...fields })
+
+  it('keys on the normalised tax id when printed, and the name otherwise (Lead ruling 1)', () => {
+    expect(invoiceDuplicateKey(values({ vendor_name: 'Acme GmbH', vendor_tax_id: 'DE 123.456', invoice_number: 'INV-7' }))).toEqual({
+      key: 'invoice|de123456|inv7',
+      field_paths: ['vendor_tax_id', 'invoice_number'],
+      flag_paths: ['vendor_tax_id', 'invoice_number'],
+      label: 'vendor and invoice number',
+    })
+    expect(invoiceDuplicateKey(values({ vendor_name: 'ACME  GmbH', invoice_number: 'inv 7' })).key).toBe('invoice|acmegmbh|inv7')
+  })
+
+  it('passes with no earlier document; fails naming the earlier file and what matched', () => {
+    const key = invoiceDuplicateKey(values({ vendor_name: 'Acme', invoice_number: 'INV-7' }))
+    expect(checkU1(key, null)).toEqual({ check_id: 'U1', status: 'pass', field_paths: ['vendor_name', 'invoice_number'], message: null })
+    expect(checkU1(key, { file_name: 'scan.pdf', by: 'key' })).toEqual({
+      check_id: 'U1',
+      status: 'fail',
+      field_paths: ['vendor_name', 'invoice_number'],
+      message: 'Duplicate of "scan.pdf": the same vendor and invoice number.',
+    })
+    expect(checkU1(key, { file_name: 'scan.pdf', by: 'file' }).message).toBe('Duplicate of "scan.pdf": the same file was uploaded before.')
+  })
+
+  it('is skipped when a key field is empty and no file matches (OQ-43)', () => {
+    const key = invoiceDuplicateKey(values({ vendor_name: 'Acme' }))
+    expect(key.key).toBeNull()
+    expect(checkU1(key, null)).toEqual({
+      check_id: 'U1',
+      status: 'skipped',
+      field_paths: ['vendor_name', 'invoice_number'],
+      message: 'Skipped: the vendor and invoice number are not all printed, and no earlier upload is the same file.',
+    })
+    // The same file still fails it, flagging only the key fields that have a value (Lead ruling 3).
+    expect(checkU1(key, { file_name: 'scan.pdf', by: 'file' }).field_paths).toEqual(['vendor_name'])
+  })
+})
+
 describe('invoiceChecks', () => {
-  it('runs A1 to A4, in order', () => {
-    expect(invoiceChecks(invoice(), CENT).map((c) => c.check_id)).toEqual(['A1', 'A2', 'A3', 'A4'])
+  it('runs A1 to A4, D1, D2 and U1, in order', () => {
+    expect(invoiceChecks(invoice(), { tolerance: CENT, today: TODAY }).map((c) => c.check_id)).toEqual([
+      'A1',
+      'A2',
+      'A3',
+      'A4',
+      'D1',
+      'D2',
+      'U1',
+    ])
   })
 })

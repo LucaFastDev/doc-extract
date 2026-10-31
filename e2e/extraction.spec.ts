@@ -86,6 +86,9 @@ test('an invoice reaches Needs review with type Invoice, detected by Claude', as
     { check_id: 'A2', status: 'pass' },
     { check_id: 'A3', status: 'pass' },
     { check_id: 'A4', status: 'skipped' },
+    { check_id: 'D1', status: 'pass' },
+    { check_id: 'D2', status: 'pass' },
+    { check_id: 'U1', status: 'pass' },
   ])
   const [fields] = await sql<{ n: number }>('select count(*)::int as n from public.extraction_fields where document_id = $1', [stored.id])
   expect(fields.n).toBeGreaterThan(20)
@@ -103,9 +106,89 @@ test('an invoice reaches Needs review with type Invoice, detected by Claude', as
     tool_choice: { type: 'auto' },
     tools: [
       { name: 'record_invoice', strict: true },
+      { name: 'record_receipt', strict: true },
+      { name: 'record_bank_statement', strict: true },
+      { name: 'record_purchase_order', strict: true },
+      { name: 'record_delivery_note', strict: true },
+      { name: 'record_quote', strict: true },
       { name: 'record_not_supported', strict: true },
     ],
   })
+})
+
+// The other five types (milestone 6, PRD section 4.1, US-3.1, US-7.1 AC-5, OQ-16, OQ-29): each is
+// detected, stored with its type's fields and checks, and shown on the list with its type.
+const TYPES = [
+  { doc: MOCK_DOCUMENTS.receipt, label: 'Receipt', docType: 'receipt', checks: ['A1', 'A2', 'A3', 'D1', 'U1'] },
+  { doc: MOCK_DOCUMENTS.bankStatement, label: 'Bank statement', docType: 'bank_statement', checks: ['A1', 'A2', 'A3', 'D1', 'D2', 'U1'] },
+  { doc: MOCK_DOCUMENTS.purchaseOrder, label: 'Purchase order', docType: 'purchase_order', checks: ['A1', 'A2', 'A3', 'D1', 'D2', 'U1'] },
+  { doc: MOCK_DOCUMENTS.deliveryNote, label: 'Delivery note', docType: 'delivery_note', checks: ['A1', 'A2', 'D1', 'U1'] },
+  { doc: MOCK_DOCUMENTS.quote, label: 'Quote', docType: 'quote', checks: ['A1', 'A2', 'A3', 'D1', 'D2', 'U1'] },
+]
+
+for (const { doc, label, docType, checks } of TYPES) {
+  test(`a ${label.toLowerCase()} reaches Needs review with type ${label}`, async ({ page, context, baseURL }) => {
+    const { user, loads } = await openDocuments(page, context, baseURL!)
+    await upload(page, doc)
+
+    await expect(row(page, doc.name).getByRole('cell')).toHaveText([doc.name, label, 'Needs review', '1'], PIPELINE)
+    expect(loads.count).toBe(0)
+    await expectNoSideScroll(page)
+
+    const stored = await documentOf(user, doc.name)
+    expect(stored).toMatchObject({ status: 'needs_review', doc_type: docType, doc_type_source: 'detected' })
+    const rows = await sql<{ check_id: string; status: string }>(
+      'select check_id, status from public.check_results where document_id = $1 order by check_id',
+      [stored.id],
+    )
+    expect(rows).toEqual(checks.map((check_id) => ({ check_id, status: 'pass' })))
+    const fields = await sql<{ path: string; extracted_value: string | null; flags: string[] }>(
+      'select path, extracted_value, flags from public.extraction_fields where document_id = $1',
+      [stored.id],
+    )
+    const byPath = Object.fromEntries(fields.map((f) => [f.path, f]))
+    // Only a symbol several currencies use is printed on the receipt: the currency is a guess.
+    expect(byPath.currency.flags.includes('currency_guessed')).toBe(docType === 'receipt')
+    if (docType === 'receipt') expect(byPath.card_last4.extracted_value).toBe('4417')
+    if (docType === 'bank_statement') expect(byPath.iban_last4.extracted_value).toBe('4321')
+  })
+}
+
+test('a second invoice with the same vendor and number reaches Needs review too, flagged as a duplicate of the first', async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  const first = MOCK_DOCUMENTS.invoice
+  const second = MOCK_DOCUMENTS.duplicateInvoice
+  const { user, loads } = await openDocuments(page, context, baseURL!)
+  await upload(page, first)
+  await expect(row(page, first.name)).toContainText('Needs review', PIPELINE)
+  await upload(page, second)
+
+  // Flagged, not refused (OQ-9, Lead ruling 4 on #27).
+  await expect(row(page, second.name).getByRole('cell')).toHaveText([second.name, 'Invoice', 'Needs review', '1'], PIPELINE)
+  await expect(row(page, first.name).getByRole('cell')).toHaveText([first.name, 'Invoice', 'Needs review', '1'])
+  expect(loads.count).toBe(0)
+  await expectNoSideScroll(page)
+
+  const a = await documentOf(user, first.name)
+  const b = await documentOf(user, second.name)
+  const [dup] = await sql<{ duplicate_of: string | null }>('select duplicate_of from public.documents where id = $1', [b.id])
+  expect(dup.duplicate_of).toBe(a.id)
+  const [u1] = await sql<{ status: string; message: string }>(
+    "select status, message from public.check_results where document_id = $1 and check_id = 'U1'",
+    [b.id],
+  )
+  expect(u1).toEqual({ status: 'fail', message: `Duplicate of "${first.name}": the same vendor and invoice number.` })
+  const flagged = await sql<{ path: string }>(
+    "select path from public.extraction_fields where document_id = $1 and 'duplicate' = any(flags) order by path",
+    [b.id],
+  )
+  expect(flagged.map((f) => f.path)).toEqual(['invoice_number', 'vendor_tax_id'])
+  // The earlier one is not changed.
+  const [original] = await sql<{ status: string }>("select status from public.check_results where document_id = $1 and check_id = 'U1'", [a.id])
+  expect(original.status).toBe('pass')
 })
 
 test('a document that is none of the types reaches Not supported, with its reason, and counts no pages', async ({

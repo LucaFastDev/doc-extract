@@ -179,7 +179,11 @@ src/
   lib/supabase/proxy.ts        the proxy's session refresh (request and response cookies); throws if unset
   lib/stripe.ts                server-only Stripe client; throws unless the key starts with sk_test_
   features/…                   upload, documents, review, export, billing, workspace, demo
-shared/doctypes/               per-type field sets, JSON Schemas, tool descriptions, checks; no imports
+shared/doctypes/               one module per type (invoice, receipt, bank-statement, purchase-order,
+                               delivery-note, quote): field set, record_<type> tool and its JSON
+                               Schema, checks, U1 key; checks.ts (shared check kinds, dates),
+                               duplicate.ts (U1), currency.ts (OQ-16), index.ts (the registry and
+                               prepareResult); no imports outside shared/
 shared/limits.ts               accepted MIME types, 10 MB, 10 pages, 10 files per upload
 supabase/
   config.toml
@@ -257,7 +261,7 @@ A function not in this table is added to it, by the same rule, in the milestone 
 | `reserve_spend(document_id uuid, estimate numeric) → (reservation uuid, refused_by text)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages`; decides with `app_config.spend_cap_usd` and `daily_cap_usd` on every call (section 7) |
 | `settle_spend(reservation uuid, actual_cost numeric)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
 | `release_stale_spend_reservations() → int` | `purge-files` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
-| `record_extraction(document_id uuid, reservation uuid, result jsonb) → text` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages`; one attempt in one transaction (section 6.3 step 8) |
+| `record_extraction(document_id uuid, reservation uuid, result jsonb) → text` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages`; one attempt in one transaction (section 6.3 step 8). Since milestone 6 it also stores `duplicate_key` and runs the duplicate query (step 7) under a transaction-scoped advisory lock per workspace, taken before the document row, so two documents of a workspace record one after the other (Lead ruling 1 on #27). Earlier means created earlier, then by id (ruling 2); a document counts while it is `queued`, `waiting_budget`, `processing`, `needs_review` or `approved`, file deleted or not, and not while `rejected`, `failed` or `unsupported` (ruling 3 on the worker's questions). It flags the recording document against the earliest earlier match, and every later match in `needs_review` that points to no document or to one created after the recording one; an approved document is left as it is (ruling 2 on the worker's questions) |
 | `extract_send(document_id uuid) → bigint` | `submit-document` (service role), `retry_document` (as its owner) | definer | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | sends `{document_id}` to the pgmq queue `extract`; the service role has no grants on `pgmq`, which the API does not expose |
 | `extract_read(vt int, qty int) → table (msg_id bigint, read_ct int, enqueued_at timestamptz, message jsonb)` | `process-queue` (service role) | definer | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `extract_send`: `pgmq.read` on `extract` only |
 | `extract_set_vt(msg_id bigint, vt int)` | `process-queue` (service role) | definer | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `extract_send`: `pgmq.set_vt` on `extract` only, to delay a message |
@@ -369,11 +373,12 @@ never changes an existing role.
 | pages_reserved | boolean default false |
 | pages_period_start | date: the UTC month `reserve_pages` counted the pages against, which `release_pages` gives them back to (Lead ruling 2 on #24) |
 | processing_started_at | timestamptz |
-| duplicate_of | uuid references documents on delete set null |
+| duplicate_of | uuid references documents on delete set null: the earliest earlier duplicate (OQ-9) |
+| duplicate_key | text: the type name and the normalised U1 key fields, joined by `\|`, such as `invoice\|de123456789\|inv1042`; null when any key field is empty or the document is not extracted yet (Lead ruling 1 on #27). Names and numbers are lower cased and lose all whitespace and punctuation; an amount key part is the exact decimal with leading zeros and trailing fractional zeros dropped and the point kept, so 11.80 becomes 11.8 and 1180 stays 1180 (Lead ruling on amount key fields, [issuecomment-6543137847](https://github.com/LucaFastDev/doc-extract/issues/27#issuecomment-6543137847) on #27) |
 | created_at, processed_at, approved_at, file_deleted_at | timestamptz |
 | approved_by | uuid references profiles on delete set null |
 
-Index on `(workspace_id, created_at desc)` and `(workspace_id, sha256)`.
+Index on `(workspace_id, created_at desc)`, `(workspace_id, sha256)` and `(workspace_id, duplicate_key)`.
 
 RLS: select where `is_member(workspace_id)`. Insert only through `rpc create_document` (section
 4.1; checks `is_member`, sets status `uploading` and the storage path). No client update: type
@@ -677,8 +682,32 @@ AC-4). `src/lib/supabase/server.ts` throws when `NEXT_PUBLIC_SUPABASE_URL` or
    `extractions` row, set status `unsupported`; then `release_pages` (0 pages, OQ-1); archive;
    stop.
 6. Validate the tool input against the type's JSON Schema again, in the function.
-7. Normalise values, run the type's checks and the duplicate query, compute flags (including
-   `currency_guessed`, OQ-16).
+7. Normalise values (a card, account or IBAN number cut to its last four characters without
+   spaces, in the fields and in the stored `raw_output`, OQ-29), run the type's checks against
+   today's UTC date (OQ-6), compute flags (`low_confidence`, `check_failed`, and
+   `currency_guessed` on `currency` when `currency_as_printed` is empty or only a symbol in
+   `AMBIGUOUS_CURRENCY_SYMBOLS`, never for a delivery note, OQ-16), and the U1 key. U1 as the
+   function builds it passes, or is skipped when a key field is empty (OQ-43). In the key, names
+   and numbers are lower cased and lose all whitespace and punctuation, and an amount part is the
+   exact decimal with leading zeros and trailing fractional zeros dropped and the point kept
+   (11.80 becomes 11.8, 1180 stays 1180; Lead ruling on amount key fields,
+   [issuecomment-6543137847](https://github.com/LucaFastDev/doc-extract/issues/27#issuecomment-6543137847)
+   on #27). The duplicate
+   query runs in `record_extraction` (step 8), in the same transaction: a document is a
+   duplicate when an earlier document of the workspace has the same `sha256`, or the same
+   `duplicate_key` (which holds the type). Earlier means created earlier, then by id (Lead ruling
+   2 on #27); it counts while `queued`, `waiting_budget`, `processing`, `needs_review` or
+   `approved`, whether or not its file was deleted, and not while `rejected`, `failed` or
+   `unsupported`, so a retried document counts again once it is back in `queued` (ruling 3 on the
+   worker's questions). The earliest such document becomes `duplicate_of`; U1 fails with a message
+   naming its file and whether the file or the key matched ("Duplicate of "a.pdf": the same file
+   was uploaded before." when both did), and the `duplicate` flag goes on the U1 key fields that
+   have a value, so a match by file alone with an empty key fails with no fields (ruling 3). When
+   a document records after a later one that matches it, because the later one finished first,
+   the later one is flagged the same way and pointed to it, if it is in `needs_review` and points
+   to no document or to one created after the recording one; an approved document is left as it
+   is (ruling 2 on the worker's questions). The earlier document is never changed. A duplicate and
+   a currency guess keep the status `needs_review` (ruling 4).
 8. In one transaction (`record_extraction`): `settle_spend` with the actual usage, the
    `extractions` row, the `extraction_fields` and `check_results` rows, `doc_type` and
    `doc_type_source = 'detected'` when it was detected, status `needs_review`. It locks the
@@ -814,8 +843,9 @@ retried or change type. The `demo` bucket is never touched. The function's run i
   function validates the tool input again before storing it. Every field in a schema is an object
   `{ value: string, confidence: number }`, and an empty `value` means the document does not show the
   field, stored as null: strict tools allow at most 16 nullable or union-typed parameters per
-  request, and an invoice alone has over 30 fields. Line items are arrays of such objects. Values
-  are strings so amounts keep their exact decimals.
+  request, and an invoice alone has over 30 fields. Line items are arrays of such objects, under
+  `line_items`, or `transactions` for a bank statement; both are stored as `line_items[i].<field>`.
+  Values are strings so amounts keep their exact decimals.
 - **Prompt per type**: a system prompt shared by all types (call exactly one tool, read only what
   is printed, never invent, return an empty value for an absent field, give dates as YYYY-MM-DD and amounts as plain decimals,
   keep text as printed and do not translate (OQ-15), report the currency as an ISO 4217 code and as

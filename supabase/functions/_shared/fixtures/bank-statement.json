@@ -1,0 +1,57 @@
+{
+  "status": 200,
+  "body": {
+    "id": "msg_fixture_bank_statement",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-5-5",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_fixture_bank_statement",
+        "name": "record_bank_statement",
+        "input": {
+          "language": { "value": "en", "confidence": 0.99 },
+          "currency": { "value": "EUR", "confidence": 0.98 },
+          "currency_as_printed": { "value": "EUR", "confidence": 0.97 },
+          "bank_name": { "value": "Example Mutual Bank", "confidence": 0.97 },
+          "account_holder": { "value": "Jordan Sample", "confidence": 0.96 },
+          "account_number_last4": { "value": "0000 1234 7781", "confidence": 0.94 },
+          "iban_last4": { "value": "XX00 0000 0000 0000 4321", "confidence": 0.93 },
+          "statement_period_start": { "value": "2026-09-01", "confidence": 0.97 },
+          "statement_period_end": { "value": "2026-09-30", "confidence": 0.97 },
+          "opening_balance": { "value": "1500.00", "confidence": 0.98 },
+          "closing_balance": { "value": "2614.60", "confidence": 0.98 },
+          "total_credits": { "value": "2400.00", "confidence": 0.95 },
+          "total_debits": { "value": "1285.40", "confidence": 0.95 },
+          "transactions": [
+            {
+              "date": { "value": "2026-09-03", "confidence": 0.97 },
+              "description": { "value": "Salary, Example Studio Ltd", "confidence": 0.95 },
+              "reference": { "value": "SAL-09", "confidence": 0.9 },
+              "amount": { "value": "2400.00", "confidence": 0.97 },
+              "balance": { "value": "3900.00", "confidence": 0.96 }
+            },
+            {
+              "date": { "value": "2026-09-10", "confidence": 0.97 },
+              "description": { "value": "Rent, Sample Lettings", "confidence": 0.95 },
+              "reference": { "value": "", "confidence": 0.9 },
+              "amount": { "value": "-1200.00", "confidence": 0.97 },
+              "balance": { "value": "2700.00", "confidence": 0.96 }
+            },
+            {
+              "date": { "value": "2026-09-22", "confidence": 0.97 },
+              "description": { "value": "Groceries, Fictional Market", "confidence": 0.94 },
+              "reference": { "value": "", "confidence": 0.9 },
+              "amount": { "value": "-85.40", "confidence": 0.96 },
+              "balance": { "value": "2614.60", "confidence": 0.96 }
+            }
+          ]
+        }
+      }
+    ],
+    "stop_reason": "tool_use",
+    "stop_sequence": null,
+    "usage": { "input_tokens": 2600, "output_tokens": 900 }
+  }
+}
