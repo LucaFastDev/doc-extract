@@ -7,7 +7,8 @@ import { mockClaudePort } from './port.ts'
 // A stand-in for the Messages API (ARCHITECTURE.md section 9, "How tests mock Claude"), started by
 // Playwright's webServer and reached by the local Edge Functions through ANTHROPIC_BASE_URL. It
 // answers POST /v1/messages by the SHA-256 of the file in the request, with a recorded response
-// from supabase/functions/_shared/fixtures/, and refuses a request whose shape breaks Lead ruling 1
+// from supabase/functions/_shared/fixtures/ (or, for a request that sends only the tool of a type
+// the user chose, the document's answer for that tool), and refuses a request whose shape breaks Lead ruling 1
 // on #24 (tool_choice auto, every tool strict) with a 400, so a wrong request fails the spec that
 // sent it. GET /requests lists what it was sent, for the specs to check. Run with
 // `node e2e/mock-claude/server.ts`. Nothing here reaches the real API.
@@ -48,9 +49,10 @@ function answer(request: MessagesRequest): { status: number; body: unknown; sha:
   const doc = sha ? bySha.get(sha) : undefined
   if (!sha || !doc) return { ...error(400, 'no recording for this file'), sha }
 
+  const chosen = request.tools.length === 1 ? doc.asChosen?.[request.tools[0].name] : undefined
   const n = (calls.get(sha) ?? 0) + 1
-  calls.set(sha, n)
-  const name = doc.responses[Math.min(n, doc.responses.length) - 1]
+  if (!chosen) calls.set(sha, n)
+  const name = chosen ?? doc.responses[Math.min(n, doc.responses.length) - 1]
   const fixture = JSON.parse(readFileSync(new URL(`${name}.json`, FIXTURES), 'utf8')) as { status: number; body: Record<string, unknown> }
   const body = fixture.status === 200 ? { ...fixture.body, model: request.model } : fixture.body
   return { status: fixture.status, body, sha }

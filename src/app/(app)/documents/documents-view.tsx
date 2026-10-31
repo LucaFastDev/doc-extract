@@ -331,13 +331,13 @@ export function DocumentsView({
                 <th scope="col" className="px-3 py-2 font-medium">
                   Name
                 </th>
-                <th scope="col" className="w-24 px-3 py-2 font-medium sm:w-36">
+                <th scope="col" className="w-20 px-3 py-2 font-medium sm:w-36">
                   Type
                 </th>
                 <th scope="col" className="w-24 px-3 py-2 font-medium sm:w-36">
                   Status
                 </th>
-                <th scope="col" className="w-14 px-3 py-2 text-right font-medium">
+                <th scope="col" className="w-[4.5rem] py-2 pr-1 pl-2 text-right font-medium">
                   Pages
                 </th>
               </tr>
@@ -348,31 +348,34 @@ export function DocumentsView({
                 return (
                 <tr key={doc.id}>
                   <td className="px-3 py-2 font-medium [overflow-wrap:anywhere]">
-                    <div className="flex items-start gap-1">
-                      <div className="min-w-0 flex-1">
-                        {isReviewable(doc.status) ? (
-                          <Link href={`/documents/${doc.id}`} className="underline-offset-4 hover:underline">
-                            {doc.file_name}
-                          </Link>
-                        ) : (
-                          doc.file_name
-                        )}
-                        {reason && <p className="mt-1 text-xs font-normal text-muted-foreground">{reason}</p>}
-                        {canRetry(doc) && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="mt-2"
-                            aria-label={`Retry ${doc.file_name}`}
-                            disabled={retrying === doc.id}
-                            onClick={() => void retry(doc)}
-                          >
-                            Retry
-                          </Button>
-                        )}
-                      </div>
-                      {/* Icon only: the cell's text stays the file name. */}
+                    {isReviewable(doc.status) ? (
+                      <Link href={`/documents/${doc.id}`} className="underline-offset-4 hover:underline">
+                        {doc.file_name}
+                      </Link>
+                    ) : (
+                      doc.file_name
+                    )}
+                    {reason && <p className="mt-1 text-xs font-normal text-muted-foreground">{reason}</p>}
+                    {canRetry(doc) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-2"
+                        aria-label={`Retry ${doc.file_name}`}
+                        disabled={retrying === doc.id}
+                        onClick={() => void retry(doc)}
+                      >
+                        Retry
+                      </Button>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">{doc.doc_type ? (DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type) : ''}</td>
+                  <td className="px-3 py-2">{STATUS_LABELS[doc.status]}</td>
+                  <td className="py-2 pr-1 pl-2">
+                    {/* Icon only, so each cell's text stays what it was: the page count here. */}
+                    <div className="flex items-center justify-end gap-0.5">
+                      <span className="tabular-nums">{doc.page_count ?? ''}</span>
                       <DeleteDocument
                         document={doc}
                         onDeleted={() => remove(doc.id)}
@@ -390,9 +393,6 @@ export function DocumentsView({
                       />
                     </div>
                   </td>
-                  <td className="px-3 py-2">{doc.doc_type ? (DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type) : ''}</td>
-                  <td className="px-3 py-2">{STATUS_LABELS[doc.status]}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{doc.page_count ?? ''}</td>
                 </tr>
                 )
               })}
