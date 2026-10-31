@@ -84,7 +84,8 @@ export function DocumentsView({
     // join, and refuses it as anon. The client sets that token only when its auth state loads,
     // which can come after this effect, so set it from the session before subscribing.
     async function subscribe() {
-      const { data } = await supabase.auth.getSession()
+      const { data, error } = await supabase.auth.getSession()
+      if (error) throw error
       if (cancelled) return
       if (!data.session) {
         setLive('signed_out')
@@ -99,33 +100,36 @@ export function DocumentsView({
           if (state) setLive(state)
         })
         .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'documents', filter: `workspace_id=eq.${workspace.id}` },
-        (payload) => {
-          if (payload.eventType === 'DELETE') {
-            remove((payload.old as { id: string }).id)
-            return
-          }
-          const row = payload.new as DocumentItem & { workspace_id: string }
-          if (row.workspace_id !== workspace.id) return
-          if (isListed(row.status)) {
-            upsert({
-              id: row.id,
-              file_name: row.file_name,
-              doc_type: row.doc_type,
-              status: row.status,
-              page_count: row.page_count,
-              created_at: row.created_at,
-            })
-          } else {
-            remove(row.id)
-          }
-        },
-      )
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'documents', filter: `workspace_id=eq.${workspace.id}` },
+          (payload) => {
+            if (payload.eventType === 'DELETE') {
+              remove((payload.old as { id: string }).id)
+              return
+            }
+            const row = payload.new as DocumentItem & { workspace_id: string }
+            if (row.workspace_id !== workspace.id) return
+            if (isListed(row.status)) {
+              upsert({
+                id: row.id,
+                file_name: row.file_name,
+                doc_type: row.doc_type,
+                status: row.status,
+                page_count: row.page_count,
+                created_at: row.created_at,
+              })
+            } else {
+              remove(row.id)
+            }
+          },
+        )
         .subscribe((status) => setLive(channelLiveState(status)))
     }
 
-    void subscribe()
+    subscribe().catch((error: unknown) => {
+      console.error('The documents list could not subscribe to live changes.', error)
+      if (!cancelled) setLive('channel_error')
+    })
     return () => {
       cancelled = true
       if (channel) supabase.removeChannel(channel)
