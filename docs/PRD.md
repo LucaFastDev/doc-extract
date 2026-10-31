@@ -375,7 +375,7 @@ how well it works and catch regressions when the prompt or model changes.
 **US-17.1** As the operator, I want a clean, consistent look I can adjust later.
 
 - AC-1: Every colour, radius and font the app uses comes from design tokens (CSS variables) in
-  `src/index.css`, as shadcn/ui lays them out and imported by the root layout, so the look changes
+  `src/app/globals.css`, as shadcn/ui lays them out and imported by the root layout, so the look changes
   in one place.
 - AC-2: UI components come from shadcn/ui.
 - AC-3 (**OQ-40**): The app works at phone width (from 360px) and desktop width; the review screen

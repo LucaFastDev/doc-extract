@@ -1,0 +1,2 @@
+-- Local and CI data, applied by `npx supabase db reset` after the migrations. Each milestone adds
+-- the rows its tests need, including the demo rows (milestone 11).
