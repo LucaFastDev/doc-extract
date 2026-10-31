@@ -1,7 +1,8 @@
 'use client'
 
 import { useActionState, useEffect, useState, useTransition } from 'react'
-import { ChevronsUpDownIcon, PencilIcon, PlusIcon } from 'lucide-react'
+import Link from 'next/link'
+import { ChevronsUpDownIcon, PencilIcon, PlusIcon, UsersIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -32,7 +33,7 @@ interface Workspace {
 }
 
 // The workspace switcher (PRD US-8.1 AC-3, AC-4): lists the user's workspaces, switches between
-// them, creates one, and lets an owner rename the current one.
+// them, creates one, lets an owner rename the current one, and opens its members (US-8.2).
 export function WorkspaceSwitcher({ workspaces, current }: { workspaces: Workspace[]; current: Workspace }) {
   const [dialog, setDialog] = useState<'create' | 'rename' | null>(null)
   const [pending, startTransition] = useTransition()
@@ -61,6 +62,12 @@ export function WorkspaceSwitcher({ workspaces, current }: { workspaces: Workspa
             ))}
           </DropdownMenuRadioGroup>
           <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link href="/members">
+              <UsersIcon />
+              Members
+            </Link>
+          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setDialog('create')}>
             <PlusIcon />
             Create workspace

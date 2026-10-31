@@ -9,6 +9,10 @@ const FUNCTIONS = [
   { signature: 'public.is_owner(uuid)', definer: true, roles: ['authenticated'] },
   { signature: 'public.create_workspace(text)', definer: true, roles: ['authenticated'] },
   { signature: 'public.handle_new_user()', definer: true, roles: [] },
+  { signature: 'public.create_invite(uuid, text, text)', definer: true, roles: ['authenticated'] },
+  { signature: 'public.accept_invite(text)', definer: true, roles: ['authenticated'] },
+  { signature: 'public.remove_member(uuid, uuid)', definer: true, roles: ['authenticated'] },
+  { signature: 'public.set_member_role(uuid, uuid, text)', definer: true, roles: ['authenticated'] },
 ]
 
 const ROLES = ['public', 'anon', 'authenticated', 'service_role']
@@ -71,7 +75,9 @@ describe('tables', () => {
       )
       return { tables: t.rows, open: p.rows }
     })
-    expect(tables.map((t) => t.relname)).toEqual(expect.arrayContaining(['profiles', 'workspace_members', 'workspaces']))
+    expect(tables.map((t) => t.relname)).toEqual(
+      expect.arrayContaining(['profiles', 'workspace_invites', 'workspace_members', 'workspaces']),
+    )
     expect(tables.filter((t) => !t.rls)).toEqual([])
     expect(open).toEqual([])
   })

@@ -32,5 +32,7 @@ export default defineConfig({
     url: BASE_URL,
     reuseExistingServer: true,
     timeout: 120_000,
+    // Invitation links are built from SITE_URL (src/lib/site.ts): here, the test server itself.
+    env: { SITE_URL: BASE_URL },
   },
 })
