@@ -19,7 +19,7 @@
     "mock-claude": "node e2e/mock-claude/server.ts",
     "demo:samples": "node demo/make-samples.ts",
     "demo:upload": "node demo/upload-local.ts",
-    "eval": "node eval/run.ts",
+    "eval": "node --experimental-transform-types eval/run.ts",
     "eval:documents": "node eval/make-documents.ts"
   },
   "dependencies": {

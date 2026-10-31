@@ -7,6 +7,7 @@ import { LAST4_FIELDS } from '@shared/doctypes/fields'
 import { DOC_TYPES, prepareResult, type DocType } from '@shared/doctypes/index'
 import { MAX_FILE_BYTES, MAX_IMAGE_BYTES, MAX_PAGES } from '@shared/limits'
 import { buildDocuments, expectedFile, expectedJson, expectedResult, printedValue, receiptLines } from './make-documents'
+import { toolInput } from './run'
 import type { ExpectedResult } from './score'
 import { DOCUMENTS_DIR, EVAL_DOCUMENTS, EXPECTED_DIR, type EvalDocument } from './values'
 
@@ -35,18 +36,6 @@ async function pdfText(bytes: Uint8Array): Promise<string> {
   }
   await pdf.destroy()
   return pages.join('\n')
-}
-
-/** A tool input that says exactly what the expected result holds, for the app's validation. */
-function toolInput(e: ExpectedResult): Record<string, unknown> {
-  const def = DOC_TYPES[e.doc_type]
-  const field = (value: string | null) => ({ value: value ?? '', confidence: 0.99 })
-  const header = Object.fromEntries(def.fields.map((f) => [f.name, field(e.fields.find((x) => x.path === f.name)!.value)]))
-  const lineCount = new Set(e.fields.map((f) => /^line_items\[(\d+)\]/.exec(f.path)?.[1]).filter(Boolean)).size
-  const lines = Array.from({ length: lineCount }, (_, i) =>
-    Object.fromEntries(def.lineFields.map((f) => [f.name, field(e.fields.find((x) => x.path === `line_items[${i}].${f.name}`)!.value)])),
-  )
-  return { ...header, [def.linesKey]: lines }
 }
 
 describe('the eval documents', () => {
