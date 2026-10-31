@@ -26,6 +26,17 @@ export function correctionFor(row: Pick<ReviewRow, 'path' | 'extracted_value'>, 
   return value === (row.extracted_value ?? '').trim() ? null : value
 }
 
+/**
+ * What the screen says when a correction was not stored (Lead ruling on QA pass 2 of #34): that the
+ * document no longer needs review only when its status, read after the failure, says so; any other
+ * failure, a network error or a status that could not be read, asks the user to try again.
+ */
+export function saveFailure(label: string, status: string | null): string {
+  return status !== null && status !== 'needs_review'
+    ? `${label} could not be saved: the document no longer needs review.`
+    : `${label} could not be saved. Try again.`
+}
+
 /** The rows with one field's correction set; the extracted value is kept. */
 export function applyCorrection(rows: ReviewRow[], path: string, corrected: string | null): ReviewRow[] {
   return rows.map((r) => (r.path === path ? { ...r, corrected_value: corrected } : r))
