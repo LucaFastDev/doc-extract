@@ -15,8 +15,11 @@ check, where, and what "pass" looks like. Never write a secret's value here: nam
 is stored.
 
 The design behind these items is in [ARCHITECTURE.md](ARCHITECTURE.md); section numbers below
-refer to it. Items marked (OQ-n) depend on an open question in [PRD.md](PRD.md) and are finished
-when it is answered.
+refer to it. Where an item follows from one of the operator's answers in [PRD.md](PRD.md), it names
+the question (OQ-n).
+
+The site is served on its Vercel address, `https://<project>.vercel.app`; there is no custom
+domain (OQ-27). `<site>` below means that address.
 
 ## Last full run
 
@@ -27,109 +30,118 @@ when it is answered.
 ## Environment and secrets
 
 - [ ] **Vercel project**: Vercel → the doc-extract project → Settings → Environment Variables →
-      Production holds `VITE_SUPABASE_URL` (the production project's URL, not `127.0.0.1` or
-      `localhost`) and `VITE_SUPABASE_ANON_KEY` (the production project's anon key). Pass: both
-      set, and every variable in `.env.example` is present.
+      Production holds `NEXT_PUBLIC_SUPABASE_URL` (the production project's URL, not `127.0.0.1`
+      or `localhost`) and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the production project's anon key).
+      Pass: both set, and every variable in `.env.example` is present.
+- [ ] **Vercel project, server-only secrets**: the same page holds `SUPABASE_SERVICE_ROLE_KEY`,
+      `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO` and `SITE_URL`, the first
+      three marked Sensitive. Pass: every name present; none of them has a `NEXT_PUBLIC_` prefix;
+      `SITE_URL` is `<site>`. Values are never copied here.
 - [ ] **Vercel project**: Settings → Git: the production branch is `main`; Settings → Build: the
-      framework preset is Vite and the output directory is `dist`. Pass: the latest production
-      deploy was built from `main`.
+      framework preset is Next.js. Pass: the latest production deploy was built from `main`.
+- [ ] **No secret in the browser**: on `<site>`, open the browser's developer tools, search the
+      loaded JavaScript for `service_role`, `sk_test_` and `whsec_`. Pass: none is found.
 - [ ] **Edge Function secrets**: `supabase secrets list --project-ref <prod ref>` (or dashboard →
-      Edge Functions → Secrets) shows each of `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`,
-      `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `SITE_URL`, `CRON_SECRET`.
-      Pass: every name present; `ANTHROPIC_BASE_URL` is `https://api.anthropic.com`; `SITE_URL` is
-      the production domain. The list shows digests only; values are never copied here.
+      Edge Functions → Secrets) shows each of `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL` and
+      `CRON_SECRET`. Pass: every name present; `ANTHROPIC_BASE_URL` is `https://api.anthropic.com`;
+      no Stripe secret is set there (Stripe runs only in Vercel route handlers). The list shows
+      digests only; values are never copied here.
 - [ ] **Vault**: SQL editor, `select name from vault.decrypted_secrets` lists the functions' base
       URL and `CRON_SECRET` entries the cron jobs read (section 12). Pass: both names present, and
       the Vault `CRON_SECRET` matches the function secret (a cron run succeeds, see Scheduled jobs).
-- [ ] **app_config**: SQL editor, `select spend_cap_usd, model, input_usd_per_mtok,
-      output_usd_per_mtok from app_config`. Pass: `spend_cap_usd` is 10.00, `model` is the model
-      chosen from the latest eval run, and both prices equal Anthropic's current pricing page for
-      that model.
+- [ ] **app_config**: SQL editor, `select spend_cap_usd, daily_cap_usd, account_page_cap, model,
+      input_usd_per_mtok, output_usd_per_mtok, confidence_threshold, amount_tolerance from
+      app_config`. Pass: `spend_cap_usd` is 10.00, `daily_cap_usd` is 2.00 (OQ-33),
+      `account_page_cap` is 10 (OQ-2), `confidence_threshold` is 0.80 (OQ-8), `amount_tolerance` is
+      0.01 (OQ-7), `model` is the model chosen from the latest eval run, and both prices equal
+      Anthropic's current pricing page for that model.
+- [ ] **plan_limits**: SQL editor, `select * from plan_limits`. Pass: `free` 20 pages and 0, `pro`
+      500 pages and 19.00 (OQ-2, OQ-24).
 
 ## Supabase project settings
 
 - [ ] Migrations: production's history matches the repo (`supabase migration list` shows no
       local-only row).
 - [ ] Extensions: dashboard → Database → Extensions shows `pgmq`, `pg_cron` and `pg_net` enabled.
-- [ ] Auth → URL configuration: the site URL is the production domain, and the redirect URLs allow
-      the production domain's sign-in callback and invite-acceptance routes (and nothing on
-      `localhost`).
-- [ ] Auth → Providers → Email is enabled with the sign-in method chosen in OQ-21.
-- [ ] Auth → email templates and SMTP sender are the production ones, not the defaults: custom
-      SMTP is configured with the provider chosen in OQ-19. Pass: a sign-in email reaches an
-      address outside the Supabase team.
-- [ ] Auth → Rate limits and sign-up protection match OQ-33.
-- [ ] Storage: dashboard → Storage shows bucket `documents` (**not public**, file size limit and
-      allowed MIME types as OQ-4 sets) and bucket `demo` (**not public**; read through its select
-      policy). Pass: opening a `documents` or `demo` object URL without a signed token returns an
-      error.
+- [ ] Auth → URL configuration: the site URL is `<site>`, and the redirect URLs allow
+      `<site>/auth/callback` (and nothing on `localhost`).
+- [ ] Auth → Providers → Email is **disabled** (OQ-19, OQ-21). The local `config.toml` enables it
+      for tests only, so it is never pushed to production with `supabase config push`. Pass: the
+      provider shows disabled, and `<site>/sign-in` offers only "Continue with Google".
+- [ ] Auth → no custom SMTP is configured and no captcha is enabled: the app sends no email and has
+      no captcha (OQ-19, OQ-33).
+- [ ] Storage: dashboard → Storage shows bucket `documents` (**not public**, file size limit 10 MB,
+      allowed MIME types `application/pdf`, `image/jpeg`, `image/png`, `image/webp`; OQ-4) and
+      bucket `demo` (**not public**; read through its select policy). Pass: opening a `documents`
+      or `demo` object URL without a signed token returns an error.
 - [ ] Storage: the `demo` bucket holds one file per published `demo_documents` row (`select slug,
       file_path from demo_documents where published`). Pass: every sample's file opens on its
-      `/demo/:slug` page while signed out.
+      `/demo/<slug>` page while signed out.
 - [ ] Realtime: dashboard → Database → Publications → `supabase_realtime` includes `documents`.
 - [ ] Security advisors show no open finding (dashboard → Advisors → Security), in particular no
       table without RLS and no `security definer` function with a mutable search path.
+- [ ] Function grants: SQL editor, `select has_function_privilege('anon',
+      'public.get_plan_limits()', 'execute'), has_function_privilege('anon',
+      'public.get_budget_status()', 'execute')`. Pass: `true`, `false` (OQ-27, OQ-22).
 - [ ] Backups: the plan's backups are on. Uploaded files are deleted after 7 days by design, so
       point-in-time recovery is not needed for them.
 
 ## Google sign-in
 
+Google is the only sign-in method (OQ-19, OQ-21).
+
 - [ ] Google Cloud Console → APIs & Services → Credentials: the OAuth 2.0 client (type Web
       application) lists `https://<prod ref>.supabase.co/auth/v1/callback` as an authorised
       redirect URI.
 - [ ] Google Cloud Console → OAuth consent screen: publishing status is **In production** (not
-      Testing, which only admits listed test users), the app name and support email are set, and
-      the authorised domain includes the production domain.
+      Testing, which only admits listed test users), the app name and support email are set, the
+      home page is `<site>` and the privacy policy link is `<site>/privacy`.
 - [ ] Supabase → Auth → Providers → Google is enabled with that client's id and secret (secret
       stored only there).
-- [ ] Pass: signing in with a Google account that is not a test user lands signed in on the
-      production site.
+- [ ] Pass: signing in with a Google account that is not a test user lands signed in on `<site>`,
+      with a personal workspace (OQ-17).
 
-## Domain
+## Site address
 
-- [ ] The production domain (OQ-27) is added in Vercel → Settings → Domains, resolves, the
-      certificate is valid, and the bare and `www` forms end on the same URL.
-- [ ] A deep link such as `https://<domain>/demo` loads the app, not a 404 (single-page-app
-      rewrite in `vercel.json`).
-
-## Email
-
-- [ ] The sending domain of the provider chosen in OQ-19 is verified (SPF and DKIM pass; DMARC
-      set).
-- [ ] A real email of each kind the app sends (sign-in, invitation) arrives at the operator's own
-      address, **not in spam**, and its links open the production site.
+- [ ] `<site>` loads over HTTPS, and a deep link such as `<site>/demo` loads its page, not a 404.
+- [ ] The landing page links to the repo and to the operator's portfolio, and shows the plans and
+      their page limits while signed out (OQ-27).
+- [ ] `<site>/privacy` and `<site>/terms` load while signed out (OQ-30).
 
 ## Claude API
 
 - [ ] Anthropic Console → Settings → Limits (for the workspace that holds the production key):
       the monthly spend limit is **$10**. Pass: the limit page shows $10 for the current month.
 - [ ] Anthropic Console → API keys: the key stored as `ANTHROPIC_API_KEY` belongs to that
-      workspace and is used by nothing else (the eval uses its own key or the operator's choice in
-      OQ-26). Pass: the key's name matches, and usage for the month matches `ai_spend_periods`
-      within a few cents.
+      workspace and is used by nothing else; the eval runs on the operator's own laptop key, not
+      this one (OQ-26). Pass: the key's name matches, and usage for the month matches
+      `ai_spend_periods` within a few cents.
 - [ ] Spend ledger: SQL editor, `select * from ai_spend_periods order by period_start desc limit
-      1`. Pass: `cap_usd` is 10.00 and `spent_usd + reserved_usd` is at most `cap_usd`.
+      1` and `select * from ai_spend_days order by day desc limit 1`. Pass: `cap_usd` is 10.00 and
+      2.00 respectively, and in each row `spent_usd + reserved_usd` is at most `cap_usd`.
+- [ ] Waiting work: SQL editor, `select count(*) from documents where status = 'waiting_budget'`.
+      Pass: 0, unless `get_budget_status()` reports the daily ceiling or the monthly cap reached
+      (OQ-23).
 
 ## Payments (Stripe, test mode only)
 
 This app takes **no real payments**. Every item here checks that only test mode is in use.
 
-- [ ] `STRIPE_SECRET_KEY` in the Edge Function secrets is a **test** key (`sk_test_…`); no live key
-      (`sk_live_…`) is set anywhere. Pass: Stripe dashboard → Developers → API keys, with "Test
-      mode" on, shows the key whose last four characters match; the functions refuse a live key
-      at startup (section 6.1), so a wrong key shows as every billing call failing.
-- [ ] Stripe dashboard (test mode) → Products: the Pro product and price exist; its price id is
-      the one in `STRIPE_PRICE_PRO`.
+- [ ] `STRIPE_SECRET_KEY` in Vercel is a **test** key (`sk_test_…`); no live key (`sk_live_…`) is
+      set anywhere. Pass: Stripe dashboard → Developers → API keys, with "Test mode" on, shows the
+      key whose last four characters match; the server refuses a live key at startup (section
+      6.2), so a wrong key shows as every billing call failing.
+- [ ] Stripe dashboard (test mode) → Products: the Pro product has a recurring price of **$19 a
+      month in USD** with no trial (OQ-24); its price id is the one in `STRIPE_PRICE_PRO`.
 - [ ] Stripe dashboard (test mode) → Developers → Webhooks: an endpoint for
-      `https://<prod ref>.supabase.co/functions/v1/stripe-webhook` is registered for
-      `checkout.session.completed`, `customer.subscription.updated` and
-      `customer.subscription.deleted`, and its signing secret is the one in
-      `STRIPE_WEBHOOK_SECRET`.
+      `<site>/api/stripe/webhook` is registered for `checkout.session.completed`,
+      `customer.subscription.updated` and `customer.subscription.deleted`, and its signing secret
+      is the one in `STRIPE_WEBHOOK_SECRET`.
 - [ ] Stripe dashboard (test mode) → Settings → Billing → Customer portal is activated with
-      cancellation allowed (OQ-37).
+      cancellation at the end of the billing period allowed (OQ-37).
 - [ ] One upgrade with the test card `4242 4242 4242 4242` turns a Free workspace into Pro within
       10 seconds (OQ-36), the webhook endpoint shows the delivery as succeeded, and cancelling it
-      through the portal returns the workspace to Free at the period end (OQ-37).
+      through the portal returns the workspace to Free at the period end (OQ-24, OQ-37).
 
 ## Scheduled jobs
 
@@ -143,17 +155,17 @@ This app takes **no real payments**. Every item here checks that only test mode 
 - [ ] Retention (OQ-14, OQ-39): SQL editor, `select count(*) from documents where created_at <
       now() - interval '8 days' and file_deleted_at is null`. Pass: 0.
 - [ ] Queue: SQL editor, `select * from pgmq.metrics('extract')`. Pass: the oldest message is less
-      than 10 minutes old (no stuck queue).
+      than 10 minutes old, unless documents are waiting for budget (no stuck queue).
 
 ## After every deploy (automated once the smoke test exists)
 
-- [ ] The production site loads with no console errors, and the sign-in page works.
+- [ ] The production site loads with no console errors, and "Continue with Google" signs in.
 - [ ] Production runs the commit that was meant to ship (Vercel → Deployments: the production
       deploy's commit is the release's).
 - [ ] The demo opens from the landing page in one click, every sample shows its stored result,
       and `ai_spend_periods.spent_usd` is unchanged afterwards (the demo makes no Claude calls).
-- [ ] One real upload of a one-page sample invoice reaches "Needs review" with fields, while the
-      spend cap is not reached.
+- [ ] One real upload of a one-page sample invoice reaches "Needs review" with its type detected
+      as invoice, while the daily ceiling and the monthly cap are not reached.
 
 ## Rollback
 
