@@ -52,12 +52,21 @@ async function bytesOf(download: Download): Promise<Uint8Array> {
   return new Uint8Array(await readFile(await download.path()))
 }
 
-/** A CSV file's rows, split on commas: the values these specs check hold none. */
-const csvRows = (bytes: Uint8Array) =>
-  strFromU8(bytes)
-    .split('\r\n')
-    .filter(Boolean)
-    .map((r) => r.split(','))
+/** A CSV file's rows (RFC 4180): the samples' addresses hold commas, so quoted fields are read whole. */
+function csvRows(bytes: Uint8Array): string[][] {
+  const rows: string[][] = []
+  const fields = /("(?:[^"]|"")*"|[^,\r\n]*)(,|\r\n|$)/gy
+  let row: string[] = []
+  for (const m of strFromU8(bytes).matchAll(fields)) {
+    if (m[0] === '') break
+    row.push(m[1].startsWith('"') ? m[1].slice(1, -1).replaceAll('""', '"') : m[1])
+    if (m[2] !== ',') {
+      rows.push(row)
+      row = []
+    }
+  }
+  return rows
+}
 
 const columnOf = (rows: string[][], name: string) => rows.slice(1).map((r) => r[rows[0].indexOf(name)])
 

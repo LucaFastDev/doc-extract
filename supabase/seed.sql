@@ -1,5 +1,6 @@
 -- Local and CI data, applied by `npx supabase db reset` after the migrations. Each milestone adds
--- the rows its tests need, including the demo rows (milestone 11).
+-- the rows its tests need. The demo's rows are not here: they arrive by their migration, in
+-- production too (milestone 11, Lead ruling 1 on #41).
 
 -- The Vault entries the process-queue cron job reads (milestone 5, ARCHITECTURE.md section 12), so
 -- the job runs locally and in CI. The database reaches the Edge Functions through the API gateway

@@ -19,12 +19,16 @@ export function createClient() {
   return createBrowserClient(supabaseUrl, supabaseAnonKey)
 }
 
+let anonClient: ReturnType<typeof createSupabaseClient> | null = null
+
 /**
  * A browser client with no session, whoever is signed in: the anon role, for the public demo
- * (ARCHITECTURE.md section 10). It keeps nothing in storage and never refreshes a token.
+ * (ARCHITECTURE.md section 10). It keeps nothing in storage and never refreshes a token; one per
+ * page, as the browser client is.
  */
 export function createAnonClient() {
-  return createSupabaseClient(supabaseUrl, supabaseAnonKey, {
+  anonClient ??= createSupabaseClient(supabaseUrl, supabaseAnonKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'demo-anon' },
   })
+  return anonClient
 }
