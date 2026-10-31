@@ -61,6 +61,7 @@ export function DocumentsView({
   const supabase = useMemo(() => createClient(), [])
   const [documents, setDocuments] = useState(initialDocuments)
   const [allowance, setAllowance] = useState(initialAllowance)
+  const [allowanceStale, setAllowanceStale] = useState(false)
   const [refusal, setRefusal] = useState<Refusal | null>(null)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -182,7 +183,14 @@ export function DocumentsView({
     if (refused.length > 0) setRefusal({ problems: refused, nothingUploaded: false })
 
     const fresh = await supabase.rpc('get_page_allowance', { ws: workspace.id }).single<PageAllowance>()
-    if (fresh.data) setAllowance(fresh.data)
+    // On a failed refresh the last counts stay on screen, marked as possibly out of date.
+    if (fresh.error) {
+      console.error('The pages left could not be refreshed after an upload.', fresh.error)
+      setAllowanceStale(true)
+    } else {
+      setAllowance(fresh.data)
+      setAllowanceStale(false)
+    }
   }
 
   function onDrop(event: DragEvent) {
@@ -242,6 +250,11 @@ export function DocumentsView({
         <p className="text-xs text-muted-foreground">
           {left.account} · {left.workspace}
         </p>
+        {allowanceStale && (
+          <p className="text-xs text-destructive">
+            Couldn&apos;t update pages left. Reload the page to see the current count.
+          </p>
+        )}
         {progress && (
           <p role="status" className="text-sm">
             Uploading {Math.min(progress.done + 1, progress.total)} of {progress.total}…

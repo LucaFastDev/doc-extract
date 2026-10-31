@@ -178,6 +178,36 @@ test('an upload over the allowances is refused, saying how many pages remain, an
   await expect(page.getByText('0 of your account’s 10 pages left')).toBeVisible()
 })
 
+test('a failed refresh of the pages left keeps the last counts and says so until a refresh succeeds', async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  const stale = "Couldn't update pages left. Reload the page to see the current count."
+  const errors: string[] = []
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text())
+  })
+  await openDocuments(page, context, baseURL!)
+  await expect(page.getByText('10 of your account’s 10 pages left')).toBeVisible()
+
+  await page.route('**/rest/v1/rpc/get_page_allowance', (route) =>
+    route.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"unavailable"}' }),
+  )
+  await picker(page).setInputFiles(pngFile('first.png'))
+  await expect(row(page, 'first.png').getByRole('cell')).toHaveText(['first.png', '', 'Queued', '1'])
+  await expect(page.getByText(stale)).toBeVisible()
+  await expect(page.getByText('10 of your account’s 10 pages left')).toBeVisible()
+  expect(errors.some((e) => e.includes('The pages left could not be refreshed after an upload.'))).toBe(true)
+  await expectNoSideScroll(page)
+
+  await page.unroute('**/rest/v1/rpc/get_page_allowance')
+  await picker(page).setInputFiles(pngFile('second.png'))
+  await expect(row(page, 'second.png').getByRole('cell')).toHaveText(['second.png', '', 'Queued', '1'])
+  await expect(page.getByText('8 of your account’s 10 pages left')).toBeVisible()
+  await expect(page.getByText(stale)).toHaveCount(0)
+})
+
 test('a status change made in the database reaches the open list without a reload', async ({ page, context, baseURL }) => {
   const user = await createUser()
   const ws = await workspaceOf(user)
