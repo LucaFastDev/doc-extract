@@ -65,6 +65,17 @@ export async function personalWorkspaceId(user: TestUser): Promise<string> {
   return data[0].workspace_id as string
 }
 
+/** Creates a document as the user through create_document, as the upload control does. */
+export async function createDocument(
+  user: TestUser,
+  ws: string,
+  file = { file_name: 'invoice.pdf', mime_type: 'application/pdf', byte_size: 1024 },
+): Promise<{ id: string; storage_path: string }> {
+  const { data, error } = await user.client.rpc('create_document', { ws, ...file }).single()
+  if (error) throw error
+  return data as { id: string; storage_path: string }
+}
+
 /** Adds the user to the workspace directly in the database, as clients cannot. */
 export async function addMember(ws: string, user: TestUser, role: 'owner' | 'member'): Promise<void> {
   await withDb((db) =>
