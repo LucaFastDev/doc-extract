@@ -30,7 +30,7 @@ flowchart LR
     UI["Next.js pages<br/>(client components)"]
   end
   subgraph Vercel
-    SC["Server components,<br/>middleware"]
+    SC["Server components,<br/>proxy"]
     RH["Route handlers<br/>/auth/callback<br/>/api/billing/*<br/>/api/stripe/webhook<br/>/api/documents/[id]<br/>/api/workspaces/[id]<br/>/api/account"]
   end
   subgraph Supabase
@@ -171,10 +171,12 @@ src/
     api/account/route.ts           DELETE: delete the signed-in account
     layout.tsx                 root layout; imports ./globals.css
     globals.css                design tokens (CSS variables on :root), shadcn layout
-  middleware.ts                refreshes the session cookie; sends signed-out visitors to /sign-in
+  proxy.ts                     Next.js 16's proxy (the renamed middleware.ts): refreshes the session
+                               cookie; sends signed-out visitors to /sign-in
   lib/supabase/client.ts       the browser client (createBrowserClient); throws if NEXT_PUBLIC_SUPABASE_URL is unset
-  lib/supabase/server.ts       the server client (createServerClient + cookies), the service-role
-                               client and the middleware helper; `import 'server-only'`; throws if unset
+  lib/supabase/server.ts       the server client (createServerClient + cookies) and the service-role
+                               client; `import 'server-only'`; throws if unset
+  lib/supabase/proxy.ts        the proxy's session refresh (request and response cookies); throws if unset
   lib/stripe.ts                server-only Stripe client; throws unless the key starts with sk_test_
   features/…                   upload, documents, review, export, billing, workspace, demo
 shared/doctypes/               per-type field sets, JSON Schemas, tool descriptions, checks; no imports
@@ -605,7 +607,7 @@ Every function reads its settings through `_shared/env.ts`, which throws at star
 variable is unset; nothing has a default that points at a real service. Stripe is not used by any
 Edge Function.
 
-### 6.2 Next.js route handlers and middleware
+### 6.2 Next.js route handlers and proxy
 
 All run on the Node.js runtime and are short; none calls Claude.
 
@@ -619,10 +621,20 @@ All run on the Node.js runtime and are short; none calls Claude.
 | `DELETE /api/workspaces/[id]` | browser | session cookie | Checks `is_owner`. With the service-role client: cancels an active subscription at once in Stripe; removes every object under `{id}/` in `documents` through the Storage API, in batches of 100; then deletes the `workspaces` row, which cascades. If removing files fails, it stops before deleting the row and returns 500, so it is safe to run again (OQ-17, OQ-30). |
 | `DELETE /api/account` | browser | session cookie | Refuses with 409 while the caller is the only owner of a workspace that has other members (OQ-20). Deletes, as above, every workspace where the caller is the only member; then `auth.admin.deleteUser(caller)`, which cascades to `profiles`, memberships and `account_page_usage`, and sets the caller's audit columns elsewhere to null (OQ-30). |
 
-`src/middleware.ts` refreshes the session cookie on each request (the `@supabase/ssr` pattern),
-and sends a signed-out visitor who opens a page outside the public list (`/`, `/demo…`,
-`/sign-in`, `/privacy`, `/terms`, `/auth/callback`, `/api/stripe/webhook`) to
-`/sign-in?next=<path>`.
+`src/proxy.ts` (Next.js 16 renamed the `middleware.ts` convention to `proxy.ts`, exporting
+`proxy`) refreshes the session cookie on each request (the `@supabase/ssr` pattern), and sends a
+signed-out visitor who opens a page outside the public list (`/`, `/demo…`, `/sign-in`,
+`/privacy`, `/terms`, `/auth/callback`, `/api/stripe/webhook`) to `/sign-in?next=<path>`. It
+redirects only `GET` and `HEAD`: a 307 would make the browser repeat a server action's `POST`
+against `/sign-in`, which cannot answer it. It passes the requested path and query on to the page
+in an `x-request-path` request header, always overwriting any the browser sent, and each server
+action and the signed-in layout check the user themselves: one that finds none, because the
+session ended while the page was open, redirects to `/sign-in?next=<that path, through
+safeNextPath>`.
+
+The current workspace is a `workspace` cookie holding its id, set by the switcher. It is checked
+against the user's memberships on every use and falls back to the personal workspace (the first
+one joined); it only chooses what to show and is never trusted for access, which RLS decides.
 
 `src/lib/stripe.ts` throws if `STRIPE_SECRET_KEY` does not start with `sk_test_` (PRD US-11.1
 AC-4). `src/lib/supabase/server.ts` throws when `NEXT_PUBLIC_SUPABASE_URL` or
@@ -863,7 +875,7 @@ PRD.md.
 | # | Milestone | Days | Depends on | Decisions it applies |
 |---|---|---|---|---|
 | 1 | Scaffold: agent-ready Next.js repo | 1 | this PR, and the ai-hq change below | OQ-40, OQ-41 |
-| 2 | Google sign-in, profiles, personal workspace, workspace switch, create and rename, RLS helpers, middleware | 1 | 1 | OQ-17, OQ-19, OQ-21, OQ-34 |
+| 2 | Google sign-in, profiles, personal workspace, workspace switch, create and rename, RLS helpers, proxy | 1 | 1 | OQ-17, OQ-19, OQ-21, OQ-34 |
 | 3 | Copy-link invitations and roles | 1 | 2 | OQ-18, OQ-19, OQ-20 |
 | 4 | Upload, Storage, `submit-document`, page allowances, document list with live status | 1 | 2 | OQ-2, OQ-3, OQ-4, OQ-5, OQ-27, OQ-35, OQ-42, OQ-45 |
 | 5 | Queue, `process-queue`, Claude client with type detection, mock server, spend cap and daily ceiling, waiting for budget, retries (invoice type only) | 1.5 | 4 | OQ-1, OQ-7, OQ-8, OQ-10, OQ-22, OQ-23, OQ-33, OQ-43 |
@@ -918,7 +930,7 @@ needed. It does not add secrets to CI.
 2. **Auth and workspaces**: `profiles`, `workspaces`, `workspace_members`, `is_member`,
    `is_owner`, `create_workspace`, `handle_new_user` creating the personal workspace; Google
    sign-in only (Google configured from `config.toml` `env()`), the sign-in page, `/auth/callback`,
-   `middleware.ts` with the return-to path; workspace switcher, create and rename; access tests for
+   `src/proxy.ts` with the return-to path; workspace switcher, create and rename; access tests for
    every table.
 3. **Invitations and roles**: `workspace_invites`, `create_invite` with the copy-link,
    `/invite/[token]` and `accept_invite`, revoke, `remove_member`, `set_member_role`; members page;
