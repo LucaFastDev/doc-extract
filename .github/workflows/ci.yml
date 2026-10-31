@@ -33,6 +33,7 @@ jobs:
 
       - run: npm test
 
+      - run: npm run functions:env --if-present
       # The CLI pinned in package.json.
       - name: Start the local Supabase stack
         run: npx supabase start
