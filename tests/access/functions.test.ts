@@ -30,6 +30,21 @@ const FUNCTIONS = [
   { signature: 'public.extract_read(integer, integer)', definer: true, roles: ['service_role'] },
   { signature: 'public.extract_set_vt(bigint, integer)', definer: true, roles: ['service_role'] },
   { signature: 'public.extract_archive(bigint)', definer: true, roles: ['service_role'] },
+  // Milestone 7: the review screen and single-document delete.
+  { signature: 'public.add_line_item(uuid, integer)', definer: true, roles: ['authenticated'] },
+  { signature: 'public.delete_line_item(uuid, integer)', definer: true, roles: ['authenticated'] },
+  { signature: 'public.set_check_ticked(uuid, text, boolean)', definer: true, roles: ['authenticated'] },
+  { signature: 'public.reopen_document(uuid)', definer: true, roles: ['authenticated'] },
+  { signature: 'public.change_document_type(uuid, text)', definer: true, roles: ['authenticated'] },
+  { signature: 'public.get_amount_tolerance()', definer: true, roles: ['authenticated'] },
+  { signature: 'public.approve_document(uuid, uuid, jsonb)', definer: false, roles: ['service_role'] },
+  { signature: 'public.delete_document(uuid)', definer: false, roles: ['service_role'] },
+  { signature: 'public.set_correction_audit()', definer: false, roles: [] },
+  // Helpers the review RPCs call as their owner.
+  { signature: 'public.line_item_fields(text)', definer: false, roles: [] },
+  { signature: 'public.line_item_count(uuid)', definer: false, roles: [] },
+  { signature: 'public.shift_line_items(uuid, integer, integer)', definer: false, roles: [] },
+  { signature: 'public.lock_document_for_review(uuid, text[], text)', definer: false, roles: [] },
 ]
 
 const ROLES = ['public', 'anon', 'authenticated', 'service_role']
@@ -67,6 +82,17 @@ describe('database functions', () => {
     expect(allowed).toEqual(fn.roles)
   })
 
+  it('runs set_correction_audit before a correction to extraction_fields', async () => {
+    const triggers = await withDb(async (db) => {
+      const { rows } = await db.query<{ fn: string }>(
+        `select t.tgfoid::regprocedure::text as fn from pg_trigger t
+         where t.tgrelid = 'public.extraction_fields'::regclass and not t.tgisinternal`,
+      )
+      return rows.map((r) => r.fn)
+    })
+    expect(triggers).toEqual(['set_correction_audit()'])
+  })
+
   it('runs handle_new_user after insert on auth.users', async () => {
     const triggers = await withDb(async (db) => {
       const { rows } = await db.query<{ fn: string }>(
@@ -100,6 +126,7 @@ describe('tables', () => {
         'ai_spend_reservations',
         'app_config',
         'check_results',
+        'check_ticks',
         'document_events',
         'documents',
         'extraction_fields',

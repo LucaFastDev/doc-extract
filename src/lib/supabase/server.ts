@@ -1,5 +1,6 @@
 import 'server-only'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
 // The backend target comes only from the environment: a missing value fails here, at load, rather
@@ -33,4 +34,13 @@ export async function createClient() {
       },
     },
   })
+}
+
+/**
+ * The service-role client, for the route handlers that must bypass RLS (ARCHITECTURE.md section
+ * 6.2). It holds no session and throws when SUPABASE_SERVICE_ROLE_KEY is unset.
+ */
+export function createServiceRoleClient() {
+  const key = required('SUPABASE_SERVICE_ROLE_KEY', process.env.SUPABASE_SERVICE_ROLE_KEY)
+  return createSupabaseClient(supabaseUrl, key, { auth: { persistSession: false, autoRefreshToken: false } })
 }
