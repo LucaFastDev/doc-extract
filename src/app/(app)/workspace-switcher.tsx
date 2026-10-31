@@ -33,12 +33,23 @@ interface Workspace {
   role: 'owner' | 'member'
 }
 
+// Set when a workspace is created from NoWorkspace: that page, and the dialog trigger focus would
+// return to, unmounts as the switcher replaces it, so the switcher takes focus when it mounts.
+let focusOnMount = false
+
 // The workspace switcher (PRD US-8.1 AC-3, AC-4): lists the user's workspaces, switches between
 // them, creates one, lets an owner rename the current one, and opens its members (US-8.2).
 export function WorkspaceSwitcher({ workspaces, current }: { workspaces: Workspace[]; current: Workspace }) {
   const [dialog, setDialog] = useState<'create' | 'rename' | null>(null)
   const [pending, startTransition] = useTransition()
   const trigger = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (focusOnMount) {
+      focusOnMount = false
+      trigger.current?.focus()
+    }
+  }, [])
 
   return (
     <>
@@ -110,7 +121,7 @@ export function NoWorkspace() {
         <DialogTrigger asChild>
           <Button>Create workspace</Button>
         </DialogTrigger>
-        <DialogContent>{open && <CreateForm onDone={() => setOpen(false)} />}</DialogContent>
+        <DialogContent>{open && <CreateForm action={createAndHandOffFocus} onDone={() => setOpen(false)} />}</DialogContent>
       </Dialog>
     </main>
   )
@@ -124,8 +135,22 @@ function useClosingAction(action: (prev: FormState, data: FormData) => Promise<F
   return { state, formAction, pending }
 }
 
-function CreateForm({ onDone }: { onDone: () => void }) {
-  const { state, formAction, pending } = useClosingAction(createWorkspace, onDone)
+// The server response that creates the workspace also swaps NoWorkspace for the switcher, so the
+// hand-off is set here, before that render, not in a close handler that would never run.
+async function createAndHandOffFocus(prev: FormState, data: FormData) {
+  const state = await createWorkspace(prev, data)
+  if (state.ok) focusOnMount = true
+  return state
+}
+
+function CreateForm({
+  action = createWorkspace,
+  onDone,
+}: {
+  action?: (prev: FormState, data: FormData) => Promise<FormState>
+  onDone: () => void
+}) {
+  const { state, formAction, pending } = useClosingAction(action, onDone)
   return (
     <form action={formAction} className="grid gap-4">
       <DialogHeader>
