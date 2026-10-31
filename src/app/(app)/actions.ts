@@ -28,7 +28,9 @@ async function rememberWorkspace(id: string) {
 
 export async function switchWorkspace(id: string): Promise<void> {
   const supabase = await createClient()
-  const { data: member } = await supabase.rpc('is_member', { ws: id })
+  const { data: member, error } = await supabase.rpc('is_member', { ws: id })
+  if (error) throw error
+  // Not a member: the cookie is left as it was, so the switch does nothing.
   if (member !== true) return
   await rememberWorkspace(id)
   revalidatePath('/', 'layout')
@@ -63,6 +65,7 @@ export async function renameWorkspace(_prev: FormState, formData: FormData): Pro
 
 export async function signOut(): Promise<void> {
   const supabase = await createClient()
-  await supabase.auth.signOut()
+  const { error } = await supabase.auth.signOut()
+  if (error) throw error
   redirect('/')
 }
