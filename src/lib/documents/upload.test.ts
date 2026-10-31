@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   allowanceSummary,
+  canRetry,
   channelLiveState,
   checkSelection,
   DOC_TYPE_LABELS,
   isListed,
   STATUS_LABELS,
+  statusReason,
   systemLiveState,
 } from './upload'
 
@@ -115,5 +117,44 @@ describe('allowanceSummary', () => {
     expect(allowanceSummary({ workspace_used: 25, workspace_limit: 20, account_used: 0, account_cap: 10 }).workspace).toBe(
       '0 of this workspace’s 20 pages left this month',
     )
+  })
+
+  it('leaves the account out when app_config turns the account cap off (null)', () => {
+    expect(allowanceSummary({ workspace_used: 7, workspace_limit: 20, account_used: 12, account_cap: null })).toEqual({
+      account: null,
+      workspace: '13 of this workspace’s 20 pages left this month',
+    })
+  })
+})
+
+// Milestone 5 (PRD US-2.1 AC-6 and AC-7, US-1.2 AC-2, US-12.1 AC-2, issue #24 criterion 10): the
+// list says why a document failed, is not supported or is waiting, and offers Retry on a failed
+// document whose file is still there.
+describe('statusReason', () => {
+  it('shows the reason of a Failed, Not supported or Waiting for budget document', () => {
+    for (const status of ['failed', 'unsupported', 'waiting_budget'] as const) {
+      expect(statusReason({ status, status_reason: 'Why.' }), status).toBe('Why.')
+    }
+  })
+
+  it('shows none for other statuses, or when there is no reason', () => {
+    for (const status of ['queued', 'processing', 'needs_review', 'approved'] as const) {
+      expect(statusReason({ status, status_reason: 'Old reason.' }), status).toBeNull()
+    }
+    expect(statusReason({ status: 'failed', status_reason: null })).toBeNull()
+    expect(statusReason({ status: 'failed', status_reason: '  ' })).toBeNull()
+  })
+})
+
+describe('canRetry', () => {
+  it('offers Retry on a failed document whose file is not deleted', () => {
+    expect(canRetry({ status: 'failed', file_deleted_at: null })).toBe(true)
+  })
+
+  it('does not offer it once the file is deleted, or for any other status', () => {
+    expect(canRetry({ status: 'failed', file_deleted_at: '2026-10-30T00:00:00Z' })).toBe(false)
+    for (const status of ['queued', 'processing', 'waiting_budget', 'needs_review', 'approved', 'unsupported'] as const) {
+      expect(canRetry({ status, file_deleted_at: null }), status).toBe(false)
+    }
   })
 })

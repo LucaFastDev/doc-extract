@@ -174,7 +174,7 @@ describe('reserve_spend', () => {
     } finally {
       await a.end()
       await b.end()
-      // Put the shared rows back as they were.
+      // Put the shared rows back as they were, or remove them if this test made them.
       await withDb(async (db) => {
         if (reservation) await db.query('delete from public.ai_spend_reservations where id = $1', [reservation])
         if (before.period) {
@@ -182,12 +182,16 @@ describe('reserve_spend', () => {
             before.period.spent_usd,
             before.period.reserved_usd,
           ])
+        } else {
+          await db.query(`delete from public.ai_spend_periods where period_start = ${MONTH}`)
         }
         if (before.day) {
           await db.query(`update public.ai_spend_days set spent_usd = $1, reserved_usd = $2 where day = ${DAY}`, [
             before.day.spent_usd,
             before.day.reserved_usd,
           ])
+        } else {
+          await db.query(`delete from public.ai_spend_days where day = ${DAY}`)
         }
       })
     }

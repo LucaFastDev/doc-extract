@@ -3,14 +3,16 @@
 import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import { FunctionsHttpError, type RealtimeChannel } from '@supabase/supabase-js'
 import { UploadIcon } from 'lucide-react'
-import { buttonVariants } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import {
   allowanceSummary,
+  canRetry,
   channelLiveState,
   checkSelection,
   DOC_TYPE_LABELS,
   isListed,
   STATUS_LABELS,
+  statusReason,
   systemLiveState,
   type ListedStatus,
   type PageAllowance,
@@ -25,6 +27,8 @@ export interface DocumentItem {
   status: ListedStatus
   page_count: number | null
   created_at: string
+  status_reason: string | null
+  file_deleted_at: string | null
 }
 
 interface Refusal {
@@ -49,6 +53,8 @@ async function reason(fileName: string, error: unknown): Promise<string> {
 // US-14.1 AC-4). Each chosen file becomes a document: create_document, the upload to the path it
 // returns, then submit-document, which counts its pages and queues it. The list follows every
 // change to the workspace's documents through Realtime, which sends only rows the user may read.
+// A Failed, Not supported or Waiting for budget row says why, and a failed one whose file is still
+// there can be retried (US-2.1 AC-6 and AC-7, issue #24).
 export function DocumentsView({
   workspace,
   initialDocuments,
@@ -66,6 +72,8 @@ export function DocumentsView({
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [dragging, setDragging] = useState(false)
   const [live, setLive] = useState('connecting')
+  const [retrying, setRetrying] = useState<string | null>(null)
+  const [retryError, setRetryError] = useState<string | null>(null)
 
   function upsert(doc: DocumentItem) {
     setDocuments((docs) =>
@@ -118,6 +126,8 @@ export function DocumentsView({
                 status: row.status,
                 page_count: row.page_count,
                 created_at: row.created_at,
+                status_reason: row.status_reason,
+                file_deleted_at: row.file_deleted_at,
               })
             } else {
               remove(row.id)
@@ -173,6 +183,8 @@ export function DocumentsView({
               status: 'queued',
               page_count: submitted.data.document.page_count,
               created_at: new Date().toISOString(),
+              status_reason: null,
+              file_deleted_at: null,
             })
           }
         }
@@ -190,6 +202,20 @@ export function DocumentsView({
     } else {
       setAllowance(fresh.data)
       setAllowanceStale(false)
+    }
+  }
+
+  // retry_document reserves the pages again and re-queues the document; the row then changes
+  // through Realtime, like any other status change.
+  async function retry(doc: DocumentItem) {
+    setRetryError(null)
+    setRetrying(doc.id)
+    const { error } = await supabase.rpc('retry_document', { document_id: doc.id })
+    setRetrying(null)
+    if (error) {
+      console.error('The document could not be retried.', error)
+      // The function's own refusals (allowance, deleted file) are written for the user.
+      setRetryError(error.code === '22023' ? error.message : `${doc.file_name} could not be retried. Try again.`)
     }
   }
 
@@ -247,9 +273,7 @@ export function DocumentsView({
           Choose files
         </label>
         <p className="text-sm font-medium">Files are deleted 7 days after upload.</p>
-        <p className="text-xs text-muted-foreground">
-          {left.account} · {left.workspace}
-        </p>
+        <p className="text-xs text-muted-foreground">{[left.account, left.workspace].filter(Boolean).join(' · ')}</p>
         {allowanceStale && (
           <p className="text-xs text-destructive">
             Couldn&apos;t update pages left. Reload the page to see the current count.
@@ -282,6 +306,12 @@ export function DocumentsView({
         </div>
       )}
 
+      {retryError && (
+        <p role="alert" aria-label="Retry refused" className="rounded-lg border border-destructive/50 px-4 py-3 text-sm text-destructive">
+          {retryError}
+        </p>
+      )}
+
       <span hidden data-testid="live-status" data-state={live} />
       {documents.length === 0 ? (
         <p className="text-muted-foreground">
@@ -308,14 +338,33 @@ export function DocumentsView({
               </tr>
             </thead>
             <tbody className="divide-y">
-              {documents.map((doc) => (
+              {documents.map((doc) => {
+                const reason = statusReason(doc)
+                return (
                 <tr key={doc.id}>
-                  <td className="px-3 py-2 font-medium [overflow-wrap:anywhere]">{doc.file_name}</td>
+                  <td className="px-3 py-2 font-medium [overflow-wrap:anywhere]">
+                    {doc.file_name}
+                    {reason && <p className="mt-1 text-xs font-normal text-muted-foreground">{reason}</p>}
+                    {canRetry(doc) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-2"
+                        aria-label={`Retry ${doc.file_name}`}
+                        disabled={retrying === doc.id}
+                        onClick={() => void retry(doc)}
+                      >
+                        Retry
+                      </Button>
+                    )}
+                  </td>
                   <td className="px-3 py-2">{doc.doc_type ? (DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type) : ''}</td>
                   <td className="px-3 py-2">{STATUS_LABELS[doc.status]}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{doc.page_count ?? ''}</td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>
