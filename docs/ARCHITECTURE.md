@@ -927,8 +927,62 @@ retried or change type. The `demo` bucket is never touched. The function's run i
 Export runs in the browser: it reads the chosen approved documents of one type through RLS and
 builds the file locally, so no server code and no extra secret is needed (OQ-13). XLSX has two
 sheets, "Documents" and "Line items"; CSV is the same two tables as `documents.csv` and
-`line_items.csv` in one zip. The CSV writer is our own small, tested function (RFC 4180). The XLSX
-and zip libraries are chosen and justified in the export milestone.
+`line_items.csv` in one zip. The CSV writer is our own small, tested function (RFC 4180).
+
+**The page.** `/documents/export` (`src/app/(app)/documents/export/`), opened by the Export button
+on the document list, works in the current workspace. The user picks one of the six types (each
+shows how many approved documents it has; a type with none cannot be picked), then the approved
+documents of that type, newest approval first, all ticked at first, with Select all and Select
+none; then XLSX or CSV, and Download, which is disabled while nothing is ticked.
+`src/lib/export/load.ts` reads, with the browser client as the signed-in user, the workspace's
+`documents` in status `approved`, and on Download reads the ticked ones again (one reopened,
+changed to another type or deleted meanwhile is left out, and the page says how many) and their
+`extraction_fields`, a page of 1000 rows at a time (PostgREST's `max_rows`) and 100 document ids
+per request. A document whose file was deleted after 7 days is exported like any other: its data
+remains (section 8).
+
+**The module.** `src/lib/export/model.ts` turns a document's `extraction_fields` rows into plain
+data, `{ id, fileName, approvedAt, fields, lineItems }`: each value is `corrected_value` when it is
+not null and `extracted_value` otherwise, so an emptied field is empty; a deleted line has no rows
+left and an added one has its own, so the lines are the review screen's, in its order. It builds the
+two tables from that data. `src/lib/export/files.ts` writes them: `buildXlsx(input)` and
+`buildCsvZip(input)` take `{ docType, documents }` and return the file's bytes. Neither reads
+Supabase or imports React, so the demo (milestone 11) calls them with its stored results. The page
+loads `files.ts` with a dynamic `import()` when Download is pressed, so the two libraries below are
+in a chunk of their own that no other page loads. Files are named `<type>-export-<yyyy-mm-dd>.xlsx`
+or `.zip`, the type in kebab case (`bank-statement`) and the date the export was made, in UTC.
+
+**Columns** (Lead ruling 1 on #39). Header cells are the field `name`s from `shared/doctypes/`, in
+the type's own order, so an import into another tool is stable. "Documents" (`documents.csv`) has
+one row per document: `document_id`, `file_name`, `approved_at`, then every header field of the
+type. "Line items" (`line_items.csv`) has one row per line item, a bank statement's per transaction:
+`document_id`, `file_name`, `position` (from 1, the order on the review screen), then every
+line-item field of the type. Every field of the type has a column, even when all its values are
+empty, and the currency is in its own column (`currency`, and `currency_as_printed`).
+
+**Values** (Lead ruling 2 on #39). An amount, number or percent that parses as a plain decimal
+(`shared/doctypes/decimal.ts`) is a number exactly as stored: a percent of 19 stays 19. In XLSX it
+is a numeric cell; in CSV it is the stored text, never passed through a float. A date that is a
+full YYYY-MM-DD calendar date is an XLSX date cell shown as `yyyy-mm-dd`, and in CSV that text.
+`approved_at` is a date and time in UTC: an XLSX date-time cell shown as `yyyy-mm-dd hh:mm`, and in
+CSV ISO 8601 to the second with a `Z`, such as `2026-10-31T14:05:12Z`. A value that does not parse
+as its kind is text, as written. An empty or missing value is an empty cell or an empty CSV field.
+CSV files are UTF-8 without a byte order mark, with a header row, RFC 4180 quoting (a field holding
+a comma, a double quote, a CR or an LF, or starting or ending with a space or a tab, is quoted, its
+quotes doubled) and CRLF line ends.
+
+**Formula safety** (Lead ruling 3 on #39, and the Lead's ruling on the worker's question there).
+Values come from documents and are untrusted. In XLSX every text value is a string cell, never a
+formula. In CSV every value written as text, in any column, that starts with `=`, `+`, `-`, `@`, a
+tab or a carriage return gets a single quote `'` in front, so an amount stored as `=1+1` is
+written `'=1+1`. Parsed numbers and full dates are never changed, so `-12.50` stays a number.
+
+**Libraries** (Lead ruling 4 on #39), two runtime dependencies, pinned:
+
+| Package | Version | Publisher | Why |
+|---|---|---|---|
+| `fflate` | 0.8.3 | 101arrowz (Arjun Barrett) | the zip of the two CSV files (`zipSync`); small, no dependencies, runs in the browser and Node; the specs and unit tests also read the files back with it |
+| `write-excel-file` | 4.1.1 | catamphetamine | the XLSX: a writer only, typed cells (string, number, date with a number format), several sheets, frozen header row; its one dependency is `fflate`, so the two share one zip implementation. Its `universal` entry returns a `Blob` in the browser and in Node, so the same module runs on the page and in the unit tests. ExcelJS was not chosen: nine dependencies (`jszip`, `archiver`, `unzipper` among them) for a reader and styling the export does not need. The `xlsx` package on the npm registry is not used (ruling 4) |
 
 ## 12. Environment variables and secrets
 
