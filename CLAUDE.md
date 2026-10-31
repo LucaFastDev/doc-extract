@@ -40,7 +40,10 @@ hand-named file `supabase/migrations/<UTC yyyymmddhhmmss>_<name>.sql`.
   (`import 'server-only'`)
 - `src/lib/utils.ts` shadcn/ui's `cn`; `components.json` shadcn/ui's settings
 - `supabase/` `config.toml` (local stack only), forward-only `migrations/`, `seed.sql`,
-  `functions/`
+  `functions/` (each function's checks in pure modules with `*.test.ts` beside them, run by
+  `npm test`; `supabase start` serves the functions present when it starts)
+- `shared/` plain TypeScript with no imports, read by Next.js as `@shared/*` and by the functions
+  by relative import (`limits.ts`: accepted types, 10 MB, 10 pages, 10 files)
 - `tests/access/` Vitest access tests against the local stack (`vitest.access.config.ts`)
 - `e2e/` Playwright specs; `playwright.config.ts` picks one port per checkout from `E2E_PORT`
 - `.github/workflows/ci.yml` CI on GitHub's hosted runners: typecheck, lint, unit tests,

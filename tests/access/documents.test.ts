@@ -199,15 +199,19 @@ describe('documents in Realtime', () => {
     const toStranger: unknown[] = []
     const member = await subscribe(ownerA, wsA, toMember)
     const stranger = await subscribe(ownerB, wsA, toStranger)
-    // Realtime starts listening for a channel's changes just after it reports SUBSCRIBED.
-    await new Promise((r) => setTimeout(r, 1000))
 
-    await withDb((db) => db.query("update public.documents set status = 'queued', page_count = 2 where id = $1", [docA]))
+    // Realtime starts sending a channel's changes a moment after it reports SUBSCRIBED, and longer
+    // just after `supabase db reset` restarts it, so the change is repeated until one arrives.
+    const deadline = Date.now() + 20_000
+    for (let n = 1; !toMember.some((d) => d.id === docA && d.status === 'queued') && Date.now() < deadline; n++) {
+      await withDb((db) => db.query("update public.documents set status = 'queued', page_count = $2 where id = $1", [docA, n]))
+      await new Promise((r) => setTimeout(r, 500))
+    }
+    expect(toMember.map((d) => [d.id, d.status])).toContainEqual([docA, 'queued'])
 
-    await expect.poll(() => toMember.map((d) => [d.id, d.status]), { timeout: 5000 }).toContainEqual([docA, 'queued'])
     await new Promise((r) => setTimeout(r, 1500))
     expect(toStranger).toEqual([])
     await ownerA.client.removeChannel(member)
     await ownerB.client.removeChannel(stranger)
-  }, 15_000)
+  }, 30_000)
 })

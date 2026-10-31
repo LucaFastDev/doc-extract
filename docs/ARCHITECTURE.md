@@ -252,6 +252,7 @@ A function not in this table is added to it, by the same rule, in the milestone 
 | `get_budget_status() → (spent_usd numeric, cap_usd numeric, daily_reached boolean, monthly_reached boolean, resumes_at timestamptz)` | browser, signed in | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | reads `ai_spend_periods`, `ai_spend_days` and `app_config`, which have no client grants; signed-in users only (OQ-22) |
 | `get_plan_limits() → table (plan text, pages_per_period int, monthly_price_usd numeric)`, `stable` | browser and server components, signed in or not | definer | `set search_path = ''` | revoke execute from public; grant execute to `anon`, `authenticated` | reads `plan_limits`, which has RLS and no select policy; `anon` because the landing page shows the plans to visitors who are not signed in (OQ-27) |
 | `reserve_pages(document_id uuid) → boolean` | `submit-document` (service role), `retry_document`, `change_document_type` | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | `service_role` bypasses RLS, so definer is not needed |
+| `account_page_cap() → int`, `stable`: the account lifetime cap, 10 (OQ-2) | `reserve_pages` (as the service role), `get_page_allowance` (as its owner) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | reads nothing a caller could not; it stands in for `app_config.account_page_cap` until milestone 5 adds `app_config` and replaces its body with a read of that column |
 | `release_pages(document_id uuid)` | `process-queue` (service role), `delete_document` | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
 | `reserve_spend(document_id uuid, estimate numeric) → (reservation uuid, refused_by text)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
 | `settle_spend(reservation uuid, actual_cost numeric)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
@@ -850,6 +851,7 @@ and zip libraries are chosen and justified in the export milestone.
 | `EXTRACT_CONCURRENCY` | pg_cron job | 1 | 2 |
 | Google OAuth client id and secret | Supabase Auth | `env()` in `config.toml`, from `supabase/.env` | Supabase dashboard → Auth → Providers → Google (secret) |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | all Edge Functions | provided by the local runtime | provided by Supabase |
+| `SUPABASE_ANON_KEY` | `submit-document`, to read as the caller through RLS | provided by the local runtime | provided by Supabase |
 | `SUPABASE_DB_URL` | access tests only | from `supabase status` | never set |
 
 Only the two `NEXT_PUBLIC_` variables reach the browser; Next.js inlines them at build time. Every

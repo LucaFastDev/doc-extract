@@ -93,7 +93,14 @@ domain (OQ-27). `<site>` below means that address.
 - [ ] Storage: the `demo` bucket holds one file per published `demo_documents` row (`select slug,
       file_path from demo_documents where published`). Pass: every sample's file opens on its
       `/demo/<slug>` page while signed out.
-- [ ] Realtime: dashboard → Database → Publications → `supabase_realtime` includes `documents`.
+- [ ] Storage policies on `documents` (section 5): SQL editor, `select policyname, cmd, roles from
+      pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname like
+      'documents_objects_%' order by policyname`. Pass: exactly `documents_objects_insert` (INSERT,
+      `{authenticated}`) and `documents_objects_select` (SELECT, `{authenticated}`), and no other
+      policy on `storage.objects` names `documents`: there is no client update or delete.
+- [ ] Realtime: dashboard → Database → Publications → `supabase_realtime` includes `documents`;
+      or SQL editor, `select tablename from pg_publication_tables where pubname =
+      'supabase_realtime'`. Pass: `documents` is listed (section 4.3, OQ-35).
 - [ ] Security advisors show no open finding (dashboard → Advisors → Security), in particular no
       table without RLS and no `security definer` function with a mutable search path.
 - [ ] Function grants: SQL editor, `select has_function_privilege('anon',
@@ -101,6 +108,28 @@ domain (OQ-27). `<site>` below means that address.
       'public.get_budget_status()', 'execute')`. Pass: `true`, `false` (OQ-27, OQ-22).
 - [ ] Backups: the plan's backups are on. Uploaded files are deleted after 7 days by design, so
       point-in-time recovery is not needed for them.
+
+## Upload
+
+Milestone 4: the browser creates a document, uploads its file to the `documents` bucket and posts
+it to the `submit-document` Edge Function, which counts its pages and reserves them (sections 2,
+5, 6.1 and 7).
+
+- [ ] `submit-document` is deployed from the release's commit: `supabase functions deploy
+      submit-document --project-ref <prod ref>`. Dashboard → Edge Functions lists
+      `submit-document` with "Enforce JWT verification" on. It reads only `SUPABASE_URL`,
+      `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`, which Supabase provides to every
+      function, so it needs no secret of its own. Pass: the function is listed with the release's
+      deploy time, and `curl -X POST https://<prod ref>.supabase.co/functions/v1/submit-document`
+      with no `Authorization` header is refused with 401.
+- [ ] Account cap: SQL editor, `select public.account_page_cap()`. Pass: 10 (OQ-2). Until
+      milestone 5 adds `app_config`, the cap is this function's body, so changing it takes a
+      migration.
+- [ ] Pass: signed in on `<site>/documents`, the upload control says "Files are deleted 7 days
+      after upload." and shows the account's and the workspace's pages left. Uploading a one-page
+      PDF lists it as "Queued" with 1 page; a 20 MB file and a `.txt` file are refused before
+      upload. With the same workspace open in a second window, the new document appears there
+      within 5 seconds, without a reload (OQ-35).
 
 ## Google sign-in
 
