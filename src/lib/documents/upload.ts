@@ -1,4 +1,13 @@
-import { ACCEPTED_TYPES_LABEL, isAcceptedMimeType, MAX_FILE_BYTES, MAX_FILES, pages } from '@shared/limits'
+import {
+  ACCEPTED_TYPES_LABEL,
+  isAcceptedMimeType,
+  isImageMimeType,
+  MAX_FILE_BYTES,
+  MAX_FILES,
+  MAX_IMAGE_BYTES,
+  MAX_IMAGE_LABEL,
+  pages,
+} from '@shared/limits'
 
 // What the upload control checks before anything is uploaded (PRD US-1.1 AC-2 to AC-4), and how
 // the document list names statuses and types (US-10.1 AC-1). submit-document checks the file again.
@@ -17,6 +26,8 @@ export function checkSelection(files: ChosenFile[]): string[] {
   for (const f of files) {
     if (!isAcceptedMimeType(f.type)) {
       problems.push(`${f.name} is not a PDF, JPEG, PNG or WebP file. Accepted types: ${ACCEPTED_TYPES_LABEL}.`)
+    } else if (isImageMimeType(f.type) && f.size > MAX_IMAGE_BYTES) {
+      problems.push(`${f.name} is over the ${MAX_IMAGE_LABEL} limit for images.`)
     } else if (f.size > MAX_FILE_BYTES) {
       problems.push(`${f.name} is over the ${MAX_FILE_BYTES / 1024 / 1024} MB limit.`)
     } else if (f.size === 0) {

@@ -246,7 +246,8 @@ export function DocumentsView({
       >
         <UploadIcon className="size-6 text-muted-foreground" aria-hidden />
         <p className="text-sm text-muted-foreground">
-          Drop up to 10 files here, or choose them. PDF, JPEG, PNG or WebP, at most 10 MB and 10 pages each.
+          Drop up to 10 files here, or choose them. PDF, JPEG, PNG or WebP. PDFs at most 10 MB, images at most
+          7.5 MB, and 10 pages each.
         </p>
         {/* The input is visually hidden, so its label shows the button's focus ring for it. */}
         <input

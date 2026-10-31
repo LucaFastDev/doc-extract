@@ -69,10 +69,29 @@ describe('create_document', () => {
     })
   })
 
-  it('accepts JPEG, PNG and WebP, and a file of exactly 10 MB', async () => {
+  // Issue #28: images at most 7,500,000 bytes, PDFs at most 10 MB.
+  it('accepts a JPEG, PNG and WebP of exactly 7,500,000 bytes, and a PDF of exactly 10 MB', async () => {
     for (const mime_type of ['image/jpeg', 'image/png', 'image/webp']) {
-      await createDocument(owner, ws, { file_name: 'photo', mime_type, byte_size: 10 * 1024 * 1024 })
+      await createDocument(owner, ws, { file_name: 'photo', mime_type, byte_size: 7_500_000 })
     }
+    await createDocument(owner, ws, { file_name: 'scan.pdf', mime_type: 'application/pdf', byte_size: 10 * 1024 * 1024 })
+  })
+
+  it('refuses a JPEG, PNG or WebP over 7,500,000 bytes, naming the image limit, and creates nothing', async () => {
+    const before = await documentCount(ws)
+    for (const mime_type of ['image/jpeg', 'image/png', 'image/webp']) {
+      for (const byte_size of [7_500_001, 10 * 1024 * 1024]) {
+        const { data, error } = await owner.client.rpc('create_document', { ws, file_name: 'photo', mime_type, byte_size })
+        expect(data, `${mime_type} ${byte_size}`).toBeNull()
+        expect(error?.code).toBe('22023')
+        expect(error?.message).toBe('an image must be at most 7.5 MB')
+      }
+    }
+    expect(await documentCount(ws)).toBe(before)
+  })
+
+  it('accepts a PDF over 7.5 MB', async () => {
+    await createDocument(owner, ws, { file_name: 'scan.pdf', mime_type: 'application/pdf', byte_size: 7_500_001 })
   })
 
   it('refuses a non-member and anon, and creates nothing', async () => {

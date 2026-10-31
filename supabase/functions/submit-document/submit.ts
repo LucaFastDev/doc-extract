@@ -2,6 +2,7 @@ import type { AcceptedMimeType } from '../../../shared/limits.ts'
 import {
   allowanceRefusal,
   countPages,
+  imageSizeRefusal,
   magicBytesRefusal,
   pageLimitRefusal,
   sha256Hex,
@@ -55,7 +56,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const refused = (error: string): SubmitResult => ({ status: 409, body: { error } })
 
 /**
- * Checks the caller and the document, then the file: magic bytes, page count, the 10-page limit,
+ * Checks the caller and the document, then the file: magic bytes, the image size limit, page count,
+ * the 10-page limit,
  * and the allowances through reserve_pages. Every refusal happens before reserve_pages, or is
  * reserve_pages' own, so no refusal leaves pages counted. An accepted document is set queued and
  * sent to the extract queue.
@@ -86,6 +88,8 @@ export async function submitDocument(body: unknown, deps: SubmitDeps): Promise<S
   // The content must be the accepted type the file was created as.
   const typeRefusal = magicBytesRefusal(doc.file_name, bytes, doc.mime_type)
   if (typeRefusal) return reject(typeRefusal)
+  const tooBig = imageSizeRefusal(doc.file_name, doc.mime_type, bytes.length)
+  if (tooBig) return reject(tooBig)
 
   const pageCount = await countPages(bytes, doc.mime_type as AcceptedMimeType)
   if (pageCount === null) return reject(`${doc.file_name} could not be read as a PDF.`)
