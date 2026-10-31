@@ -62,6 +62,22 @@ export interface PageAllowance {
   account_cap: number
 }
 
+// The list's live state, which the hidden live-status element reports. A joined channel is not yet
+// receiving changes: Realtime then confirms or refuses the postgres_changes subscription in a
+// system message, so only that confirmation makes the list "subscribed", and a refusal is an error.
+
+/** The live state for a status passed to the channel's subscribe callback. */
+export function channelLiveState(status: string): string {
+  return status === 'SUBSCRIBED' ? 'joined' : status.toLowerCase()
+}
+
+/** The live state for a system message on the channel, or null when it changes nothing. */
+export function systemLiveState(message: { extension?: string; status?: string }): string | null {
+  if (message.status === 'error') return 'channel_error'
+  if (message.extension === 'postgres_changes' && message.status === 'ok') return 'subscribed'
+  return null
+}
+
 /** The pages left, for the upload screen (PRD US-13.2 AC-3). */
 export function allowanceSummary(a: PageAllowance) {
   const accountLeft = Math.max(0, a.account_cap - a.account_used)

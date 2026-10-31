@@ -1,15 +1,17 @@
 'use client'
 
 import { useEffect, useMemo, useState, type DragEvent } from 'react'
-import { FunctionsHttpError } from '@supabase/supabase-js'
+import { FunctionsHttpError, type RealtimeChannel } from '@supabase/supabase-js'
 import { UploadIcon } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import {
   allowanceSummary,
+  channelLiveState,
   checkSelection,
   DOC_TYPE_LABELS,
   isListed,
   STATUS_LABELS,
+  systemLiveState,
   type ListedStatus,
   type PageAllowance,
 } from '@/lib/documents/upload'
@@ -75,9 +77,28 @@ export function DocumentsView({
   }
 
   useEffect(() => {
-    const channel = supabase
-      .channel(`documents:${workspace.id}`)
-      .on(
+    let cancelled = false
+    let channel: RealtimeChannel | null = null
+
+    // The channel must join as the user: Realtime checks the subscription against the token in the
+    // join, and refuses it as anon. The client sets that token only when its auth state loads,
+    // which can come after this effect, so set it from the session before subscribing.
+    async function subscribe() {
+      const { data } = await supabase.auth.getSession()
+      if (cancelled) return
+      if (!data.session) {
+        setLive('signed_out')
+        return
+      }
+      await supabase.realtime.setAuth(data.session.access_token)
+      if (cancelled) return
+      channel = supabase
+        .channel(`documents:${workspace.id}`)
+        .on('system', {}, (message) => {
+          const state = systemLiveState(message)
+          if (state) setLive(state)
+        })
+        .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'documents', filter: `workspace_id=eq.${workspace.id}` },
         (payload) => {
@@ -101,9 +122,13 @@ export function DocumentsView({
           }
         },
       )
-      .subscribe((status) => setLive(status.toLowerCase()))
+        .subscribe((status) => setLive(channelLiveState(status)))
+    }
+
+    void subscribe()
     return () => {
-      supabase.removeChannel(channel)
+      cancelled = true
+      if (channel) supabase.removeChannel(channel)
     }
   }, [supabase, workspace.id])
 
@@ -185,25 +210,30 @@ export function DocumentsView({
         <p className="text-sm text-muted-foreground">
           Drop up to 10 files here, or choose them. PDF, JPEG, PNG or WebP, at most 10 MB and 10 pages each.
         </p>
-        <label
-          htmlFor="upload-files"
-          className={cn(buttonVariants(), progress ? 'pointer-events-none opacity-50' : 'cursor-pointer')}
-        >
-          Choose files
-        </label>
+        {/* The input is visually hidden, so its label shows the button's focus ring for it. */}
         <input
           id="upload-files"
           type="file"
           multiple
           accept={ACCEPT}
           disabled={progress !== null}
-          className="sr-only"
+          className="peer sr-only"
           onChange={(e) => {
             const files = Array.from(e.target.files ?? [])
             e.target.value = ''
             void upload(files)
           }}
         />
+        <label
+          htmlFor="upload-files"
+          className={cn(
+            buttonVariants(),
+            'peer-focus-visible:border-ring peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50',
+            progress ? 'pointer-events-none opacity-50' : 'cursor-pointer',
+          )}
+        >
+          Choose files
+        </label>
         <p className="text-sm font-medium">Files are deleted 7 days after upload.</p>
         <p className="text-xs text-muted-foreground">
           {left.account} · {left.workspace}

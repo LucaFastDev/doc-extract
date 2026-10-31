@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { allowanceSummary, checkSelection, DOC_TYPE_LABELS, isListed, STATUS_LABELS } from './upload'
+import {
+  allowanceSummary,
+  channelLiveState,
+  checkSelection,
+  DOC_TYPE_LABELS,
+  isListed,
+  STATUS_LABELS,
+  systemLiveState,
+} from './upload'
 
 // The checks the upload control makes before anything is uploaded (PRD US-1.1 AC-2 to AC-4, OQ-4,
 // OQ-42), and how the list names statuses and types (US-10.1 AC-1).
@@ -72,6 +80,29 @@ describe('labels', () => {
       'Delivery note',
       'Quote',
     ])
+  })
+})
+
+describe('live state', () => {
+  it('is only joined when the channel subscribes, and reports every other channel status', () => {
+    expect(channelLiveState('SUBSCRIBED')).toBe('joined')
+    expect(channelLiveState('CHANNEL_ERROR')).toBe('channel_error')
+    expect(channelLiveState('TIMED_OUT')).toBe('timed_out')
+    expect(channelLiveState('CLOSED')).toBe('closed')
+  })
+
+  it('is subscribed once Realtime confirms the postgres_changes subscription', () => {
+    expect(systemLiveState({ extension: 'postgres_changes', status: 'ok' })).toBe('subscribed')
+  })
+
+  it('is an error when Realtime refuses the subscription in a system message', () => {
+    expect(systemLiveState({ extension: 'postgres_changes', status: 'error' })).toBe('channel_error')
+    expect(systemLiveState({ extension: 'system', status: 'error' })).toBe('channel_error')
+  })
+
+  it('ignores other system messages', () => {
+    expect(systemLiveState({ extension: 'system', status: 'ok' })).toBeNull()
+    expect(systemLiveState({})).toBeNull()
   })
 })
 
