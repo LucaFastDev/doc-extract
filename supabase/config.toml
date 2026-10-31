@@ -44,6 +44,16 @@ file_size_limit = "10MiB"
 [auth]
 enabled = true
 enable_signup = true
+# Auth returns users only to /auth/callback on this machine, on whatever port the dev server or a
+# checkout's e2e run uses (playwright.config.ts). Production's URLs are set in the dashboard
+# (docs/go-live.md).
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["http://localhost:*/auth/callback**", "http://127.0.0.1:*/auth/callback**"]
+
+# The e2e test of the sign-in round trip sends a magic link through the test-only email provider;
+# the default of 2 an hour would fail a second run.
+[auth.rate_limit]
+email_sent = 100
 
 # For tests only (ARCHITECTURE.md section 4.4): the access tests and Playwright's global setup
 # create users with the admin API and sign them in with a password. The app has no email form,
