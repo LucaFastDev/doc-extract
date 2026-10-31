@@ -37,8 +37,12 @@ export interface SubmitDeps {
   allowance(workspaceId: string): Promise<PageAllowance>
   /** Sets status rejected with the reason. */
   reject(id: string, reason: string, file?: { page_count?: number | null; sha256?: string | null }): Promise<void>
-  /** Sets status queued. The extraction queue itself is milestone 5. */
+  /** Sets status queued. */
   queue(id: string): Promise<void>
+  /** Sends {document_id} to the extract queue, through extract_send. */
+  enqueue(id: string): Promise<void>
+  /** release_pages, with the service role. */
+  releasePages(id: string): Promise<void>
 }
 
 export interface SubmitResult {
@@ -53,7 +57,8 @@ const refused = (error: string): SubmitResult => ({ status: 409, body: { error }
 /**
  * Checks the caller and the document, then the file: magic bytes, page count, the 10-page limit,
  * and the allowances through reserve_pages. Every refusal happens before reserve_pages, or is
- * reserve_pages' own, so no refusal leaves pages counted.
+ * reserve_pages' own, so no refusal leaves pages counted. An accepted document is set queued and
+ * sent to the extract queue.
  */
 export async function submitDocument(body: unknown, deps: SubmitDeps): Promise<SubmitResult> {
   const documentId = (body as { document_id?: unknown } | null)?.document_id
@@ -91,6 +96,21 @@ export async function submitDocument(body: unknown, deps: SubmitDeps): Promise<S
   if (!(await deps.reservePages(doc.id))) {
     return reject(allowanceRefusal(doc.file_name, pageCount, await deps.allowance(doc.workspace_id)))
   }
-  await deps.queue(doc.id)
+
+  // The status is set first: process-queue skips a message whose document is not queued. If either
+  // step fails, the pages go back, and the document is rejected so it is not listed as queued
+  // with no message behind it (Lead ruling on #20). The first error is what the caller sees.
+  try {
+    await deps.queue(doc.id)
+    await deps.enqueue(doc.id)
+  } catch (error) {
+    try {
+      await deps.releasePages(doc.id)
+      await deps.reject(doc.id, `${doc.file_name} could not be queued for extraction. Upload it again.`)
+    } catch (cleanup) {
+      console.error('submit-document could not give back the pages of', doc.id, cleanup)
+    }
+    throw error
+  }
   return { status: 202, body: { document: { id: doc.id, status: 'queued', page_count: pageCount } } }
 }

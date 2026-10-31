@@ -1,0 +1,8 @@
+{
+  "status": 400,
+  "body": {
+    "type": "error",
+    "error": { "type": "invalid_request_error", "message": "The PDF specified could not be read." },
+    "request_id": "req_fixture_400"
+  }
+}
