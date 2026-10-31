@@ -84,6 +84,14 @@ export function statusReason(doc: { status: ListedStatus; status_reason: string 
   return reason ? reason : null
 }
 
+/**
+ * The statuses whose document opens its review screen: Queued, Waiting for budget, Processing and
+ * Failed documents stay on the list (Lead ruling 3 on #32).
+ */
+export function isReviewable(status: string): boolean {
+  return status === 'needs_review' || status === 'approved' || status === 'unsupported'
+}
+
 /** Retry is offered on a failed document whose file is still there (PRD US-2.1 AC-6, AC-7). */
 export function canRetry(doc: { status: ListedStatus; file_deleted_at: string | null }): boolean {
   return doc.status === 'failed' && doc.file_deleted_at === null
