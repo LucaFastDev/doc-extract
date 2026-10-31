@@ -183,7 +183,8 @@ shared/doctypes/               one module per type (invoice, receipt, bank-state
                                delivery-note, quote): field set, record_<type> tool and its JSON
                                Schema, checks, U1 key; checks.ts (shared check kinds, dates),
                                duplicate.ts (U1), currency.ts (OQ-16), index.ts (the registry and
-                               prepareResult); no imports outside shared/
+                               prepareResult), review.ts (the checks again on corrected values, for
+                               the review screen and approve-document); no imports outside shared/
 shared/limits.ts               accepted MIME types, 10 MB (PDF), 7.5 MB (image), 10 pages, 10 files per upload
 supabase/
   config.toml
@@ -204,7 +205,11 @@ Deno needs. The scaffold milestone proves both builds can import it.
 
 **Where code runs.** Pages are server components by default and read data with the server client,
 as the signed-in user, through RLS. The document list and the review screen are client components
-because they subscribe to Realtime and edit fields; they use the browser client. Nothing that holds
+because the list subscribes to Realtime and the review screen edits fields; they use the browser
+client. The review screen (`src/app/(app)/documents/[id]/`) is first read by its server component
+(`src/lib/documents/load-review.ts`), then reads again after each approval, reopen or refused
+change; it does not subscribe to Realtime, and a change another member made meanwhile is caught by
+the RPCs' status checks and `approve_document`'s comparison of the values. Nothing that holds
 a secret is imported by a client component: every module that reads a server-only variable starts
 with `import 'server-only'`, so such an import fails the build.
 
@@ -247,11 +252,15 @@ A function not in this table is added to it, by the same rule, in the milestone 
 | `set_member_role(ws uuid, member uuid, role text)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | updates `workspace_members`, which has no client update |
 | `create_document(ws uuid, file_name text, mime_type text, byte_size bigint) → (id uuid, storage_path text)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | inserts into `documents`, which has no client insert; refuses a MIME type outside OQ-4's list, a size over 10 MB, or a JPEG, PNG or WebP over 7.5 MB (7,500,000 bytes, #28) |
 | `get_page_allowance(ws uuid) → (workspace_used int, workspace_limit int, account_used int, account_cap int)`, `stable` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | checks `is_member`; reads `plan_limits` and `app_config`, which have no client grants (OQ-2) |
-| `add_line_item(document_id uuid, after_position int)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | inserts into `extraction_fields`, which has no client insert (OQ-44) |
-| `delete_line_item(document_id uuid, position int)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | deletes from `extraction_fields`, which has no client delete (OQ-44) |
-| `set_check_ticked(document_id uuid, check_id text, ticked boolean)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | checks `is_member` and status `needs_review`; writes `check_ticks`, which has no client writes (OQ-11) |
-| `reopen_document(document_id uuid)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | checks `is_member` and status `approved`; clears the approval and writes `document_events`, neither of which clients may do (OQ-12) |
-| `change_document_type(document_id uuid, doc_type text)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | checks `is_member`, status `needs_review` or `unsupported` and that the file is not deleted; deletes the document's fields, checks and ticks, reserves pages for an `unsupported` document, sends it to the queue (OQ-1) |
+| `add_line_item(document_id uuid, after_position int)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | inserts into `extraction_fields`, which has no client insert (OQ-44); checks `is_member` and status `needs_review`; inserts an empty line of the type's cells (from `line_item_fields`) after line `after_position`, -1 for the first, and moves the later lines down; the cells have no extracted value or confidence, and `corrected_by` names who added them |
+| `delete_line_item(document_id uuid, line_position int)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | deletes from `extraction_fields`, which has no client delete (OQ-44); same checks; deletes every cell of line `line_position` (from 0; `position` is a reserved word) and moves the later lines up |
+| `set_check_ticked(document_id uuid, check_id text, ticked boolean)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | checks `is_member` and status `needs_review`; writes `check_ticks`, which has no client writes (OQ-11). Any check the document has a `check_results` row for may be ticked, not only a stored fail: the browser re-runs the checks on corrections, and `approve-document` stores the failures it finds |
+| `reopen_document(document_id uuid)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | checks `is_member` and status `approved`; sets `needs_review`, clears `approved_by` and `approved_at`, and writes a `reopened` event, neither of which clients may do (OQ-12); ticks are kept |
+| `change_document_type(document_id uuid, doc_type text)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | checks `is_member`, status `needs_review` or `unsupported`, that the file is not deleted and that the type is one of the six; deletes the document's fields, check results and ticks, sets `doc_type` and `doc_type_source = 'user'`, clears `duplicate_key` and `duplicate_of` (Lead ruling 1 on #32: `record_extraction` computes them again; later documents pointing at it are not changed), writes a `type_changed` event, reserves pages for an `unsupported` document only (refused like `retry_document` when they no longer fit), resets `attempts` and sends it to the queue (OQ-1) |
+| `get_amount_tolerance() → numeric`, `stable` | browser, signed in | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | reads `app_config.amount_tolerance`, which has no client grants, so the review screen's live re-check uses the server's tolerance (OQ-7) |
+| `approve_document(document_id uuid, actor uuid, result jsonb) → jsonb` | `approve-document` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages`; section 6.1. Under the workspace's duplicate lock (as `record_extraction`) and the document's row lock: refuses when the values `approve-document` checked are no longer the stored ones; runs U1 against the database with the corrected key and stores `duplicate_key` and `duplicate_of` (Lead ruling 2 on #32); upserts the checks and the fields' flags; approves unless a stored fail has no tick |
+| `line_item_fields(doc_type text) → table (name text, kind text, ord int)`, `immutable` | `add_line_item` (as its owner) | invoker | `set search_path = ''` | revoke execute from public; no grant | each type's line-item cells, as `lineFields` in `shared/doctypes/`; an access test compares the two |
+| `line_item_count(document_id uuid) → int`, `shift_line_items(document_id uuid, after int, delta int)`, `lock_document_for_review(document_id uuid, statuses text[], refusal text) → documents` | the review RPCs (as their owner) | invoker | `set search_path = ''` | revoke execute from public; no grant | helpers: the number of lines, moving lines by one (through a temporary prefix, since paths are unique), and the review RPCs' shared membership and status check under a row lock |
 | `retry_document(document_id uuid)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | checks `is_member`, status `failed` and that the file is not deleted; resets `attempts`, reserves pages and sends to the queue, none of which clients may do (OQ-10) |
 | `get_budget_status() → (spent_usd numeric, cap_usd numeric, daily_reached boolean, monthly_reached boolean, resumes_at timestamptz)` | browser, signed in | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | reads `ai_spend_periods`, `ai_spend_days` and `app_config`, which have no client grants; signed-in users only (OQ-22) |
 | `get_plan_limits() → table (plan text, pages_per_period int, monthly_price_usd numeric)`, `stable` | browser and server components, signed in or not | definer | `set search_path = ''` | revoke execute from public; grant execute to `anon`, `authenticated` | reads `plan_limits`, which has RLS and no select policy; `anon` because the landing page shows the plans to visitors who are not signed in (OQ-27) |
@@ -261,14 +270,14 @@ A function not in this table is added to it, by the same rule, in the milestone 
 | `reserve_spend(document_id uuid, estimate numeric) → (reservation uuid, refused_by text)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages`; decides with `app_config.spend_cap_usd` and `daily_cap_usd` on every call (section 7) |
 | `settle_spend(reservation uuid, actual_cost numeric)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
 | `release_stale_spend_reservations() → int` | `purge-files` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
-| `record_extraction(document_id uuid, reservation uuid, result jsonb) → text` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages`; one attempt in one transaction (section 6.3 step 8). Since milestone 6 it also stores `duplicate_key` and runs the duplicate query (step 7) under a transaction-scoped advisory lock per workspace, taken before the document row, so two documents of a workspace record one after the other (Lead ruling 1 on #27). Earlier means created earlier, then by id (ruling 2); a document counts while it is `queued`, `waiting_budget`, `processing`, `needs_review` or `approved`, file deleted or not, and not while `rejected`, `failed` or `unsupported` (ruling 3 on the worker's questions). It flags the recording document against the earliest earlier match, and every later match in `needs_review` that points to no document or to one created after the recording one; an approved document is left as it is (ruling 2 on the worker's questions) |
+| `record_extraction(document_id uuid, reservation uuid, result jsonb) → text` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages`; one attempt in one transaction (section 6.3 step 8). Since milestone 6 it also stores `duplicate_key` and runs the duplicate query (step 7) under a transaction-scoped advisory lock per workspace, taken before the document row, so two documents of a workspace record one after the other (Lead ruling 1 on #27). Earlier means created earlier, then by id (ruling 2); a document counts while it is `queued`, `waiting_budget`, `processing`, `needs_review` or `approved`, file deleted or not, and not while `rejected`, `failed` or `unsupported` (ruling 3 on the worker's questions). It flags the recording document against the earliest earlier match, and every later match in `needs_review` that points to no document or to one created after the recording one; an approved document is left as it is (ruling 2 on the worker's questions). Since milestone 7 a document that reaches `needs_review` also gets an `extracted` event |
 | `extract_send(document_id uuid) → bigint` | `submit-document` (service role), `retry_document` (as its owner) | definer | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | sends `{document_id}` to the pgmq queue `extract`; the service role has no grants on `pgmq`, which the API does not expose |
 | `extract_read(vt int, qty int) → table (msg_id bigint, read_ct int, enqueued_at timestamptz, message jsonb)` | `process-queue` (service role) | definer | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `extract_send`: `pgmq.read` on `extract` only |
 | `extract_set_vt(msg_id bigint, vt int)` | `process-queue` (service role) | definer | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `extract_send`: `pgmq.set_vt` on `extract` only, to delay a message |
 | `extract_archive(msg_id bigint) → boolean` | `process-queue` (service role) | definer | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `extract_send`: `pgmq.archive` on `extract` only |
 | `delete_document(document_id uuid)` | `DELETE /api/documents/[id]` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages`; the route handler checks `is_member` before calling it (section 6.2) |
 | `handle_new_user()`, trigger after insert on `auth.users` | Auth, through the trigger | definer | `set search_path = ''` | revoke execute from public; no grant | inserts into `public.profiles`, and creates the personal workspace with the user as owner (OQ-17), as Auth's own role, which has no grant on them |
-| `set_correction_audit()`, trigger before update on `extraction_fields` | the trigger | invoker | `set search_path = ''` | revoke execute from public; no grant | only sets `corrected_by = auth.uid()` and `corrected_at = now()` on the row being updated |
+| `set_correction_audit()`, trigger before update of `corrected_value` on `extraction_fields`, when it changes | the trigger | invoker | `set search_path = ''` | revoke execute from public; no grant | only sets `corrected_by = auth.uid()` and `corrected_at = now()` on the row being updated, and cuts a corrected `card_last4`, `account_number_last4` or `iban_last4` to its last four characters (OQ-29) |
 
 "revoke execute from public" in the table is short for the full revoke in rule 3. When
 `retry_document` or `change_document_type` calls `reserve_pages` or `extract_send`, it runs as its
@@ -389,20 +398,24 @@ by Edge Functions with the service role. No client delete: a member deletes a do
 `document_events`, `extractions`) reference `documents` `on delete cascade`, so deleting the row
 deletes them.
 
-**document_events**: the document's history: approvals, reopens, type changes and retries (OQ-12,
-OQ-44).
+**document_events**: the document's history: extractions, approvals, reopens, type changes and
+retries (OQ-12, OQ-44).
 
 | Column | Type |
 |---|---|
 | id | uuid PK |
 | document_id | uuid references documents on delete cascade |
 | workspace_id | uuid |
-| kind | text check in ('approved','reopened','type_changed','retried') |
-| actor | uuid references profiles on delete set null |
+| kind | text check in ('extracted','approved','reopened','type_changed','retried') |
+| actor | uuid references profiles on delete set null; null for `extracted` |
 | created_at | timestamptz default now() |
 
-RLS: select where `is_member(workspace_id)`. Written only by `approve-document` (service role) and
-the RPCs `reopen_document`, `change_document_type` and `retry_document`.
+RLS: select where `is_member(workspace_id)`. Written only by `record_extraction` (`extracted`, each
+time a document reaches `needs_review`), `approve_document` (service role) and the RPCs
+`reopen_document`, `change_document_type` and `retry_document`. The review screen's history lists
+them newest first, with the upload last, which is the document row itself (`created_at`,
+`uploaded_by`). Milestone 7's migration gave each document already extracted the `extracted` event
+of its last extraction.
 
 **extraction_fields**: one row per field or line-item cell.
 
@@ -422,10 +435,14 @@ the RPCs `reopen_document`, `change_document_type` and `retry_document`.
 | | unique (document_id, path) |
 
 RLS: select where `is_member(workspace_id)`. Update of `corrected_value` only (column grant),
-where `is_member(workspace_id)` and the document's status is `needs_review`; the trigger
-`set_correction_audit()` sets `corrected_by` and `corrected_at`. Insert of a new line-item row, and
-delete of a line item, through `rpc add_line_item` / `rpc delete_line_item` (section 4.1) with the
-same conditions (OQ-44). Extracted values are never changed by clients.
+where `is_member(workspace_id)` and the document's status is `needs_review` (policy
+`extraction_fields_update`, using and with check); the trigger `set_correction_audit()` sets
+`corrected_by` and `corrected_at`. A null `corrected_value` means not corrected: the review screen
+stores null when the extracted value is typed again, and an empty string when a field is emptied.
+Insert of a new line-item row, and delete of a line item, through `rpc add_line_item` / `rpc
+delete_line_item` (section 4.1) with the same conditions (OQ-44); lines stay numbered from 0 with
+no gap. Extracted values are never changed by clients. `approve_document` rewrites `flags` from
+the checks it stores.
 
 **check_results**
 
@@ -443,8 +460,10 @@ same conditions (OQ-44). Extracted values are never changed by clients.
 
 RLS: select where `is_member(workspace_id)`. Written only by `process-queue` and
 `approve-document`, which upsert by `(document_id, check_id)`. While a user edits, the browser
-re-runs the same checks from `shared/doctypes/` to update flags live (PRD US-4.1 AC-7, OQ-44); the
-stored rows are the server's result.
+re-runs the same checks from `shared/doctypes/` (`recheck` in `shared/doctypes/review.ts`, which
+`approve-document` runs too) on each saved correction to update checks and flags live (PRD US-4.1
+AC-7, OQ-44); the stored rows are the server's result. U1 needs the database, so the browser shows
+its stored result until approval (Lead ruling 2 on #32).
 
 **check_ticks**: the user's tick on a failed check (OQ-11).
 
@@ -608,7 +627,10 @@ The `documents` bucket sets `file_size_limit` to 10 MB and `allowed_mime_types` 
 `application/pdf`, `image/jpeg`, `image/png` and `image/webp` (OQ-4). The 10 MB is the PDF limit;
 a bucket has one size limit for every type, so the 7.5 MB image limit is held by `create_document`
 and `submit-document` instead (#28). The review screen, and the
-demo's review screen, show a file through a signed URL valid for 10 minutes. The `demo` bucket is
+demo's review screen, show a file through a signed URL valid for 10 minutes, made in the browser
+as the member. An image is shown as is; every page of a PDF is drawn on a canvas by pdf.js
+(`pdfjs-dist`, milestone 7), which runs on the main thread: a document has at most 10 pages, and
+no worker file needs to be served. Zoom scales the pages inside a frame that scrolls. The `demo` bucket is
 not public, because a public bucket serves every object by URL whatever the policies say, including
 the files of unpublished samples. Objects are deleted only through the Storage API with the service
 role: by `purge-files` (section 8) and by the deletion route handlers (section 6.2).
@@ -621,7 +643,7 @@ role: by `purge-files` (section 8) and by the deletion route handlers (section 6
 |---|---|---|---|
 | `submit-document` | browser | user JWT | Checks membership and status `uploading`; downloads the object; checks magic bytes match the MIME type; refuses an image whose object is over 7.5 MB (7,500,000 bytes, #28); counts pages (PDF via pdf-lib; image = 1, OQ-2) and refuses more than 10 (OQ-4); computes SHA-256; `reserve_pages(document)` (atomic; refuses over the workspace's monthly allowance or the account's lifetime cap); sets status `queued`; `extract_send(document)`, which sends `{document_id}` to the queue `extract`. A refusal sets status `rejected` with the reason and returns 409. If setting `queued` or the send fails, it calls `release_pages`, sets status `rejected` ("could not be queued") and returns 500, so no document holds pages without a message (Lead ruling on #20). It does not check the spend cap: work at the cap waits (OQ-23). |
 | `process-queue` | pg_cron via pg_net | shared secret header `x-cron-secret`, checked against `CRON_SECRET`; JWT verification off | Reads one message (`extract_read(vt => 300, qty => 1)`), extracts it (6.3), archives it or delays it. Answers 401 without the right header. |
-| `approve-document` | browser | user JWT | Checks membership and status `needs_review`; re-runs the checks on the corrected values and upserts them; refuses with 409, naming them, while any failed check has no tick (OQ-11); sets `approved`, `approved_by`, `approved_at`; writes an `approved` event. |
+| `approve-document` | browser | user JWT | Reads the document and its fields as the caller, so a non-member gets 404; checks status `needs_review` (else 409); re-runs the type's checks on the corrected values (`recheck`, `shared/doctypes/review.ts`) with `app_config.amount_tolerance` and today's UTC date, and passes them, the values it checked and the flags to `approve_document` (service role), which in one transaction refuses if a value changed meanwhile (409, "try again"), re-runs U1 against the database with the corrected key fields and updates `duplicate_key` and `duplicate_of` (Lead ruling 2 on #32), upserts the check results and the fields' flags (low confidence as extracted, `check_failed`, `duplicate`, `currency_guessed`), and refuses with 409, naming them, while any stored fail, a newly failing U1 among them, has no tick (OQ-11); otherwise sets `approved`, `approved_by`, `approved_at` and writes an `approved` event. A refusal keeps the stored checks, so the screen shows a new failure with its tick box. |
 | `purge-files` | pg_cron via pg_net | shared secret header | Section 8. |
 
 Every function reads its settings through `_shared/env.ts`, which throws at startup when a required
@@ -638,7 +660,7 @@ All run on the Node.js runtime and are short; none calls Claude.
 | `POST /api/billing/checkout` | browser | session cookie | Server client; checks `is_owner` (OQ-20); creates a Stripe Checkout session in subscription mode for `STRIPE_PRICE_PRO`, with no trial (OQ-24), the workspace id as metadata; returns its URL. |
 | `POST /api/billing/portal` | browser | session cookie | Checks `is_owner`; creates a customer portal session; returns its URL (OQ-37). |
 | `POST /api/stripe/webhook` | Stripe | Stripe signature, no session | Reads the raw body (`request.text()`), verifies it with `stripe.webhooks.constructEvent` and `STRIPE_WEBHOOK_SECRET`; inserts the event id into `stripe_events` with the service-role client (a duplicate is acknowledged and skipped); on `checkout.session.completed` and `customer.subscription.updated` sets the workspace's plan, customer, subscription and period end; on `customer.subscription.deleted`, which Stripe sends at the end of a cancelled period, sets the plan to `free` (OQ-24, OQ-37). |
-| `DELETE /api/documents/[id]` | browser, after the user confirms (PRD US-19.1) | session cookie | Reads the document with the server client, as the caller, so RLS returns it only to a member of its workspace; otherwise 404, and nothing changes. Checks `is_member(workspace_id)`; any member, owner or member, may delete any document of the workspace (OQ-20). With the service-role client: unless `file_deleted_at` is set, removes the object at `storage_path` in `documents` through the Storage API (an object already gone counts as removed); then `rpc delete_document(id)`, which in one transaction locks the row `for update`, calls `release_pages` if the status is `queued`, `waiting_budget` or `processing` (pages held, not yet used, PRD US-19.1 AC-5), and deletes the row, which cascades to its fields, check results, ticks, history and extractions. Pages already counted stay in `page_usage` and `account_page_usage`, which are not keyed by document, so they are not refunded (PRD US-19.1 AC-4); spend already recorded in `ai_spend_periods` and `ai_spend_days` stays too, and `ai_spend_reservations.document_id` and a later document's `duplicate_of` become null. If removing the file fails, it stops before deleting the row and returns 500, so it is safe to run again. Returns 204. |
+| `DELETE /api/documents/[id]` | browser, after the user confirms (PRD US-19.1) | session cookie | `src/lib/documents/delete.ts`. A caller with no session gets 401. Reads the document with the server client, as the caller, so RLS returns it only to a member of its workspace; otherwise 404, and nothing changes. Checks `is_member(workspace_id)`; any member, owner or member, may delete any document of the workspace (OQ-20). With the service-role client: unless `file_deleted_at` is set, removes the object at `storage_path` in `documents` through the Storage API (an object already gone counts as removed); then `rpc delete_document(id)`, which in one transaction locks the row `for update`, calls `release_pages` if the status is `queued`, `waiting_budget` or `processing` (pages held, not yet used, PRD US-19.1 AC-5), and deletes the row, which cascades to its fields, check results, ticks, history and extractions. Pages already counted stay in `page_usage` and `account_page_usage`, which are not keyed by document, so they are not refunded (PRD US-19.1 AC-4); spend already recorded in `ai_spend_periods` and `ai_spend_days` stays too, and `ai_spend_reservations.document_id` and a later document's `duplicate_of` become null. If removing the file fails, it stops before deleting the row and returns 500, so it is safe to run again. Returns 204. |
 | `DELETE /api/workspaces/[id]` | browser | session cookie | Checks `is_owner`. With the service-role client: cancels an active subscription at once in Stripe; removes every object under `{id}/` in `documents` through the Storage API, in batches of 100; then deletes the `workspaces` row, which cascades. If removing files fails, it stops before deleting the row and returns 500, so it is safe to run again (OQ-17, OQ-30). |
 | `DELETE /api/account` | browser | session cookie | Refuses with 409 while the caller is the only owner of a workspace that has other members (OQ-20). Deletes, as above, every workspace where the caller is the only member; then `auth.admin.deleteUser(caller)`, which cascades to `profiles`, memberships and `account_page_usage`, and sets the caller's audit columns elsewhere to null (OQ-30). |
 
@@ -659,8 +681,8 @@ one joined); it only chooses what to show and is never trusted for access, which
 
 `src/lib/stripe.ts` throws if `STRIPE_SECRET_KEY` does not start with `sk_test_` (PRD US-11.1
 AC-4). `src/lib/supabase/server.ts` throws when `NEXT_PUBLIC_SUPABASE_URL` or
-`NEXT_PUBLIC_SUPABASE_ANON_KEY` is unset, and its service-role client throws when
-`SUPABASE_SERVICE_ROLE_KEY` is unset.
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` is unset, and its service-role client (`createServiceRoleClient`,
+milestone 7) throws when `SUPABASE_SERVICE_ROLE_KEY` is unset.
 
 ### 6.3 Extraction in process-queue
 
