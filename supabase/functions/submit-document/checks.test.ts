@@ -115,4 +115,13 @@ describe('pagesRemaining and allowanceRefusal', () => {
     expect(allowanceRefusal('a.pdf', 2, { ...allowance, account_used: 10 })).toContain('only 0 pages remain')
     expect(allowanceRefusal('a.png', 1, { ...allowance, account_used: 10 })).toContain('a.png has 1 page,')
   })
+
+  // Milestone 5: app_config.account_page_cap null turns the account cap off.
+  it('counts only the workspace month when the account cap is off', () => {
+    const allowance = { workspace_used: 18, workspace_limit: 20, account_used: 40, account_cap: null }
+    expect(pagesRemaining(allowance)).toBe(2)
+    expect(allowanceRefusal('Big.pdf', 3, allowance)).toBe(
+      'Big.pdf has 3 pages, but only 2 pages remain of this workspace’s monthly page allowance.',
+    )
+  })
 })

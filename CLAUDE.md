@@ -18,6 +18,7 @@ are changing in `node_modules/next/dist/docs/` first, and heed deprecation notic
 | Typecheck | `npm run typecheck` |
 | Lint | `npm run lint` |
 | Unit tests | `npm test` |
+| Functions env, before `supabase start` (dummy key, mock Claude URL) | `npm run functions:env` |
 | Local stack | `npx supabase start`, `npx supabase stop` |
 | Replay migrations and seed | `npx supabase db reset` |
 | Access tests (local stack, after a reset) | `npm run test:access` |

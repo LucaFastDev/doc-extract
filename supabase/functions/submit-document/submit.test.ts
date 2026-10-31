@@ -23,6 +23,9 @@ interface Fake extends SubmitDeps {
   rejected: { reason: string; page_count?: number | null; sha256?: string | null } | null
   queued: boolean
   recorded: { page_count: number; sha256: string } | null
+  enqueued: string | null
+  /** The document's status in the database, which reject changes only from the statuses it is given. */
+  status: string
 }
 
 function fake(overrides: Partial<SubmitDeps> & { file?: Uint8Array | null; doc?: Partial<SubmittedDocument> | null } = {}): Fake {
@@ -58,13 +61,24 @@ function fake(overrides: Partial<SubmitDeps> & { file?: Uint8Array | null; doc?:
       return true
     },
     allowance: async () => ({ workspace_used: 0, workspace_limit: 20, account_used: 0, account_cap: 10 }),
-    reject: async (_id, reason, file) => {
+    status: doc?.status ?? 'uploading',
+    reject: async (_id, reason, from, file) => {
       f.calls.push('reject')
+      if (!from.includes(f.status)) return
+      f.status = 'rejected'
       f.rejected = { reason, ...file }
     },
     queue: async () => {
       f.calls.push('queue')
       f.queued = true
+      f.status = 'queued'
+    },
+    enqueued: null,
+    enqueue: async (id) => {
+      f.enqueued = id
+    },
+    releasePages: async () => {
+      f.calls.push('releasePages')
     },
   }
   return Object.assign(f, overrides)
@@ -165,5 +179,94 @@ describe('submitDocument', () => {
     expect((result.body as { error: string }).error).toContain('only 1 page remains')
     expect(deps.calls).toEqual(['recordFile', 'reservePages', 'reject'])
     expect(deps.queued).toBe(false)
+  })
+})
+
+// Milestone 5 (ARCHITECTURE.md sections 2 and 6.1, Lead ruling on #20): after reserve_pages the
+// document is set queued and sent to the extract queue; if any step after reserve_pages fails, its
+// pages are released, so a document that never reaches the queue holds none.
+describe('submitDocument and the extract queue', () => {
+  it('sends the queued document to extract after reserving its pages', async () => {
+    const deps = fake()
+    expect((await submitDocument({ document_id: DOC }, deps)).status).toBe(202)
+    expect(deps.enqueued).toBe(DOC)
+    expect(deps.calls).not.toContain('releasePages')
+  })
+
+  it('does not send a document it refused', async () => {
+    const deps = fake({ file: await pdf(11) })
+    await submitDocument({ document_id: DOC }, deps)
+    expect(deps.enqueued).toBeNull()
+  })
+
+  it('releases the pages and rejects the document when the enqueue fails', async () => {
+    const deps = fake({
+      enqueue: async () => {
+        throw new Error('pgmq unavailable')
+      },
+    })
+    await expect(submitDocument({ document_id: DOC }, deps)).rejects.toThrow('pgmq unavailable')
+    expect(deps.calls).toEqual(['recordFile', 'reservePages', 'queue', 'releasePages', 'reject'])
+    expect(deps.rejected?.reason).toBe('Invoice.pdf could not be queued for extraction. Upload it again.')
+  })
+
+  it('releases the pages when setting the status to queued fails', async () => {
+    const deps = fake({
+      queue: async () => {
+        throw new Error('update failed')
+      },
+    })
+    await expect(submitDocument({ document_id: DOC }, deps)).rejects.toThrow('update failed')
+    expect(deps.calls).toEqual(['recordFile', 'reservePages', 'releasePages', 'reject'])
+    expect(deps.enqueued).toBeNull()
+  })
+
+  it('still reports the first failure when giving the pages back fails too', async () => {
+    const deps = fake({
+      enqueue: async () => {
+        throw new Error('pgmq unavailable')
+      },
+      releasePages: async () => {
+        throw new Error('release failed')
+      },
+    })
+    await expect(submitDocument({ document_id: DOC }, deps)).rejects.toThrow('pgmq unavailable')
+  })
+
+  // Lead ruling on review 1 of #25: only the "could not be queued" path rejects a queued document.
+  it('leaves a document a concurrent submit queued as queued when this submit refuses it', async () => {
+    for (const file of [null, PNG, new TextEncoder().encode('%PDF-1.7\nbroken'), await pdf(11)]) {
+      const deps: Fake = fake({
+        // The other submit passed the uploading check too, and queued the document meanwhile.
+        download: async () => {
+          deps.status = 'queued'
+          return file
+        },
+      })
+      expect((await submitDocument({ document_id: DOC }, deps)).status).toBe(409)
+      expect(deps.calls).toContain('reject')
+      expect(deps.status).toBe('queued')
+      expect(deps.rejected).toBeNull()
+    }
+
+    const overAllowance: Fake = fake({
+      reservePages: async () => {
+        overAllowance.status = 'queued'
+        return false
+      },
+    })
+    expect((await submitDocument({ document_id: DOC }, overAllowance)).status).toBe(409)
+    expect(overAllowance.calls).toContain('reject')
+    expect(overAllowance.status).toBe('queued')
+  })
+
+  it('rejects the queued document when it could not be sent to the queue', async () => {
+    const deps = fake({
+      enqueue: async () => {
+        throw new Error('pgmq unavailable')
+      },
+    })
+    await expect(submitDocument({ document_id: DOC }, deps)).rejects.toThrow('pgmq unavailable')
+    expect(deps.status).toBe('rejected')
   })
 })

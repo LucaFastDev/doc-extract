@@ -13,7 +13,7 @@ export default async function DocumentsPage() {
 
   const { data: documents, error } = await supabase
     .from('documents')
-    .select('id, file_name, doc_type, status, page_count, created_at')
+    .select('id, file_name, doc_type, status, page_count, created_at, status_reason, file_deleted_at')
     .eq('workspace_id', current.id)
     .in('status', LISTED_STATUSES)
     .order('created_at', { ascending: false })

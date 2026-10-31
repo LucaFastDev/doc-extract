@@ -252,20 +252,25 @@ A function not in this table is added to it, by the same rule, in the milestone 
 | `get_budget_status() → (spent_usd numeric, cap_usd numeric, daily_reached boolean, monthly_reached boolean, resumes_at timestamptz)` | browser, signed in | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | reads `ai_spend_periods`, `ai_spend_days` and `app_config`, which have no client grants; signed-in users only (OQ-22) |
 | `get_plan_limits() → table (plan text, pages_per_period int, monthly_price_usd numeric)`, `stable` | browser and server components, signed in or not | definer | `set search_path = ''` | revoke execute from public; grant execute to `anon`, `authenticated` | reads `plan_limits`, which has RLS and no select policy; `anon` because the landing page shows the plans to visitors who are not signed in (OQ-27) |
 | `reserve_pages(document_id uuid) → boolean` | `submit-document` (service role), `retry_document`, `change_document_type` | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | `service_role` bypasses RLS, so definer is not needed |
-| `account_page_cap() → int`, `stable`: the account lifetime cap, 10 (OQ-2) | `reserve_pages` (as the service role), `get_page_allowance` (as its owner) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | reads nothing a caller could not; it stands in for `app_config.account_page_cap` until milestone 5 adds `app_config` and replaces its body with a read of that column |
-| `release_pages(document_id uuid)` | `process-queue` (service role), `delete_document` | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
-| `reserve_spend(document_id uuid, estimate numeric) → (reservation uuid, refused_by text)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
+| `account_page_cap() → int`, `stable`: the account lifetime cap, `app_config.account_page_cap` (10, OQ-2); null turns the account cap off | `reserve_pages` (as the service role), `get_page_allowance` (as its owner) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | its callers may read `app_config` (the service role and `postgres`); it held the constant 10 until milestone 5 added `app_config` and gave it a read of that column |
+| `release_pages(document_id uuid)` | `process-queue` (through `record_extraction`), `submit-document` (service role), `delete_document` | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages`; subtracts from the `page_usage` row of the month the pages were counted against (`documents.pages_period_start`), never from the current one |
+| `reserve_spend(document_id uuid, estimate numeric) → (reservation uuid, refused_by text)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages`; decides with `app_config.spend_cap_usd` and `daily_cap_usd` on every call (section 7) |
 | `settle_spend(reservation uuid, actual_cost numeric)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
 | `release_stale_spend_reservations() → int` | `purge-files` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
-| `record_extraction(…)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
+| `record_extraction(document_id uuid, reservation uuid, result jsonb) → text` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages`; one attempt in one transaction (section 6.3 step 8) |
+| `extract_send(document_id uuid) → bigint` | `submit-document` (service role), `retry_document` (as its owner) | definer | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | sends `{document_id}` to the pgmq queue `extract`; the service role has no grants on `pgmq`, which the API does not expose |
+| `extract_read(vt int, qty int) → table (msg_id bigint, read_ct int, enqueued_at timestamptz, message jsonb)` | `process-queue` (service role) | definer | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `extract_send`: `pgmq.read` on `extract` only |
+| `extract_set_vt(msg_id bigint, vt int)` | `process-queue` (service role) | definer | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `extract_send`: `pgmq.set_vt` on `extract` only, to delay a message |
+| `extract_archive(msg_id bigint) → boolean` | `process-queue` (service role) | definer | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `extract_send`: `pgmq.archive` on `extract` only |
 | `delete_document(document_id uuid)` | `DELETE /api/documents/[id]` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages`; the route handler checks `is_member` before calling it (section 6.2) |
 | `handle_new_user()`, trigger after insert on `auth.users` | Auth, through the trigger | definer | `set search_path = ''` | revoke execute from public; no grant | inserts into `public.profiles`, and creates the personal workspace with the user as owner (OQ-17), as Auth's own role, which has no grant on them |
 | `set_correction_audit()`, trigger before update on `extraction_fields` | the trigger | invoker | `set search_path = ''` | revoke execute from public; no grant | only sets `corrected_by = auth.uid()` and `corrected_at = now()` on the row being updated |
 
 "revoke execute from public" in the table is short for the full revoke in rule 3. When
-`retry_document` or `change_document_type` calls `reserve_pages` or `pgmq.send`, it runs as its
-owner, `postgres`, which owns `reserve_pages`, the tables and the queue, so that call needs no
-further grant.
+`retry_document` or `change_document_type` calls `reserve_pages` or `extract_send`, it runs as its
+owner, `postgres`, which owns those functions, the tables and the queue, so that call needs no
+further grant. The queue is reached only through the four `extract_` functions: the API exposes
+`public` and `graphql_public`, never `pgmq_public` (Lead ruling 1 on #24).
 
 Workspace deletion, account deletion and the Stripe webhook are not database functions: they run in
 Next.js route handlers with the service-role client (section 6.2), because they also call Stripe
@@ -362,6 +367,7 @@ never changes an existing role.
 | storage_path | text |
 | attempts | int default 0 |
 | pages_reserved | boolean default false |
+| pages_period_start | date: the UTC month `reserve_pages` counted the pages against, which `release_pages` gives them back to (Lead ruling 2 on #24) |
 | processing_started_at | timestamptz |
 | duplicate_of | uuid references documents on delete set null |
 | created_at, processed_at, approved_at, file_deleted_at | timestamptz |
@@ -523,10 +529,14 @@ in `STRIPE_PRICE_PRO` must match `monthly_price_usd` (go-live).
 
 **app_config**: single-row configuration (`id boolean PK default true check (id)`):
 `spend_cap_usd` (10.00), `daily_cap_usd` (2.00, OQ-33), `account_page_cap` (10, OQ-2; null turns
-the cap off), `model`, `input_usd_per_mtok`, `output_usd_per_mtok`, `base_input_tokens`,
-`max_input_tokens_per_page`, `max_output_tokens`, `confidence_threshold` (0.80, OQ-8),
-`amount_tolerance` (0.01, OQ-7). The migration inserts the row with these values; the local seed
-keeps them, so tests cover the account cap and the daily ceiling.
+the cap off), `model` (`claude-sonnet-5-5`), `input_usd_per_mtok` (2) and `output_usd_per_mtok`
+(10), Sonnet 5.5's prices on Anthropic's pricing page as read on 2026-10-31,
+`base_input_tokens` (4000), `max_input_tokens_per_page` (5000), `max_output_tokens` (8192),
+`confidence_threshold` (0.80, OQ-8), `amount_tolerance` (0.01, OQ-7), and
+`extract_concurrency int not null default 1` (Lead ruling 3 on #24): how many `process-queue`
+requests the cron job sends each run, read on every run; 0 sends none; production sets 2
+(go-live). The migration inserts the row with these values; the local seed keeps them, so tests
+cover the account cap and the daily ceiling.
 
 RLS on the spend tables and `app_config`: enabled, no client grants. Signed-in clients learn the
 budget only through `rpc get_budget_status()` (section 4.1).
@@ -602,8 +612,8 @@ role: by `purge-files` (section 8) and by the deletion route handlers (section 6
 
 | Function | Caller | Auth | Does |
 |---|---|---|---|
-| `submit-document` | browser | user JWT | Checks membership and status `uploading`; downloads the object; checks magic bytes match the MIME type; counts pages (PDF via pdf-lib; image = 1, OQ-2) and refuses more than 10 (OQ-4); computes SHA-256; `reserve_pages(document)` (atomic; refuses over the workspace's monthly allowance or the account's lifetime cap); sets status `queued`; `pgmq.send('extract', {document_id})`. A refusal sets status `rejected` with the reason and returns 409. It does not check the spend cap: work at the cap waits (OQ-23). |
-| `process-queue` | pg_cron via pg_net | shared secret header | Reads one message (`pgmq.read('extract', vt => 300, qty => 1)`), extracts it (6.3), archives it or delays it. |
+| `submit-document` | browser | user JWT | Checks membership and status `uploading`; downloads the object; checks magic bytes match the MIME type; counts pages (PDF via pdf-lib; image = 1, OQ-2) and refuses more than 10 (OQ-4); computes SHA-256; `reserve_pages(document)` (atomic; refuses over the workspace's monthly allowance or the account's lifetime cap); sets status `queued`; `extract_send(document)`, which sends `{document_id}` to the queue `extract`. A refusal sets status `rejected` with the reason and returns 409. If setting `queued` or the send fails, it calls `release_pages`, sets status `rejected` ("could not be queued") and returns 500, so no document holds pages without a message (Lead ruling on #20). It does not check the spend cap: work at the cap waits (OQ-23). |
+| `process-queue` | pg_cron via pg_net | shared secret header `x-cron-secret`, checked against `CRON_SECRET`; JWT verification off | Reads one message (`extract_read(vt => 300, qty => 1)`), extracts it (6.3), archives it or delays it. Answers 401 without the right header. |
 | `approve-document` | browser | user JWT | Checks membership and status `needs_review`; re-runs the checks on the corrected values and upserts them; refuses with 409, naming them, while any failed check has no tick (OQ-11); sets `approved`, `approved_by`, `approved_at`; writes an `approved` event. |
 | `purge-files` | pg_cron via pg_net | shared secret header | Section 8. |
 
@@ -648,15 +658,21 @@ AC-4). `src/lib/supabase/server.ts` throws when `NEXT_PUBLIC_SUPABASE_URL` or
 ### 6.3 Extraction in process-queue
 
 1. Load the document. Go on if its status is `queued` or `waiting_budget`, or `processing` with
-   `processing_started_at` more than 10 minutes ago (an earlier run was killed); otherwise
-   (already done, deleted, or retried by hand) archive the message and stop.
+   `processing_started_at` more than 10 minutes ago (an earlier run was killed). If it is
+   `processing` and not yet that stale, another run may still be at work: delay the message until
+   it would be, and stop; archiving it would strand a killed run's document, whose message
+   reappears after the 300 s visibility timeout. Otherwise (already done, deleted, or retried by
+   hand) archive the message and stop.
 2. `reserve_spend(document_id, estimate)` (section 7). If it is refused by the monthly cap or the
    daily ceiling, set status `waiting_budget` with a `status_reason` naming which one and when it
-   resets, delay the message with `pgmq.set_vt(…, 600)`, and stop. No attempt is counted (OQ-23).
+   resets, delay the message with `extract_set_vt(…, 600)`, and stop. No attempt is counted
+   (OQ-23).
 3. Set status `processing`, `processing_started_at = now()`, `attempts = attempts + 1`.
-4. Call Claude (section 9) with the file from Storage: with every type's tool and `tool_choice`
-   `any` when the type is to be detected, or with the chosen type's tool forced when
-   `doc_type_source` is `user` (OQ-1).
+4. Call Claude (section 9) with the file from Storage, under `tool_choice` `auto` with every tool
+   `strict`: with every type's tool and `record_not_supported` when the type is to be detected,
+   or with only the chosen type's tool when `doc_type_source` is `user` (OQ-1). Claude must call
+   exactly one of them; no tool call, or more than one, is invalid output (Lead ruling 1 on #24:
+   Sonnet 5.5 answers forced tool use, `any` or a named tool, with a 400).
 5. If Claude called `record_not_supported`: in `record_extraction`, settle spend, store the
    `extractions` row, set status `unsupported`; then `release_pages` (0 pages, OQ-1); archive;
    stop.
@@ -667,8 +683,9 @@ AC-4). `src/lib/supabase/server.ts` throws when `NEXT_PUBLIC_SUPABASE_URL` or
    `extractions` row, the `extraction_fields` and `check_results` rows, `doc_type` and
    `doc_type_source = 'detected'` when it was detected, status `needs_review`. It locks the
    document row first; if a member deleted the document during the call (section 6.2), it only
-   settles spend and the message is archived.
-9. `pgmq.archive`.
+   settles spend and the message is archived. Every outcome of an attempt, success or failure,
+   writes its `extractions` row through `record_extraction`.
+9. `extract_archive`.
 
 A document's pages stay reserved from `submit-document` until the extraction succeeds, when they
 are counted for good, or fails or is not supported, when `release_pages` gives them back (OQ-10).
@@ -679,7 +696,7 @@ are counted for good, or fails or is not supported, when `release_pages` gives t
 |---|---|
 | Monthly cap or daily ceiling reached | Not a failure: status `waiting_budget`, message delayed 600 s, no attempt counted (step 2). |
 | Claude 429, 500, 529 (overloaded), network error, timeout | Retryable. Settle spend with any usage reported (none if the call failed before a response), record the attempt, set status back to `queued`, do not archive: the message reappears after its 300 s visibility timeout. |
-| Output fails schema validation | Retried once as above; a second invalid output is fatal. |
+| Output fails schema validation, no tool call, more than one tool call, or an answer cut off at `max_tokens` (invalid output) | Retried once as above; a second invalid output since the last retry by hand is fatal. |
 | Claude 400 (for example an unreadable or encrypted PDF), refusal | Fatal at once. |
 | Edge Function killed mid-call (wall-clock limit, deploy) | The message reappears after the visibility timeout; step 1 sees status `processing` with a stale `processing_started_at` and continues as a retry. The purge job's sweep releases spend reservations older than 15 minutes. |
 | Attempts reach 3 (`documents.attempts`) | Fatal. |
@@ -690,9 +707,11 @@ pages, OQ-10), archive the message. The user's retry (`rpc retry_document`, sect
 `retried` event and re-enqueues; it is refused once the file is deleted.
 
 `process-queue` handles one document per call, and a document has at most 10 pages, so a long bank
-statement fits in one Edge Function run. The cron job fires every 10 seconds and sends up to
-`EXTRACT_CONCURRENCY` (default 2) requests each time, so at most that many documents are processed
-at once; pgmq's visibility timeout stops two runs from taking the same message.
+statement fits in one Edge Function run. The cron job fires every 10 seconds and sends
+`app_config.extract_concurrency` requests each time, reading it on every run (1 by default and
+locally, 2 in production, Lead ruling 3 on #24), so at most that many documents are processed at
+once; pgmq's visibility timeout stops two runs from taking the same message. The job reads the
+functions' base URL and `CRON_SECRET` from Vault (section 12).
 
 ## 7. Spend cap and page allowances, server-side
 
@@ -703,11 +722,13 @@ calls cannot both pass a limit.
 **Page allowances** (OQ-2, OQ-3). `reserve_pages(document_id)` reads the document's workspace,
 uploader and `page_count`; finds the workspace's `page_usage` row for the current UTC month and the
 uploader's `account_page_usage` row (inserting either if missing); reads the plan's
-`pages_per_period` and `app_config.account_page_cap`; refuses if either
-`pages_used + pages` would pass its limit; otherwise adds the pages to both and sets
-`pages_reserved`. Called by `submit-document` before anything is queued, and by `retry_document`
-and `change_document_type`. `release_pages(document_id)` subtracts them from both rows when the
-document fails or is not supported, and clears `pages_reserved`. The client reads what is left
+`pages_per_period` and `app_config.account_page_cap` (through `account_page_cap()`; null turns the
+account cap off); refuses if either `pages_used + pages` would pass its limit; otherwise adds the
+pages to both, sets `pages_reserved` and records the month in `pages_period_start`. Called by
+`submit-document` before anything is queued, and by `retry_document` and `change_document_type`.
+`release_pages(document_id)` subtracts them from the `page_usage` row of `pages_period_start`,
+never the current month's, and from the account's row, when the document fails, is not supported
+or cannot be queued, and clears `pages_reserved` (Lead ruling 2 on #24). The client reads what is left
 through `get_page_allowance`; it cannot change it. Usage is per calendar month whatever the plan,
 so a change of plan does not reset it (PRD US-11.1 AC-7).
 
@@ -721,15 +742,19 @@ estimate = (base_input_tokens + pages × max_input_tokens_per_page) × input_usd
 
 It locks the current UTC month's `ai_spend_periods` row and the current UTC day's `ai_spend_days`
 row (inserting either with `cap_usd` from `app_config` if missing). It refuses, returning
-`refused_by` `monthly` or `daily`, if `spent_usd + reserved_usd + estimate > cap_usd` for either;
-otherwise it adds the estimate to `reserved_usd` on both, inserts an `ai_spend_reservations` row and
-returns its id. After the call, `settle_spend(reservation, actual_cost)` moves the estimate out of
+`refused_by` `monthly` or `daily` (the monthly cap checked first), if
+`spent_usd + reserved_usd + estimate` would pass `app_config.spend_cap_usd` or
+`app_config.daily_cap_usd`, which it reads on every call, so a changed cap takes effect on the next
+reservation (PRD US-12.1 AC-5); the rows' `cap_usd` records the cap in force when the row was
+created and decides nothing (Lead ruling 8 on #24). Otherwise it adds the estimate to
+`reserved_usd` on both, inserts an `ai_spend_reservations` row and returns its id. After the call, `settle_spend(reservation, actual_cost)` moves the estimate out of
 `reserved_usd` on both rows and adds the actual cost from the response's `usage` to `spent_usd` on
 both. Because the reserved amount is an upper bound, both limits hold even with concurrent calls.
 `max_output_tokens` is also sent as the call's `max_tokens`, so the output part of the bound is a
 limit, not a guess. The input part rests on `base_input_tokens` (system prompt and tool
 definitions) and `max_input_tokens_per_page`, set above the largest values the eval measures;
-`settle_spend` logs any call whose actual input passed its estimate, so a wrong setting is visible.
+`settle_spend` logs a warning for any call whose actual cost passed its estimate, so a wrong
+setting is visible.
 
 The prices in `app_config` are copied from Anthropic's pricing page for the configured model when
 the queue milestone is built, and checked in docs/go-live.md. As a second guard, the Anthropic
@@ -764,25 +789,35 @@ retried or change type. The `demo` bucket is never touched. The function's run i
 
 ## 9. Calling Claude
 
-- **Model**: `claude-sonnet-5-5` by default, set in `app_config.model` (and `CLAUDE_MODEL` locally).
+- **Model**: `claude-sonnet-5-5` by default. `app_config.model` is the source of truth;
+  `CLAUDE_MODEL` is optional in `_shared/env.ts` and, when set, overrides it, for local runs and
+  the eval only; production never sets it (Lead ruling 4 on #24, go-live).
   The eval (F16) also runs `claude-haiku-5-5`; if Haiku meets the accuracy targets it becomes the
   default, because the $10 cap buys several times more pages with it. The choice and the measured
   numbers are recorded with each eval run.
 - **Input**: one Messages API call per document. A PDF is sent as a base64 `document` content
-  block; an image as an `image` content block. OQ-4's limits (10 MB, 10 pages) are well inside the
-  API's request size and PDF page limits; the queue milestone confirms this against Anthropic's
-  current documentation.
+  block; an image as an `image` content block. Checked against Anthropic's documentation on
+  2026-10-31: a request may be 128 MB and a PDF 100 pages (600 with a 1M-token context), so a
+  10 MB, 10-page PDF fits; an image may be 10 MB **base64-encoded**, about 7.5 MB of file, so an
+  accepted image of 7.5 to 10 MB is refused with a 400 and ends as Failed (recorded in the
+  milestone 5 PR; the upload limit is unchanged).
 - **Type detection and structured output in one call** (OQ-1): each type's JSON Schema in
-  `shared/doctypes/<type>.ts` is the input schema of a tool `record_<type>` with strict schema
-  validation, and a seventh tool, `record_not_supported`, takes a short reason. To detect the type,
-  all seven tools are sent with `tool_choice: { type: "any" }`, so Claude must call exactly one;
-  the tool it calls is the type. When the user has chosen the type, only that type's tool is sent,
-  forced with `tool_choice: { type: "tool", name }`. The function validates the tool input again
-  before storing it. Every field in a schema is an object `{ value: string | null, confidence:
-  number }`; line items are arrays of such objects. Values are strings so amounts keep their exact
-  decimals.
-- **Prompt per type**: a system prompt shared by all types (read only what is printed, never
-  invent, return null for an absent field, give dates as YYYY-MM-DD and amounts as plain decimals,
+  `shared/doctypes/<type>.ts` is the input schema of a tool `record_<type>` with `strict: true`,
+  and a seventh tool, `record_not_supported`, also strict, takes a short reason. Sonnet 5.5 refuses
+  forced tool use (`tool_choice` `any` or a named tool) with a 400, so every request uses
+  `tool_choice: { type: "auto" }`, and the system prompt tells Claude to call exactly one of the
+  tools sent (Lead ruling 1 on #24). To detect the type, every type's tool and
+  `record_not_supported` are sent; the tool Claude calls is the type. When the user has chosen the
+  type, only that type's tool is sent, still under `auto`. A response with no tool call, more than
+  one, a tool that was not sent, or an answer cut off at `max_tokens` is invalid output (section
+  6.4). `buildRequest` in `_shared/claude.ts` is the one place that builds the request. The
+  function validates the tool input again before storing it. Every field in a schema is an object
+  `{ value: string, confidence: number }`, and an empty `value` means the document does not show the
+  field, stored as null: strict tools allow at most 16 nullable or union-typed parameters per
+  request, and an invoice alone has over 30 fields. Line items are arrays of such objects. Values
+  are strings so amounts keep their exact decimals.
+- **Prompt per type**: a system prompt shared by all types (call exactly one tool, read only what
+  is printed, never invent, return an empty value for an absent field, give dates as YYYY-MM-DD and amounts as plain decimals,
   keep text as printed and do not translate (OQ-15), report the currency as an ISO 4217 code and as
   printed, and when none is printed give the most likely one from context (OQ-16), give a
   confidence for each value, call `record_not_supported` for anything that is not one of the six
@@ -791,7 +826,8 @@ retried or change type. The `demo` bucket is never touched. The function's run i
   every extraction and every eval run.
 - **Temperature**: 0.
 - **Client**: `_shared/claude.ts` wraps the official TypeScript SDK in an interface
-  `ClaudeClient.extract(file, docType | null) → { docType | 'not_supported', result, usage }`.
+  `ClaudeClient.extract(file, docType | null) → { docType | 'not_supported', result, usage }`,
+  with the SDK's own retries off (retries are the queue's, section 6.4).
 
 ### How tests mock Claude
 
@@ -803,7 +839,13 @@ retried or change type. The `demo` bucket is never touched. The function's run i
   mock HTTP server (`e2e/mock-claude/`), started by Playwright's `webServer` next to `next dev`.
   The functions reach it because `ANTHROPIC_BASE_URL` points at it in the local functions env file.
   It answers the Messages API with recorded tool-call responses chosen by the SHA-256 of the
-  uploaded file, and can be told to return 429 or 529 to test retries.
+  uploaded file, and can be told to return 400, 429 or 529 to test failures and retries. It reads
+  the same fixture files as the unit tests, refuses with a 400 a request that is not
+  `tool_choice` `auto` with every tool strict, and lists what it was sent at `GET /requests`.
+  `npm run functions:env` writes `supabase/functions/.env` (a dummy key, the mock server at
+  `host.docker.internal` on a port derived from the checkout, the local `CRON_SECRET`) before
+  `npx supabase start`. The e2e upload specs run with `app_config.extract_concurrency` at 0, so
+  their documents stay as uploaded; the extraction specs run after them with it at 1.
 - `ANTHROPIC_BASE_URL` and `ANTHROPIC_API_KEY` are both required with no default, so a function
   that is missing them fails at startup instead of reaching the real API. CI sets a dummy key and
   the mock URL, and holds no real key.
@@ -846,9 +888,10 @@ and zip libraries are chosen and justified in the export milestone.
 | `SITE_URL` | invitation links `<site>/invite/<token>` (`src/lib/site.ts`), checkout and portal return URLs (server only) | `http://localhost:<port>`; the e2e config gives its dev server its own address | `https://<project>.vercel.app`; Vercel |
 | `ANTHROPIC_API_KEY` | process-queue | a dummy value | the production key; Supabase function secrets (secret) |
 | `ANTHROPIC_BASE_URL` | process-queue | the mock server's URL | `https://api.anthropic.com`; function secrets |
-| `CLAUDE_MODEL` | process-queue locally, eval | `claude-sonnet-5-5` | `app_config.model` in the database |
+| `CLAUDE_MODEL` | process-queue locally, eval: optional, overrides `app_config.model` when set | unset, or a model to try | never set: `app_config.model` in the database decides |
 | `CRON_SECRET` | process-queue, purge-files (checked) and pg_cron (sent) | any random string | random 32 bytes; function secrets and Supabase Vault (secret) |
-| `EXTRACT_CONCURRENCY` | pg_cron job | 1 | 2 |
+| `app_config.extract_concurrency` (a column, not a variable; Lead ruling 3 on #24) | pg_cron job, read on every run | 1 | 2; set with SQL (go-live) |
+| Vault `functions_base_url` and `cron_secret` | pg_cron job | `http://kong:8000/functions/v1` and the local secret, from `supabase/seed.sql` | `https://<prod ref>.supabase.co/functions/v1` and the production `CRON_SECRET`; Supabase Vault (go-live) |
 | Google OAuth client id and secret | Supabase Auth | `env()` in `config.toml`, from `supabase/.env` | Supabase dashboard → Auth → Providers → Google (secret) |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | all Edge Functions | provided by the local runtime | provided by Supabase |
 | `SUPABASE_ANON_KEY` | `submit-document`, to read as the caller through RLS | provided by the local runtime | provided by Supabase |

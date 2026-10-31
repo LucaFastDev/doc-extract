@@ -59,7 +59,23 @@ export interface PageAllowance {
   workspace_used: number
   workspace_limit: number
   account_used: number
-  account_cap: number
+  /** null when app_config turns the account cap off. */
+  account_cap: number | null
+}
+
+/** The statuses whose reason the list shows (issue #24, criterion 10). */
+const REASON_SHOWN: readonly string[] = ['failed', 'unsupported', 'waiting_budget']
+
+/** Why a document failed, is not supported or is waiting for budget; null for any other. */
+export function statusReason(doc: { status: ListedStatus; status_reason: string | null }): string | null {
+  if (!REASON_SHOWN.includes(doc.status)) return null
+  const reason = doc.status_reason?.trim()
+  return reason ? reason : null
+}
+
+/** Retry is offered on a failed document whose file is still there (PRD US-2.1 AC-6, AC-7). */
+export function canRetry(doc: { status: ListedStatus; file_deleted_at: string | null }): boolean {
+  return doc.status === 'failed' && doc.file_deleted_at === null
 }
 
 // The list's live state, which the hidden live-status element reports. A joined channel is not yet
@@ -80,10 +96,13 @@ export function systemLiveState(message: { extension?: string; status?: string }
 
 /** The pages left, for the upload screen (PRD US-13.2 AC-3). */
 export function allowanceSummary(a: PageAllowance) {
-  const accountLeft = Math.max(0, a.account_cap - a.account_used)
   const workspaceLeft = Math.max(0, a.workspace_limit - a.workspace_used)
   return {
-    account: `${accountLeft} of your account’s ${pages(a.account_cap)} left`,
+    // No account line when app_config turns the account cap off.
+    account:
+      a.account_cap === null
+        ? null
+        : `${Math.max(0, a.account_cap - a.account_used)} of your account’s ${pages(a.account_cap)} left`,
     workspace: `${workspaceLeft} of this workspace’s ${pages(a.workspace_limit)} left this month`,
   }
 }

@@ -1,0 +1,20 @@
+{
+  "status": 200,
+  "body": {
+    "id": "msg_fixture_not_supported",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-5-5",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_fixture_not_supported",
+        "name": "record_not_supported",
+        "input": { "reason": "This is a cover letter, not a business document." }
+      }
+    ],
+    "stop_reason": "tool_use",
+    "stop_sequence": null,
+    "usage": { "input_tokens": 1800, "output_tokens": 40 }
+  }
+}
