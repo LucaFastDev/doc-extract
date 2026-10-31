@@ -10,12 +10,17 @@ export interface MockDocument {
   buffer: Buffer
   /** Fixture names, one per call in order; the last repeats. */
   responses: string[]
+  /**
+   * The fixture for a request that sends only this tool, because the user chose the type (OQ-1),
+   * by tool name. Such a request is answered from here, whatever the order of calls.
+   */
+  asChosen?: Record<string, string>
 }
 
 const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]
 
-function document(name: string, label: string, responses: string[]): MockDocument {
-  return { name, mimeType: 'image/png', buffer: Buffer.concat([Buffer.from(PNG), Buffer.from(`doc-extract e2e: ${label}`)]), responses }
+function document(name: string, label: string, responses: string[], asChosen?: Record<string, string>): MockDocument {
+  return { name, mimeType: 'image/png', buffer: Buffer.concat([Buffer.from(PNG), Buffer.from(`doc-extract e2e: ${label}`)]), responses, asChosen }
 }
 
 export const MOCK_DOCUMENTS = {
@@ -23,6 +28,8 @@ export const MOCK_DOCUMENTS = {
   invoice: document('Invoice INV-1042.png', 'invoice', ['invoice']),
   /** Not one of the types: record_not_supported. */
   letter: document('Cover letter.png', 'cover letter', ['not-supported']),
+  /** Not supported when its type is detected; read as the café receipt once the user chooses Receipt (milestone 7). */
+  receiptAsLetter: document('Scanned slip.png', 'receipt read as a letter', ['not-supported'], { record_receipt: 'receipt' }),
   /** A file Claude cannot read: 400, fatal at once. */
   unreadable: document('Unreadable scan.png', 'unreadable', ['error-400']),
   /** Uploaded while the daily ceiling is reached; Claude is never called for it. */
