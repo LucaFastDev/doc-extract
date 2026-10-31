@@ -31,7 +31,7 @@ export function InviteList({ invites }: { invites: PendingInvite[] }) {
       {invites.length === 0 ? (
         <p className="text-sm text-muted-foreground">No pending invitations.</p>
       ) : (
-        <ul className="divide-y rounded-lg border">
+        <ul className="min-w-0 divide-y rounded-lg border">
           {invites.map((invite) => (
             <li key={invite.id} aria-label={invite.email} className="flex items-center gap-3 px-4 py-3">
               <div className="min-w-0 flex-1">

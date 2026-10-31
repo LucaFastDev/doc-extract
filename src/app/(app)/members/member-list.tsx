@@ -64,7 +64,7 @@ export function MemberList({
           {error}
         </p>
       )}
-      <ul className="divide-y rounded-lg border">
+      <ul className="min-w-0 divide-y rounded-lg border">
         {members.map((member) => {
           const lastOwner = isLastOwner(members, member.userId)
           return (
@@ -87,26 +87,30 @@ export function MemberList({
               {canManage && !lastOwner && (
                 <DropdownMenu modal={false}>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" disabled={pending} aria-label={`Change ${member.name}`}>
+                    {/* While a change is saving, its items are disabled rather than this trigger:
+                        closing the menu returns focus here, which a disabled button cannot take. */}
+                    <Button variant="ghost" size="icon" aria-label={`Change ${member.name}`}>
                       <EllipsisIcon />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     {member.role === 'member' ? (
                       <DropdownMenuItem
+                        disabled={pending}
                         onSelect={() => run(() => setMemberRole(workspace.id, member.userId, 'owner'))}
                       >
                         Make owner
                       </DropdownMenuItem>
                     ) : (
                       <DropdownMenuItem
+                        disabled={pending}
                         onSelect={() => run(() => setMemberRole(workspace.id, member.userId, 'member'))}
                       >
                         Make member
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem variant="destructive" onSelect={() => setRemoving(member)}>
+                    <DropdownMenuItem variant="destructive" disabled={pending} onSelect={() => setRemoving(member)}>
                       <UserMinusIcon />
                       Remove from workspace
                     </DropdownMenuItem>

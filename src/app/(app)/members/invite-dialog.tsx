@@ -68,7 +68,7 @@ function InviteForm({ workspaceId }: { workspaceId: string }) {
           </p>
         )}
       </div>
-      <fieldset className="grid gap-3">
+      <fieldset className="grid min-w-0 gap-3">
         <legend className="mb-3 text-sm leading-none font-medium">Role</legend>
         <RadioGroup name="role" defaultValue="member">
           <RoleChoice value="member" title="Member" description="Uploads, reviews, approves and exports documents." />
