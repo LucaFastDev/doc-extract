@@ -1,0 +1,70 @@
+project_id = "doc-extract"
+
+# The local stack only: nothing here is pushed to production (docs/go-live.md). Every port is the
+# Supabase default + 4000, because other projects' stacks on the same Mac use the defaults and
+# + 1000 to + 3000. Unset keys take the CLI's defaults.
+
+[api]
+enabled = true
+port = 58321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 58322
+shadow_port = 58320
+major_version = 17
+
+[db.pooler]
+enabled = false
+port = 58329
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+port = 58323
+
+[local_smtp]
+enabled = true
+port = 58324
+smtp_port = 58325
+pop3_port = 58326
+
+[storage]
+enabled = true
+file_size_limit = "10MiB"
+
+[auth]
+enabled = true
+enable_signup = true
+
+# For tests only (ARCHITECTURE.md section 4.4): the access tests and Playwright's global setup
+# create users with the admin API and sign them in with a password. The app has no email form,
+# and production has this provider disabled (docs/go-live.md).
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+
+# The only sign-in method in the app (OQ-19, OQ-21). The client id and secret come from the
+# gitignored supabase/.env, never from this file; CI and the tests leave them unset and never
+# reach Google.
+[auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+skip_nonce_check = false
+
+[edge_runtime]
+enabled = true
+inspector_port = 12083
+
+[analytics]
+enabled = true
+port = 58327
