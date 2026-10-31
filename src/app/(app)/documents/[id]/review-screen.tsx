@@ -42,6 +42,7 @@ import {
   isDocType,
   lineWord,
   liveReview,
+  orderChecks,
   saveFailure,
   storedReview,
   untickedFailures,
@@ -86,9 +87,14 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
   const [today] = useState(() => utcDate(new Date()))
   // While the user is in a field, the fields stay in the sections they were in when they went in:
   // a save that clears or adds flags would otherwise move the field they are in to another
-  // section, which mounts it again and loses the focus and what they type. The reasons and the
-  // checks still update live. null: the sections follow the live flags.
-  const [layout, setLayout] = useState<Review['flags'] | null>(null)
+  // section, which mounts it again and loses the focus and what they type. The checks keep their
+  // order too, so no tick box moves under a press. The reasons and the checks' states still update
+  // live. null: the sections and the checks follow the live review.
+  const [layout, setLayout] = useState<{ flags: Review['flags']; checks: string[] } | null>(null)
+  // A shown error that clears while held keeps its place, blank, until the hold releases.
+  const [shownError, setShownError] = useState<string | null>(null)
+  if (error !== null && error !== shownError) setShownError(error)
+  else if (error === null && shownError !== null && layout === null) setShownError(null)
   // Counts the refusals: each one puts the stored values back in the fields the user is not in.
   const [revision, setRevision] = useState(0)
 
@@ -115,18 +121,33 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
   // The sections follow the flags again once the focus has really left the fields and every change
   // has finished; moving from one field to another, by click or Tab, keeps them held.
   const [hold] = useState(() => sectionHold(inField, () => setLayout(null)))
+  // The element a press is on, and its top when the press began. Until the press ends, a change
+  // that moves it, such as a box above it growing, scrolls the page by as much, so the element stays
+  // under the pointer and the release lands on it. The browser's own scroll anchoring is off meanwhile.
+  const pressedAt = useRef<{ el: Element; top: number } | null>(null)
+  useLayoutEffect(() => {
+    const at = pressedAt.current
+    if (!at?.el.isConnected) return
+    const moved = at.el.getBoundingClientRect().top - at.top
+    if (moved) window.scrollBy(0, moved)
+  })
   useEffect(() => {
     // The field whose label, border or padding a press started on. A press there ends in that field:
     // if the release leaves no field focused, the field takes the focus, before the hold checks it.
     let pressed: string | null = null
+    const root = document.documentElement
     const press = (e: PointerEvent) => {
       const target = e.target instanceof Element ? e.target : null
       pressed = e.button === 0 && !target?.closest('input') ? (target?.closest('[data-field]')?.getAttribute('data-field') ?? null) : null
+      pressedAt.current = target ? { el: target, top: target.getBoundingClientRect().top } : null
+      root.style.overflowAnchor = 'none'
       hold.press()
     }
     const lift = () => {
       const path = pressed
       pressed = null
+      pressedAt.current = null
+      root.style.overflowAnchor = ''
       if (path !== null) {
         setTimeout(() => {
           if (!inField()) document.querySelector<HTMLInputElement>(`[data-field="${CSS.escape(path)}"] input`)?.focus()
@@ -136,6 +157,8 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
     }
     const cancel = () => {
       pressed = null
+      pressedAt.current = null
+      root.style.overflowAnchor = ''
       hold.lift()
     }
     window.addEventListener('pointerdown', press, true)
@@ -145,6 +168,7 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
       window.removeEventListener('pointerdown', press, true)
       window.removeEventListener('pointerup', lift, true)
       window.removeEventListener('pointercancel', cancel, true)
+      root.style.overflowAnchor = ''
     }
   }, [hold])
 
@@ -309,9 +333,9 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
         </div>
       )}
 
-      {error && (
-        <p role="alert" className="rounded-lg border border-destructive/50 px-4 py-3 text-sm text-destructive">
-          {error}
+      {shownError !== null && (
+        <p role="alert" className={cn('rounded-lg border border-destructive/50 px-4 py-3 text-sm text-destructive', error === null && 'invisible')}>
+          {shownError}
         </p>
       )}
 
@@ -339,7 +363,8 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
             <>
               <HeldBox held={layout !== null} reorders>
                 <Checks
-                  checks={review.checks}
+                  checks={orderChecks(review.checks, layout?.checks)}
+                  held={layout !== null}
                   ticks={ticks}
                   editable={editable}
                   busy={busy}
@@ -363,11 +388,11 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
                 rows={rows}
                 review={review}
                 held={layout !== null}
-                layout={layout ?? review.flags}
+                layout={layout?.flags ?? review.flags}
                 revision={revision}
                 editable={editable}
                 busy={busy}
-                onEnter={() => setLayout((held) => held ?? review.flags)}
+                onEnter={() => setLayout((held) => held ?? { flags: review.flags, checks: orderChecks(review.checks).map((c) => c.check_id) })}
                 onSave={(row, typed) => void saveField(row, typed)}
                 onAddLine={(after) => void addLineAfter(after)}
                 onDeleteLine={(index) => void removeLine(index)}
@@ -405,48 +430,66 @@ function Section({ title, children, action }: { title: string; children: ReactNo
   )
 }
 
-/** Every check with its state and message; a failed one has its tick box (US-4.1, US-5.1 AC-5). */
+/**
+ * Every check with its state and message, in the order given; a failed one has its tick box
+ * (US-4.1, US-5.1 AC-5). While held, each row keeps at least its height, so a check that passes
+ * does not move the rows after it.
+ */
 function Checks({
   checks,
+  held,
   ticks,
   editable,
   busy,
   onTick,
 }: {
   checks: CheckResult[]
+  held: boolean
   ticks: Set<string>
   editable: boolean
   busy: boolean
   onTick: (checkId: string, ticked: boolean) => void
 }) {
-  const order = { fail: 0, skipped: 1, pass: 2 } as const
-  const sorted = [...checks].sort((a, b) => order[a.status] - order[b.status] || a.check_id.localeCompare(b.check_id))
   return (
     <Section title="Checks">
       <ul className="divide-y rounded-lg border">
-        {sorted.map((c) => (
-          <li key={c.check_id} data-check={c.check_id} data-status={c.status} className="flex flex-col gap-2 px-4 py-3 text-sm">
-            <div className="flex flex-wrap items-baseline gap-x-2">
-              <span className="font-medium">{c.check_id}</span>
-              <span className={cn(c.status === 'fail' ? 'text-destructive' : 'text-muted-foreground')}>{CHECK_STATUS[c.status]}</span>
-            </div>
-            {c.message && <p className="text-muted-foreground [overflow-wrap:anywhere]">{c.message}</p>}
-            {c.status === 'fail' && (
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id={`tick-${c.check_id}`}
-                  checked={ticks.has(c.check_id)}
-                  disabled={!editable || busy}
-                  onCheckedChange={(v) => onTick(c.check_id, v === true)}
-                />
-                <Label htmlFor={`tick-${c.check_id}`}>Tick {c.check_id}</Label>
-                <span className="text-xs text-muted-foreground">I checked it, and approve it as it is.</span>
-              </div>
-            )}
-          </li>
+        {checks.map((c) => (
+          <CheckRow key={c.check_id} check={c} held={held} ticked={ticks.has(c.check_id)} disabled={!editable || busy} onTick={onTick} />
         ))}
       </ul>
     </Section>
+  )
+}
+
+function CheckRow({
+  check: c,
+  held,
+  ticked,
+  disabled,
+  onTick,
+}: {
+  check: CheckResult
+  held: boolean
+  ticked: boolean
+  disabled: boolean
+  onTick: (checkId: string, ticked: boolean) => void
+}) {
+  const row = useHeldHeight<HTMLLIElement>(held)
+  return (
+    <li ref={row} data-check={c.check_id} data-status={c.status} className="flex flex-col gap-2 px-4 py-3 text-sm">
+      <div className="flex flex-wrap items-baseline gap-x-2">
+        <span className="font-medium">{c.check_id}</span>
+        <span className={cn(c.status === 'fail' ? 'text-destructive' : 'text-muted-foreground')}>{CHECK_STATUS[c.status]}</span>
+      </div>
+      {c.message && <p className="text-muted-foreground [overflow-wrap:anywhere]">{c.message}</p>}
+      {c.status === 'fail' && (
+        <div className="flex items-center gap-2">
+          <Checkbox id={`tick-${c.check_id}`} checked={ticked} disabled={disabled} onCheckedChange={(v) => onTick(c.check_id, v === true)} />
+          <Label htmlFor={`tick-${c.check_id}`}>Tick {c.check_id}</Label>
+          <span className="text-xs text-muted-foreground">I checked it, and approve it as it is.</span>
+        </div>
+      )}
+    </li>
   )
 }
 

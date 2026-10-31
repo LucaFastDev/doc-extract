@@ -108,6 +108,23 @@ export function storedReview(rows: ReviewRow[], stored: CheckResult[]): Review {
   return { checks: stored, flags: Object.fromEntries(rows.map((r) => [r.path, r.flags])) }
 }
 
+const CHECK_ORDER = { fail: 0, skipped: 1, pass: 2 } as const
+
+/**
+ * The checks in the order the screen lists them: failed, then skipped, then passed. While the
+ * sections are held (Lead ruling on QA pass 5 of PR #37), `held` is the order they had when the
+ * hold began, and each check keeps its place whatever its state now; a check it lacks goes last.
+ */
+export function orderChecks(checks: CheckResult[], held: string[] | null = null): CheckResult[] {
+  const sorted = [...checks].sort((a, b) => CHECK_ORDER[a.status] - CHECK_ORDER[b.status] || a.check_id.localeCompare(b.check_id))
+  if (!held) return sorted
+  const place = (c: CheckResult) => {
+    const i = held.indexOf(c.check_id)
+    return i === -1 ? held.length : i
+  }
+  return sorted.sort((a, b) => place(a) - place(b))
+}
+
 /** The failed checks that have no tick: while there is one, the document cannot be approved (OQ-11). */
 export function untickedFailures(checks: CheckResult[], ticked: Set<string>): string[] {
   return checks.filter((c) => c.status === 'fail' && !ticked.has(c.check_id)).map((c) => c.check_id)

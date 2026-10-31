@@ -15,6 +15,7 @@ import {
   groupFields,
   lineCount,
   liveReview,
+  orderChecks,
   saveFailure,
   storedReview,
   untickedFailures,
@@ -157,6 +158,28 @@ describe('the live re-check (US-4.1 AC-7)', () => {
     expect(untickedFailures(review.checks, new Set())).toEqual(['A2', 'A3'])
     expect(untickedFailures(review.checks, new Set(['A2']))).toEqual(['A3'])
     expect(untickedFailures(review.checks, new Set(['A2', 'A3']))).toEqual([])
+  })
+
+  it('lists failed checks, then skipped, then passed, and keeps the held order while the sections are held', () => {
+    const { rows, stored } = invoiceRows()
+    const ids = (checks: CheckResult[]) => checks.map((c) => c.check_id)
+    const before = orderChecks(liveReview(INVOICE, rows, stored, CONTEXT).checks)
+    expect(ids(before).slice(0, 2)).toEqual(['A2', 'A3'])
+    const rank = before.map((c) => ['fail', 'skipped', 'pass'].indexOf(c.status))
+    expect(rank).toEqual([...rank].sort())
+
+    // Subtotal 100.00 passes A2 and A3, and quantity 5 fails A1: held, every check keeps its row.
+    const changed = applyCorrection(applyCorrection(rows, 'subtotal', '100.00'), 'line_items[0].quantity', '5')
+    const after = liveReview(INVOICE, changed, stored, CONTEXT).checks
+    expect(status({ checks: after }, 'A2')).toBe('pass')
+    expect(status({ checks: after }, 'A1')).toBe('fail')
+    const held = orderChecks(after, ids(before))
+    expect(ids(held)).toEqual(ids(before))
+    expect(held.find((c) => c.check_id === 'A2')?.status).toBe('pass')
+    // Released, they re-sort: A1 fails, so it comes first.
+    expect(ids(orderChecks(after))[0]).toBe('A1')
+    // A check the held order lacks goes last.
+    expect(ids(orderChecks(after, ids(before).slice(1))).at(-1)).toBe(ids(before)[0])
   })
 
   it('shows an approved document as stored', () => {
