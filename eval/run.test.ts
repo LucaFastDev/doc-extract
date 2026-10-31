@@ -31,8 +31,8 @@ function fakeApi(answers: Record<string, Answer> = {}) {
       const file = byData.get(data) ?? 'unknown'
       requests.push({ file, params })
       const attempt = requests.filter((r) => r.file === file).length
-      let answer = answers[file] ?? 'ok'
-      if (typeof answer === 'function') answer = answer(attempt)
+      const settle = (a: Answer): Exclude<Answer, (attempt: number) => Answer> => (typeof a === 'function' ? settle(a(attempt)) : a)
+      const answer = settle(answers[file] ?? 'ok')
       if (answer === 'error-429' || answer === 'error-529') {
         const f = fixture(answer)
         throw Object.assign(new Error(`${f.status} error`), { status: f.status, error: f.body })
@@ -83,6 +83,15 @@ describe('npm run eval', () => {
     expect(await main(['--modle', 'x'], { ANTHROPIC_API_KEY: 'k' }, deps(api))).toBe(1)
     expect(await main(['--model'], { ANTHROPIC_API_KEY: 'k' }, deps(api))).toBe(1)
     expect(requests).toEqual([])
+  })
+
+  it('refuses when npm took --model for itself, as it does when the -- before it is lost, rather than run the default model', async () => {
+    const { api, requests } = fakeApi()
+    expect(await main([], { ANTHROPIC_API_KEY: 'k', npm_config_model: 'claude-haiku-5-5' }, deps(api))).toBe(1)
+    expect(await main(['--dry-run'], { npm_config_model: 'claude-haiku-5-5' }, deps(api))).toBe(1)
+    expect(lines.join('\n')).toContain('npm run eval -- --model claude-haiku-5-5')
+    expect(requests).toEqual([])
+    expect(readdirSync(dir)).toEqual([])
   })
 
   it('sends every document the app’s own request, with every type’s tool and record_not_supported, to claude-sonnet-5-5 by default', async () => {

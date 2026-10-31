@@ -197,7 +197,11 @@ demo/                          the demo's samples: samples/ (the committed files
                                values), make-samples.ts (the generator), upload.ts (to the local bucket)
 tests/access/                  Vitest access tests against the local stack
 e2e/                           Playwright specs; mock Claude server
-eval/                          eval documents, expected results, runner, results
+eval/                          the eval set and runner (eval/README.md): values.ts (what each document
+                               prints), make-documents.ts (the generator, `npm run eval:documents`),
+                               documents/ (30 committed files), expected/ (one result each), score.ts,
+                               run.ts (`npm run eval -- --model <model>`, `--dry-run`), prices.ts,
+                               results/ (one committed file per run)
 ```
 
 `shared/` is plain TypeScript with no dependencies, so the Next.js app and the Deno functions
@@ -848,8 +852,9 @@ retried or change type. The `demo` bucket is never touched. The function's run i
 ## 9. Calling Claude
 
 - **Model**: `claude-sonnet-5-5` by default. `app_config.model` is the source of truth;
-  `CLAUDE_MODEL` is optional in `_shared/env.ts` and, when set, overrides it, for local runs and
-  the eval only; production never sets it (Lead ruling 4 on #24, go-live).
+  `CLAUDE_MODEL` is optional in `_shared/env.ts` and, when set, overrides it, for local runs
+  only; production never sets it (Lead ruling 4 on #24, go-live). The eval names its model with
+  `--model` (`claude-sonnet-5-5` by default).
   The eval (F16) also runs `claude-haiku-5-5`; if Haiku meets the accuracy targets it becomes the
   default, because the $10 cap buys several times more pages with it. The choice and the measured
   numbers are recorded with each eval run.
@@ -1026,9 +1031,9 @@ written `'=1+1`. Parsed numbers and full dates are never changed, so `-12.50` st
 | `STRIPE_WEBHOOK_SECRET` | webhook route handler (server only) | from `stripe listen` | the test-mode endpoint's signing secret; Vercel, sensitive (secret) |
 | `STRIPE_PRICE_PRO` | checkout route handler (server only) | a test price id | the test-mode Pro price id ($19 a month); Vercel |
 | `SITE_URL` | invitation links `<site>/invite/<token>` (`src/lib/site.ts`), checkout and portal return URLs (server only) | `http://localhost:<port>`; the e2e config gives its dev server its own address | `https://<project>.vercel.app`; Vercel |
-| `ANTHROPIC_API_KEY` | process-queue | a dummy value | the production key; Supabase function secrets (secret) |
-| `ANTHROPIC_BASE_URL` | process-queue | the mock server's URL | `https://api.anthropic.com`; function secrets |
-| `CLAUDE_MODEL` | process-queue locally, eval: optional, overrides `app_config.model` when set | unset, or a model to try | never set: `app_config.model` in the database decides |
+| `ANTHROPIC_API_KEY` | process-queue; the eval runner, from the operator's own shell (`eval/README.md`) | a dummy value | the production key; Supabase function secrets (secret). The eval uses the operator's own key, never this one |
+| `ANTHROPIC_BASE_URL` | process-queue; the eval runner, optional (`https://api.anthropic.com` when unset) | the mock server's URL | `https://api.anthropic.com`; function secrets |
+| `CLAUDE_MODEL` | process-queue locally: optional, overrides `app_config.model` when set (the eval takes `--model` instead) | unset, or a model to try | never set: `app_config.model` in the database decides |
 | `CRON_SECRET` | process-queue, purge-files (checked) and pg_cron (sent) | any random string | random 32 bytes; function secrets and Supabase Vault (secret) |
 | `app_config.extract_concurrency` (a column, not a variable; Lead ruling 3 on #24) | pg_cron job, read on every run | 1 | 2; set with SQL (go-live) |
 | Vault `functions_base_url` and `cron_secret` | pg_cron job | `http://kong:8000/functions/v1` and the local secret, from `supabase/seed.sql` | `https://<prod ref>.supabase.co/functions/v1` and the production `CRON_SECRET`; Supabase Vault (go-live) |
@@ -1162,9 +1167,12 @@ needed. It does not add secrets to CI.
     buttons, plans and limits from `get_plan_limits` as `anon`, accuracy table from the latest
     committed eval results, the 7-day and test-mode notices, links to the repo and the portfolio;
     `/privacy` and `/terms`.
-13. **Eval**: `eval/` with 5 fictitious documents per type and their expected results, scoring with
-    unit tests, a runner the operator starts on their laptop with their own key, results written to
-    `eval/results/` and committed.
+13. **Eval**: `eval/` with 5 fictitious documents per type and their expected results, made by a
+    generator from a values file (`npm run eval:documents`), scoring with unit tests, a runner the
+    operator starts on their laptop with their own key (`npm run eval -- --model <model>`, run by
+    Node with `--experimental-transform-types` because it imports `_shared/claude.ts`; `--dry-run`
+    estimates tokens and cost without a call), results written to
+    `eval/results/<yyyy-mm-dd>-<model>.json` and committed.
 14. **Deletion**: `DELETE /api/workspaces/[id]` and `DELETE /api/account` with their confirmations
     in the UI, Stripe cancellation, Storage removal, the last-owner refusal; tests that every row
     and object of a deleted workspace is gone and that a remaining workspace keeps a deleted

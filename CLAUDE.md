@@ -24,6 +24,9 @@ are changing in `node_modules/next/dist/docs/` first, and heed deprecation notic
 | Access tests (local stack, after a reset) | `npm run test:access` |
 | Demo sample files to the local `demo` bucket, for `npm run dev` | `npm run demo:upload` |
 | Remake the demo sample files in `demo/samples/` | `npm run demo:samples` |
+| Remake the eval documents and expected results in `eval/` | `npm run eval:documents` |
+| Eval token and cost estimate; sends nothing, needs no key | `npm run eval -- --dry-run` |
+| Eval against the real Claude API: the operator only, by hand, own key (`eval/README.md`); never in a test or CI | `npm run eval -- --model <model>` |
 | Build | `npm run build` |
 | End-to-end tests | `npm run test:e2e` |
 
@@ -49,6 +52,8 @@ hand-named file `supabase/migrations/<UTC yyyymmddhhmmss>_<name>.sql`.
   by relative import (`limits.ts`: accepted types, 10 MB, 10 pages, 10 files)
 - `demo/` the public demo's sample files (`samples/`), their values, generator and local upload;
   their rows arrive by migration (ARCHITECTURE.md section 10)
+- `eval/` the eval set (30 fictitious documents, their values, generator and expected results), the
+  scoring, the runner, its prices and the committed results (`eval/README.md`)
 - `tests/access/` Vitest access tests against the local stack (`vitest.access.config.ts`)
 - `e2e/` Playwright specs; `playwright.config.ts` picks one port per checkout from `E2E_PORT`
 - `.github/workflows/ci.yml` CI on GitHub's hosted runners: typecheck, lint, unit tests,

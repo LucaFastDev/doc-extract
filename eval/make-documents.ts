@@ -668,7 +668,7 @@ async function bankStatement(doc: EvalDocument): Promise<Uint8Array> {
       : [{ key: 'amount', title: b.amount, weight: 1.2, align: 'right' as const, format: num }]),
     { key: 'balance', title: daily ? 'Daily balance' : b.balance, weight: 1.2, align: 'right', format: num },
   ]
-  const rows = doc.lines.map((l) => ({
+  const rows: Record<string, string>[] = doc.lines.map((l) => ({
     ...l,
     out: l.amount.startsWith('-') ? l.amount.slice(1) : '',
     in: l.amount.startsWith('-') ? '' : l.amount,

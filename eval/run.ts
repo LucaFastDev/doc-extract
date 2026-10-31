@@ -304,6 +304,13 @@ export async function main(argv: string[], env: Record<string, string | undefine
     log(args.error)
     return 1
   }
+  // Without the -- (PowerShell's npm shim can drop it), npm keeps --model as its own setting and
+  // the run would quietly use the default model.
+  const npmModel = env.npm_config_model?.trim()
+  if (npmModel && !argv.some((a) => a.startsWith('--model'))) {
+    log(`npm kept --model ${npmModel} for itself. Put -- before the runner's arguments: npm run eval -- --model ${npmModel}`)
+    return 1
+  }
   const docs = await loadDocuments()
   if (args.dryRun) {
     dryRun(docs, args.model, log)
