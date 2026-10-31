@@ -8,7 +8,7 @@ import type { ToolDefinition } from '../../../shared/doctypes/fields.ts'
 // anything else is invalid output.
 
 /** Stored on every extractions row, so a result can be traced to the prompt that made it. */
-export const PROMPT_VERSION = '2026-10-31.1'
+export const PROMPT_VERSION = '2026-10-31.2'
 
 export const SYSTEM_PROMPT = `You read one business document and record what it says by calling exactly one of the tools you are given, once. Write no other text.
 
@@ -16,7 +16,7 @@ export const SYSTEM_PROMPT = `You read one business document and record what it 
 - Read only what is printed. Never invent a value: give an empty string for a field the document does not show.
 - Give dates as YYYY-MM-DD. Give amounts as plain decimals with the printed decimals, without thousands separators or currency symbols, such as 1180.00.
 - Keep text as printed: do not translate it or correct it.
-- Give the currency as an ISO 4217 code and as printed. When no currency is printed, give the most likely one from the context.
+- Give the currency as an ISO 4217 code and as printed. When no currency is printed, give the most likely one from the context, unless the tool's currency field says to leave it empty.
 - Give every value a confidence from 0 to 1: how sure you are that it is what the document says.
 - List line items in the order they are printed.`
 

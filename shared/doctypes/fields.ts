@@ -51,21 +51,105 @@ export interface ToolDefinition {
   input_schema: Record<string, unknown>
 }
 
+const LANGUAGE: FieldDef = {
+  name: 'language',
+  kind: 'text',
+  description: 'The language the document is written in, as a BCP 47 code such as "en" or "de".',
+}
+
+const CURRENCY_AS_PRINTED: FieldDef = {
+  name: 'currency_as_printed',
+  kind: 'text',
+  description: 'The currency exactly as printed, such as "€", "EUR" or "Euro"; empty when none is printed.',
+}
+
 /** Every type's fields (PRD section 4): the language and the currency, as code and as printed. */
 export const COMMON_FIELDS: FieldDef[] = [
-  { name: 'language', kind: 'text', description: 'The language the document is written in, as a BCP 47 code such as "en" or "de".' },
+  LANGUAGE,
   {
     name: 'currency',
     kind: 'text',
     description:
       'The currency of the amounts as an ISO 4217 code such as "EUR". When none is printed, give the most likely one from the context.',
   },
-  {
-    name: 'currency_as_printed',
-    kind: 'text',
-    description: 'The currency exactly as printed, such as "€", "EUR" or "Euro"; empty when none is printed.',
-  },
+  CURRENCY_AS_PRINTED,
 ]
+
+/** The common fields of a delivery note, which has no amounts: its currency may be empty (PRD 4.1). */
+export const COMMON_FIELDS_WITHOUT_AMOUNTS: FieldDef[] = [
+  LANGUAGE,
+  {
+    name: 'currency',
+    kind: 'text',
+    description: 'The currency as an ISO 4217 code such as "EUR" if the document prints one; otherwise an empty string.',
+  },
+  CURRENCY_AS_PRINTED,
+]
+
+/** The fields' schemas by name, for a tool's input. */
+export const properties = (defs: FieldDef[]) => Object.fromEntries(defs.map((d) => [d.name, fieldSchema(d)]))
+
+const names = (defs: FieldDef[]) => defs.map((d) => d.name)
+
+/** A record_<type> tool: every header field and the list of lines, all required (section 9). */
+export function recordTool(o: {
+  name: string
+  description: string
+  fields: FieldDef[]
+  linesKey: string
+  linesDescription: string
+  lineFields: FieldDef[]
+}): ToolDefinition {
+  return {
+    name: o.name,
+    description: o.description,
+    strict: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        ...properties(o.fields),
+        [o.linesKey]: {
+          type: 'array',
+          description: o.linesDescription,
+          items: {
+            type: 'object',
+            properties: properties(o.lineFields),
+            required: names(o.lineFields),
+            additionalProperties: false,
+          },
+        },
+      },
+      required: [...names(o.fields), o.linesKey],
+      additionalProperties: false,
+    },
+  }
+}
+
+/** The fields of which only the last four characters are stored, in every type (OQ-29). */
+export const LAST4_FIELDS = ['card_last4', 'account_number_last4', 'iban_last4'] as const
+
+/** A card, account or IBAN number cut to its last four characters, without spaces (OQ-29). */
+export function lastFour(value: string): string {
+  return value.replace(/\s/g, '').slice(-4)
+}
+
+/**
+ * A copy of a tool input, or a whole response, with every last-four field's value cut, so the
+ * full number is not stored in extractions.raw_output either (OQ-29).
+ */
+export function redactLastFour<T>(json: T): T {
+  if (Array.isArray(json)) return json.map(redactLastFour) as T
+  if (!json || typeof json !== 'object') return json
+  return Object.fromEntries(
+    Object.entries(json as Record<string, unknown>).map(([key, child]) => {
+      const field = child as { value?: unknown } | null
+      if ((LAST4_FIELDS as readonly string[]).includes(key) && field && typeof field === 'object' && typeof field.value === 'string') {
+        return [key, { ...field, value: lastFour(field.value) }]
+      }
+      return [key, redactLastFour(child)]
+    }),
+  ) as T
+}
 
 /**
  * A field in a strict tool's input. The value is a string, never null: strict tool use allows
