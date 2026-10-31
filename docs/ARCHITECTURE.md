@@ -658,8 +658,11 @@ AC-4). `src/lib/supabase/server.ts` throws when `NEXT_PUBLIC_SUPABASE_URL` or
 ### 6.3 Extraction in process-queue
 
 1. Load the document. Go on if its status is `queued` or `waiting_budget`, or `processing` with
-   `processing_started_at` more than 10 minutes ago (an earlier run was killed); otherwise
-   (already done, deleted, or retried by hand) archive the message and stop.
+   `processing_started_at` more than 10 minutes ago (an earlier run was killed). If it is
+   `processing` and not yet that stale, another run may still be at work: delay the message until
+   it would be, and stop; archiving it would strand a killed run's document, whose message
+   reappears after the 300 s visibility timeout. Otherwise (already done, deleted, or retried by
+   hand) archive the message and stop.
 2. `reserve_spend(document_id, estimate)` (section 7). If it is refused by the monthly cap or the
    daily ceiling, set status `waiting_budget` with a `status_reason` naming which one and when it
    resets, delay the message with `extract_set_vt(…, 600)`, and stop. No attempt is counted
