@@ -44,17 +44,32 @@ domain (OQ-27). `<site>` below means that address.
 - [ ] **Edge Function secrets**: `supabase secrets list --project-ref <prod ref>` (or dashboard →
       Edge Functions → Secrets) shows each of `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL` and
       `CRON_SECRET`. Pass: every name present; `ANTHROPIC_BASE_URL` is `https://api.anthropic.com`;
-      no Stripe secret is set there (Stripe runs only in Vercel route handlers). The list shows
-      digests only; values are never copied here.
-- [ ] **Vault**: SQL editor, `select name from vault.decrypted_secrets` lists the functions' base
-      URL and `CRON_SECRET` entries the cron jobs read (section 12). Pass: both names present, and
-      the Vault `CRON_SECRET` matches the function secret (a cron run succeeds, see Scheduled jobs).
+      `ANTHROPIC_API_KEY` is the production key (see Claude API below), not the dummy local value;
+      `CLAUDE_MODEL` is **not** set, so `app_config.model` decides (Lead ruling 4 on #24); no
+      Stripe secret is set there (Stripe runs only in Vercel route handlers). The list shows
+      digests only; values are never copied here. `process-queue` reads `ANTHROPIC_API_KEY` and
+      `ANTHROPIC_BASE_URL` with no default and fails at startup without them (its Logs say
+      "ANTHROPIC_API_KEY is not set").
+- [ ] **Vault**: SQL editor, `select name from vault.decrypted_secrets where name in
+      ('functions_base_url', 'cron_secret')`: the entries the `process-queue` cron job reads
+      (section 12), created with `select vault.create_secret('<value>', '<name>')`. Pass: both
+      names present; `select decrypted_secret from vault.decrypted_secrets where name =
+      'functions_base_url'` is `https://<prod ref>.supabase.co/functions/v1` (no trailing slash);
+      the Vault `cron_secret` equals the `CRON_SECRET` function secret, which shows as the job's
+      calls answering 200, not 401 (see Scheduled jobs). Never copy either value here.
 - [ ] **app_config**: SQL editor, `select spend_cap_usd, daily_cap_usd, account_page_cap, model,
-      input_usd_per_mtok, output_usd_per_mtok, confidence_threshold, amount_tolerance from
-      app_config`. Pass: `spend_cap_usd` is 10.00, `daily_cap_usd` is 2.00 (OQ-33),
-      `account_page_cap` is 10 (OQ-2), `confidence_threshold` is 0.80 (OQ-8), `amount_tolerance` is
-      0.01 (OQ-7), `model` is the model chosen from the latest eval run, and both prices equal
-      Anthropic's current pricing page for that model.
+      input_usd_per_mtok, output_usd_per_mtok, base_input_tokens, max_input_tokens_per_page,
+      max_output_tokens, confidence_threshold, amount_tolerance, extract_concurrency, (select
+      count(*) from app_config) as rows from app_config`. Pass: one row; `spend_cap_usd` is 10.00,
+      `daily_cap_usd` is 2.00 (OQ-33), `account_page_cap` is 10 (OQ-2), `confidence_threshold` is
+      0.80 (OQ-8), `amount_tolerance` is 0.01 (OQ-7), `model` is the model chosen from the latest
+      eval run (`claude-sonnet-5-5` until then), and both prices equal Anthropic's current pricing
+      page for that model (https://platform.claude.com/docs/en/about-claude/pricing; Sonnet 5.5 was
+      2 and 10 USD per million input and output tokens on 2026-10-31). `extract_concurrency` is
+      **2** in production (Lead ruling 3 on #24): the migration inserts 1, so set it once with
+      `update app_config set extract_concurrency = 2`. `max_output_tokens` and the two input
+      settings bound the spend estimate (section 7): keep them at or above the eval's largest
+      measured values.
 - [ ] **plan_limits**: SQL editor, `select * from plan_limits`. Pass: `free` 20 pages and 0, `pro`
       500 pages and 19.00 (OQ-2, OQ-24).
 
@@ -63,6 +78,13 @@ domain (OQ-27). `<site>` below means that address.
 - [ ] Migrations: production's history matches the repo (`supabase migration list` shows no
       local-only row).
 - [ ] Extensions: dashboard → Database → Extensions shows `pgmq`, `pg_cron` and `pg_net` enabled.
+- [ ] The `extract` queue: SQL editor, `select queue_name from pgmq.list_queues()`. Pass: `extract`
+      is listed (milestone 5's migration creates it). Dashboard → Project Settings → Data API →
+      Exposed schemas lists only `public` and `graphql_public`: `pgmq_public` is **not** exposed,
+      and the queue is reached only through the `extract_` functions, which only the service role
+      may execute (Lead ruling 1 on #24). Pass also: `select has_function_privilege('anon',
+      'public.extract_send(uuid)', 'execute'), has_function_privilege('authenticated',
+      'public.extract_read(integer, integer)', 'execute')` is `false`, `false`.
 - [ ] Auth → URL configuration: the site URL is `<site>`, and the redirect URLs list exactly
       `<site>/auth/callback**`. The `**` is needed because the app returns to
       `/auth/callback?next=<path>` (OQ-34); without it Auth drops the redirect and sends users to
@@ -122,14 +144,39 @@ it to the `submit-document` Edge Function, which counts its pages and reserves t
       function, so it needs no secret of its own. Pass: the function is listed with the release's
       deploy time, and `curl -X POST https://<prod ref>.supabase.co/functions/v1/submit-document`
       with no `Authorization` header is refused with 401.
-- [ ] Account cap: SQL editor, `select public.account_page_cap()`. Pass: 10 (OQ-2). Until
-      milestone 5 adds `app_config`, the cap is this function's body, so changing it takes a
-      migration.
+- [ ] Account cap: SQL editor, `select account_page_cap from app_config` and `select
+      public.account_page_cap()`. Pass: both 10 (OQ-2). Since milestone 5 the function reads
+      `app_config.account_page_cap`, so the operator changes the cap with `update app_config set
+      account_page_cap = <n>`, and null turns it off, without a release.
 - [ ] Pass: signed in on `<site>/documents`, the upload control says "Files are deleted 7 days
       after upload." and shows the account's and the workspace's pages left. Uploading a one-page
       PDF lists it as "Queued" with 1 page; a 20 MB file and a `.txt` file are refused before
       upload. With the same workspace open in a second window, the new document appears there
       within 5 seconds, without a reload (OQ-35).
+
+## Extraction
+
+Milestone 5: `submit-document` sends each accepted document to the pgmq queue `extract`; a pg_cron
+job posts to `process-queue` every 10 seconds, which reserves spend, calls Claude and stores the
+result (sections 6.1, 6.3, 6.4, 7 and 9).
+
+- [ ] `submit-document` is redeployed from the release's commit (it now sends to the queue):
+      `supabase functions deploy submit-document --project-ref <prod ref>`, with "Enforce JWT
+      verification" on. Pass: Dashboard → Edge Functions shows it with the release's deploy time.
+- [ ] `process-queue` is deployed from the release's commit **without JWT verification**, because
+      pg_cron calls it with `CRON_SECRET`, not a user's JWT: `supabase functions deploy
+      process-queue --no-verify-jwt --project-ref <prod ref>`. Pass: Dashboard → Edge Functions
+      lists `process-queue` with "Enforce JWT verification" off and the release's deploy time, and
+      `curl -X POST https://<prod ref>.supabase.co/functions/v1/process-queue` with no
+      `x-cron-secret` header is answered 401.
+- [ ] Pass: signed in on `<site>/documents`, upload a one-page sample invoice. Within a minute it
+      goes Queued → Processing → "Needs review" with type Invoice, without a reload; SQL editor,
+      `select outcome, model, cost_usd from extractions order by created_at desc limit 1` shows
+      `ok`, `claude-sonnet-5-5` and a cost of a few cents. Upload a photo that is not a business
+      document: it reaches "Not supported" with a reason, and `account_page_usage` for the account
+      is unchanged by it (OQ-1).
+- [ ] Pass: a "Failed" document shows its reason and a Retry button; Retry puts it back to
+      "Queued" (`select kind from document_events where document_id = '<id>'` shows `retried`).
 
 ## Google sign-in
 
@@ -218,6 +265,11 @@ This app takes **no real payments**. Every item here checks that only test mode 
 
 - [ ] SQL editor, `select jobname, schedule, active from cron.job`. Pass: `process-queue` (every 10
       seconds) and `purge-files` (daily at 03:00 UTC) are listed and `active`.
+- [ ] `process-queue` job runs reach the function: SQL editor, `select status_code, content,
+      error_msg, created from net._http_response order by id desc limit 10`. Pass: recent rows are
+      200 with `{"outcome": …}`; a 401 means the Vault `cron_secret` and the `CRON_SECRET` function
+      secret differ, a 404 or "Couldn't resolve host name" a wrong `functions_base_url`. The job
+      sends `app_config.extract_concurrency` requests per run, so 0 there pauses extraction.
 - [ ] SQL editor, `select jobname, status, start_time from cron.job_run_details d join cron.job j
       using (jobid) order by start_time desc limit 20`. Pass: recent runs of both jobs show
       `succeeded`.

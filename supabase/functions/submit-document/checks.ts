@@ -53,16 +53,22 @@ export interface PageAllowance {
   workspace_used: number
   workspace_limit: number
   account_used: number
-  account_cap: number
+  /** null when app_config turns the account cap off. */
+  account_cap: number | null
 }
 
 /** The pages left under the lower of the workspace's month and the account's lifetime cap. */
 export function pagesRemaining(a: PageAllowance): number {
-  return Math.max(0, Math.min(a.workspace_limit - a.workspace_used, a.account_cap - a.account_used))
+  const workspace = a.workspace_limit - a.workspace_used
+  return Math.max(0, a.account_cap === null ? workspace : Math.min(workspace, a.account_cap - a.account_used))
 }
 
 /** The refusal for an upload over the allowances (PRD US-1.1 AC-6): how many pages remain. */
 export function allowanceRefusal(fileName: string, pageCount: number, a: PageAllowance): string {
   const left = pagesRemaining(a)
-  return `${fileName} has ${pages(pageCount)}, but only ${pages(left)} ${left === 1 ? 'remains' : 'remain'} of your page allowance (this workspace’s monthly allowance and your account’s ${a.account_cap}-page limit).`
+  const remain = `${pages(left)} ${left === 1 ? 'remains' : 'remain'}`
+  if (a.account_cap === null) {
+    return `${fileName} has ${pages(pageCount)}, but only ${remain} of this workspace’s monthly page allowance.`
+  }
+  return `${fileName} has ${pages(pageCount)}, but only ${remain} of your page allowance (this workspace’s monthly allowance and your account’s ${a.account_cap}-page limit).`
 }

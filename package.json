@@ -14,7 +14,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:access": "vitest run --config vitest.access.config.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "functions:env": "node e2e/mock-claude/functions-env.ts",
+    "mock-claude": "node e2e/mock-claude/server.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
