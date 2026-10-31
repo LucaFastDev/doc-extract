@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_PATH, isPublicPath, safeNextPath, signInUrl } from './paths'
+import { DEFAULT_PATH, isPublicPath, safeNextPath, signInPath, signInUrl } from './paths'
 
 describe('safeNextPath', () => {
   it('keeps a path on this site, with its query and hash', () => {
@@ -84,4 +84,21 @@ describe('signInUrl', () => {
     expect(url.pathname).toBe('/sign-in')
     expect(url.searchParams.get('next')).toBe('/documents?status=failed')
   })
+})
+
+describe('signInPath', () => {
+  it('carries the page, with its query, as next', () => {
+    const url = new URL(signInPath('/documents?status=failed'), 'http://site.test')
+    expect(url.pathname).toBe('/sign-in')
+    expect(url.searchParams.get('next')).toBe('/documents?status=failed')
+  })
+
+  it.each([null, '//evil.example/x', '/.//evil.example/x', '/sign-in?next=%2Fdocuments'])(
+    'passes next through safeNextPath, so %s gives the document list',
+    (next) => {
+      const url = new URL(signInPath(next), 'http://site.test')
+      expect(url.origin).toBe('http://site.test')
+      expect(url.searchParams.get('next')).toBe(DEFAULT_PATH)
+    },
+  )
 })

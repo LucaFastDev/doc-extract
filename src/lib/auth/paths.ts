@@ -47,3 +47,18 @@ export function signInUrl(requested: URL): URL {
   url.searchParams.set('next', `${requested.pathname}${requested.search}`)
   return url
 }
+
+/**
+ * The request header in which the proxy passes on the path and query a request was made to, so a
+ * server action, which is a POST to the page it runs on, knows that page. The proxy always sets it,
+ * so a value the browser sent never arrives.
+ */
+export const REQUEST_PATH_HEADER = 'x-request-path'
+
+/**
+ * Where a server action or page sends a visitor it finds without a session: sign-in, with `next`
+ * the page they were on, passed through `safeNextPath`.
+ */
+export function signInPath(next: string | null | undefined): string {
+  return `/sign-in?${new URLSearchParams({ next: safeNextPath(next) })}`
+}

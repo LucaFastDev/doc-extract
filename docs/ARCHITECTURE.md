@@ -624,7 +624,13 @@ All run on the Node.js runtime and are short; none calls Claude.
 `src/proxy.ts` (Next.js 16 renamed the `middleware.ts` convention to `proxy.ts`, exporting
 `proxy`) refreshes the session cookie on each request (the `@supabase/ssr` pattern), and sends a
 signed-out visitor who opens a page outside the public list (`/`, `/demo…`, `/sign-in`,
-`/privacy`, `/terms`, `/auth/callback`, `/api/stripe/webhook`) to `/sign-in?next=<path>`.
+`/privacy`, `/terms`, `/auth/callback`, `/api/stripe/webhook`) to `/sign-in?next=<path>`. It
+redirects only `GET` and `HEAD`: a 307 would make the browser repeat a server action's `POST`
+against `/sign-in`, which cannot answer it. It passes the requested path and query on to the page
+in an `x-request-path` request header, always overwriting any the browser sent, and each server
+action and the signed-in layout check the user themselves: one that finds none, because the
+session ended while the page was open, redirects to `/sign-in?next=<that path, through
+safeNextPath>`.
 
 The current workspace is a `workspace` cookie holding its id, set by the switcher. It is checked
 against the user's memberships on every use and falls back to the personal workspace (the first
