@@ -113,3 +113,13 @@ test('a signed-in user who opens sign-in goes on to next', async ({ page, contex
   await page.goto('/sign-in?next=%2Fdocuments')
   await expect(page).toHaveURL((url) => url.pathname === '/documents')
 })
+
+test('a signed-in user whose next resolves to another host lands on the document list', async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  await signIn(context, baseURL!, await createUser())
+  await page.goto('/sign-in?next=/.//evil.example/x')
+  await expect(page).toHaveURL(new URL('/documents', baseURL).toString())
+})
