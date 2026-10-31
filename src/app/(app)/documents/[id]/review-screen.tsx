@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FunctionsHttpError } from '@supabase/supabase-js'
@@ -42,6 +42,7 @@ import {
   isDocType,
   lineWord,
   liveReview,
+  saveFailure,
   storedReview,
   untickedFailures,
   type Review,
@@ -54,6 +55,9 @@ import { DeleteDocument } from '../delete-document'
 import { DocumentViewer } from './document-viewer'
 
 const CHECK_STATUS = { pass: 'Passed', fail: 'Failed', skipped: 'Skipped' } as const
+
+/** Whether the focus is in one of the fields or cells, where the user may be typing. */
+const inField = () => document.activeElement?.closest('[data-field]') != null
 
 /** The message an RPC or an Edge Function refused with, when it wrote one for the user. */
 async function refusal(error: unknown, fallback: string): Promise<string> {
@@ -79,6 +83,13 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [today] = useState(() => utcDate(new Date()))
+  // While the user is in a field, the fields stay in the sections they were in when they went in:
+  // a save that clears or adds flags would otherwise move the field they are in to another
+  // section, which mounts it again and loses the focus and what they type. The reasons and the
+  // checks still update live. null: the sections follow the live flags.
+  const [layout, setLayout] = useState<Review['flags'] | null>(null)
+  // Counts the refusals: each one puts the stored values back in the fields the user is not in.
+  const [revision, setRevision] = useState(0)
 
   const doc = data.document
   const def = isDocType(doc.doc_type) ? DOC_TYPES[doc.doc_type] : null
@@ -102,7 +113,13 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
 
   // Changes run one at a time, in the order they were made. A field's save on blur does not disable
   // the buttons: the click that blurred the field still lands, and its action runs after the save.
-  const [queue] = useState(() => changeQueue(() => setBusy(false)))
+  // Once every change has finished and the user is not in a field, the sections follow the flags.
+  const [queue] = useState(() =>
+    changeQueue(() => {
+      setBusy(false)
+      if (!inField()) setLayout(null)
+    }),
+  )
 
   /**
    * Runs one change after those before it; a refusal is shown, the changes waiting behind it are
@@ -117,10 +134,13 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
         const refused = await change()
         if (!refused) return true
         setError(refused)
-        await reload()
+        setRevision((n) => n + 1)
+        // The refusal stays shown if the reload fails too.
+        await reload().catch((e) => console.error('The review could not be reloaded.', e))
       } catch (e) {
         console.error('A review change failed.', e)
         setError('That change could not be saved. Reload the page and try again.')
+        setRevision((n) => n + 1)
       }
       return false
     })
@@ -130,15 +150,29 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
     act(async () => {
       const corrected = correctionFor(row, typed)
       if (corrected === row.corrected_value) return null
-      const { data: saved, error } = await supabase
-        .from('extraction_fields')
-        .update({ corrected_value: corrected })
-        .eq('document_id', doc.id)
-        .eq('path', row.path)
-        .select('path')
-      if (error || !saved?.length) return `${fieldLabel(def!, row.path)} could not be saved: the document no longer needs review.`
-      setRows((r) => applyCorrection(r, row.path, corrected))
-      return null
+      try {
+        const { data: saved, error } = await supabase
+          .from('extraction_fields')
+          .update({ corrected_value: corrected })
+          .eq('document_id', doc.id)
+          .eq('path', row.path)
+          .select('path')
+        if (!error && saved?.length) {
+          setRows((r) => applyCorrection(r, row.path, corrected))
+          return null
+        }
+        if (error) console.error('A correction could not be saved.', error)
+      } catch (e) {
+        console.error('A correction could not be saved.', e)
+      }
+      // RLS updates no row once the document no longer needs review; its status says whether that is why.
+      const current = await supabase
+        .from('documents')
+        .select('status')
+        .eq('id', doc.id)
+        .maybeSingle<{ status: string }>()
+        .then(({ data }) => data?.status ?? null, () => null)
+      return saveFailure(fieldLabel(def!, row.path), current)
     }, { fromButton: false })
 
   const addLineAfter = (after: number) =>
@@ -281,8 +315,11 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
                 def={def}
                 rows={rows}
                 review={review}
+                layout={layout ?? review.flags}
+                revision={revision}
                 editable={editable}
                 busy={busy}
+                onEnter={() => setLayout((held) => held ?? review.flags)}
                 onSave={(row, typed) => void saveField(row, typed)}
                 onAddLine={(after) => void addLineAfter(after)}
                 onDeleteLine={(index) => void removeLine(index)}
@@ -365,13 +402,19 @@ function Checks({
   )
 }
 
-/** Flagged fields and cells first, each with its reasons, then the other fields, then each line (US-5.1 AC-2 to AC-4). */
+/**
+ * Flagged fields and cells first, each with its reasons, then the other fields, then each line
+ * (US-5.1 AC-2 to AC-4). The sections come from `layout`, the reasons from the live review.
+ */
 function Fields({
   def,
   rows,
   review,
+  layout,
+  revision,
   editable,
   busy,
+  onEnter,
   onSave,
   onAddLine,
   onDeleteLine,
@@ -379,21 +422,26 @@ function Fields({
   def: DocTypeDef
   rows: ReviewRow[]
   review: Review
+  layout: Review['flags']
+  revision: number
   editable: boolean
   busy: boolean
+  onEnter: () => void
   onSave: (row: ReviewRow, typed: string) => void
   onAddLine: (after: number) => void
   onDeleteLine: (index: number) => void
 }) {
-  const groups = groupFields(def, rows, review.flags)
+  const groups = groupFields(def, rows, layout)
   const word = lineWord(def)
   const entry = (row: ReviewRow) => (
     <FieldEntry
-      key={`${row.path}:${currentValue(row) ?? ''}`}
+      key={row.path}
       def={def}
       row={row}
       reasons={flagReasons(row, review.flags[row.path] ?? [], review.checks, rows)}
+      revision={revision}
       editable={editable}
+      onEnter={onEnter}
       onSave={onSave}
     />
   )
@@ -455,18 +503,29 @@ function FieldEntry({
   def,
   row,
   reasons,
+  revision,
   editable,
+  onEnter,
   onSave,
 }: {
   def: DocTypeDef
   row: ReviewRow
   reasons: string[]
+  revision: number
   editable: boolean
+  onEnter: () => void
   onSave: (row: ReviewRow, typed: string) => void
 }) {
   const id = useId()
+  const input = useRef<HTMLInputElement>(null)
+  // Set between a click's focus and its mouseup, which would otherwise undo the selection.
+  const clickedIn = useRef(false)
   const value = currentValue(row) ?? ''
   const label = fieldLabel(def, row.path)
+  // The stored value, once it changes or a save is refused; the field the user is in keeps what they type.
+  useEffect(() => {
+    if (input.current && input.current !== document.activeElement) input.current.value = value
+  }, [value, revision])
   return (
     <div data-field={row.path} className={cn('flex min-w-0 flex-col gap-1.5 rounded-md border p-3', reasons.length > 0 && 'border-destructive/50')}>
       <div className="flex items-baseline justify-between gap-2">
@@ -477,9 +536,22 @@ function FieldEntry({
       </div>
       {editable ? (
         <Input
+          ref={input}
           id={id}
           defaultValue={value}
           autoComplete="off"
+          // Going into a field selects its value, by a click as by Tab, so what is typed replaces it.
+          onMouseDown={(e) => {
+            clickedIn.current = e.currentTarget !== document.activeElement
+          }}
+          onMouseUp={(e) => {
+            if (clickedIn.current) e.preventDefault()
+            clickedIn.current = false
+          }}
+          onFocus={(e) => {
+            e.currentTarget.select()
+            onEnter()
+          }}
           onBlur={(e) => onSave(row, e.currentTarget.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') e.currentTarget.blur()

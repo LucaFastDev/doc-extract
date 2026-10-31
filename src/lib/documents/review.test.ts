@@ -15,6 +15,7 @@ import {
   groupFields,
   lineCount,
   liveReview,
+  saveFailure,
   storedReview,
   untickedFailures,
   type ReviewRow,
@@ -74,6 +75,14 @@ describe('corrections', () => {
   it('keep only the last four characters of a card, account or IBAN number (OQ-29)', () => {
     expect(correctionFor({ path: 'card_last4', extracted_value: '1111' }, '4111 1111 1111 1234')).toBe('1234')
     expect(correctionFor({ path: 'line_items[0].description', extracted_value: null }, '4111 1111')).toBe('4111 1111')
+  })
+
+  it('that fail say the document no longer needs review only when its status says so (Lead ruling on QA pass 2 of #34)', () => {
+    expect(saveFailure('Vendor name', 'approved')).toBe('Vendor name could not be saved: the document no longer needs review.')
+    expect(saveFailure('Total', 'queued')).toBe('Total could not be saved: the document no longer needs review.')
+    // Still in review, or the status could not be read (a network error, a deleted document): try again.
+    expect(saveFailure('Vendor name', 'needs_review')).toBe('Vendor name could not be saved. Try again.')
+    expect(saveFailure('Line 2 · Amount', null)).toBe('Line 2 · Amount could not be saved. Try again.')
   })
 })
 
