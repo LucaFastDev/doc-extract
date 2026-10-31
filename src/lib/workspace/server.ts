@@ -39,5 +39,20 @@ export const getWorkspaceContext = cache(async () => {
   const cookieStore = await cookies()
   const current = pickCurrentWorkspace(memberships, cookieStore.get(WORKSPACE_COOKIE)?.value)
 
-  return { user, memberships, current }
+  return { supabase, user, memberships, current }
 })
+
+/**
+ * Makes the workspace the current one. Call it only with a workspace the user has just been found
+ * to be a member of; getWorkspaceContext checks the cookie again on every use regardless.
+ */
+export async function setCurrentWorkspace(id: string) {
+  const cookieStore = await cookies()
+  cookieStore.set(WORKSPACE_COOKIE, id, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 24 * 365,
+  })
+}
