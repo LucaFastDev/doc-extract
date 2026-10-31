@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { withDb } from './local-db'
 
 // Test users (ARCHITECTURE.md section 4.4): Google cannot be driven from a test, so the local stack
 // enables the email provider with passwords. Users are created with the admin API and signed in
@@ -62,4 +63,11 @@ export async function personalWorkspaceId(user: TestUser): Promise<string> {
   if (error) throw error
   if (data.length !== 1) throw new Error(`expected one workspace, got ${data.length}`)
   return data[0].workspace_id as string
+}
+
+/** Adds the user to the workspace directly in the database, as clients cannot. */
+export async function addMember(ws: string, user: TestUser, role: 'owner' | 'member'): Promise<void> {
+  await withDb((db) =>
+    db.query('insert into public.workspace_members (workspace_id, user_id, role) values ($1, $2, $3)', [ws, user.id, role]),
+  )
 }
