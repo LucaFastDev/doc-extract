@@ -13,6 +13,12 @@ const FUNCTIONS = [
   { signature: 'public.accept_invite(text)', definer: true, roles: ['authenticated'] },
   { signature: 'public.remove_member(uuid, uuid)', definer: true, roles: ['authenticated'] },
   { signature: 'public.set_member_role(uuid, uuid, text)', definer: true, roles: ['authenticated'] },
+  { signature: 'public.get_plan_limits()', definer: true, roles: ['anon', 'authenticated'] },
+  { signature: 'public.get_page_allowance(uuid)', definer: true, roles: ['authenticated'] },
+  { signature: 'public.create_document(uuid, text, text, bigint)', definer: true, roles: ['authenticated'] },
+  { signature: 'public.reserve_pages(uuid)', definer: false, roles: ['service_role'] },
+  // Stands in for app_config.account_page_cap until milestone 5; reserve_pages runs as its caller.
+  { signature: 'public.account_page_cap()', definer: false, roles: ['service_role'] },
 ]
 
 const ROLES = ['public', 'anon', 'authenticated', 'service_role']
@@ -76,7 +82,16 @@ describe('tables', () => {
       return { tables: t.rows, open: p.rows }
     })
     expect(tables.map((t) => t.relname)).toEqual(
-      expect.arrayContaining(['profiles', 'workspace_invites', 'workspace_members', 'workspaces']),
+      expect.arrayContaining([
+        'account_page_usage',
+        'documents',
+        'page_usage',
+        'plan_limits',
+        'profiles',
+        'workspace_invites',
+        'workspace_members',
+        'workspaces',
+      ]),
     )
     expect(tables.filter((t) => !t.rls)).toEqual([])
     expect(open).toEqual([])
