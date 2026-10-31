@@ -204,6 +204,11 @@ for (const { name, viewport } of VIEWPORTS) {
       await expect(pages).toHaveCount(2)
       await expect(pages.nth(0)).toHaveAccessibleName(`${file.name}, page 1 of 2`)
       await expect(pages.nth(1)).toHaveAccessibleName(`${file.name}, page 2 of 2`)
+      // The document is above the fields on a phone, and beside them on a desktop (OQ-40).
+      const viewer = (await page.getByRole('region', { name: 'Document', exact: true }).boundingBox())!
+      const checks = (await page.getByRole('region', { name: 'Checks' }).boundingBox())!
+      if (viewport.width <= 360) expect(viewer.y + viewer.height).toBeLessThanOrEqual(checks.y)
+      else expect(viewer.x + viewer.width).toBeLessThanOrEqual(checks.x)
       const zoom = page.getByRole('status', { name: 'Zoom level' })
       await expect(zoom).toHaveText('100%')
       const fit = (await pages.nth(0).boundingBox())!.width
