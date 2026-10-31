@@ -169,13 +169,13 @@ src/
     api/documents/[id]/route.ts    DELETE: delete one document
     api/workspaces/[id]/route.ts   DELETE: delete a workspace
     api/account/route.ts           DELETE: delete the signed-in account
-    layout.tsx                 root layout; imports ../index.css
+    layout.tsx                 root layout; imports ./globals.css
+    globals.css                design tokens (CSS variables on :root), shadcn layout
   middleware.ts                refreshes the session cookie; sends signed-out visitors to /sign-in
   lib/supabase/client.ts       the browser client (createBrowserClient); throws if NEXT_PUBLIC_SUPABASE_URL is unset
   lib/supabase/server.ts       the server client (createServerClient + cookies), the service-role
                                client and the middleware helper; `import 'server-only'`; throws if unset
   lib/stripe.ts                server-only Stripe client; throws unless the key starts with sk_test_
-  index.css                    design tokens (CSS variables on :root), shadcn layout
   features/…                   upload, documents, review, export, billing, workspace, demo
 shared/doctypes/               per-type field sets, JSON Schemas, tool descriptions, checks; no imports
 shared/limits.ts               accepted MIME types, 10 MB, 10 pages, 10 files per upload
@@ -904,9 +904,9 @@ any file to pass the check.
 | `supabase/seed.sql present` | `supabase/seed.sql`, nearly empty |
 | `Vitest installed, with a test` | `vitest` in `package.json`, at least one `*.test.ts`; a second Vitest config for `tests/access/` |
 | `Playwright installed, with a test` | `@playwright/test` in `package.json`, at least one `*.spec.ts` that loads the home page |
-| `CLAUDE.md present` | `CLAUDE.md`: commands, layout, the rules above (Claude mocked, no production URLs, RLS on every table, tokens in `src/index.css`, server-only secrets never `NEXT_PUBLIC_` and only in `server-only` modules, the extraction pipeline stays in Edge Functions) |
+| `CLAUDE.md present` | `CLAUDE.md`: commands, layout, the rules above (Claude mocked, no production URLs, RLS on every table, tokens in `src/app/globals.css`, server-only secrets never `NEXT_PUBLIC_` and only in `server-only` modules, the extraction pipeline stays in Edge Functions) |
 | `gitignored: .env.local`, `gitignored: supabase/.branches` | `.gitignore` entries `.env.local`, `.env*.local`, `supabase/.branches`, `supabase/.temp`, `supabase/.env`, `supabase/functions/.env`, `node_modules`, `.next`, `out` (checked with `git check-ignore`) |
-| `design tokens in src/index.css` | shadcn/ui set up, CSS variables on `:root` in `src/index.css` (`--background`, `--foreground`, `--primary`, …), imported by `src/app/layout.tsx` and consumed by Tailwind |
+| `design tokens in src/app/globals.css` | shadcn/ui set up, CSS variables on `:root` in `src/app/globals.css` (`--background`, `--foreground`, `--primary`, …), imported by `src/app/layout.tsx` and consumed by Tailwind |
 | `e2e server port per checkout` | `playwright.config.ts` setting `E2E_PORT` from the hash of `process.cwd()` as in ai-hq's `docs/03-workers.md` ("Tests"), no hardcoded `localhost:<port>`, `reuseExistingServer: true`; its `webServer` runs `npm run dev -- --port ${PORT}`, without `--strictPort`, which is not a `next dev` option |
 
 The scaffold's CI workflow runs typecheck, lint, unit tests, `supabase db reset`, the access tests,

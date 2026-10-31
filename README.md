@@ -1,2 +1,2 @@
 # doc-extract
-Upload invoices and receipts, get checked structured data out
+Upload invoices, receipts, bank statements, purchase orders, delivery notes and quotes, get checked structured data out

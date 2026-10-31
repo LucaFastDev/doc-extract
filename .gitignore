@@ -1,0 +1,25 @@
+# Dependencies and builds
+node_modules
+.next
+out
+next-env.d.ts
+*.tsbuildinfo
+
+# Environment: local stack values only, never committed (ARCHITECTURE.md section 12)
+.env
+.env.local
+.env*.local
+supabase/.env
+supabase/functions/.env
+
+# Supabase CLI state
+supabase/.branches
+supabase/.temp
+
+# Test output
+test-results
+playwright-report
+playwright/.cache
+coverage
+
+.DS_Store
