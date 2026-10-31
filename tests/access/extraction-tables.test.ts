@@ -73,7 +73,7 @@ describe('result tables', () => {
   })
 
   it.each(MEMBER_TABLES)('%s: no client inserts, updates or deletes', async (table) => {
-    const row =
+    const row: Record<string, string> =
       table === 'document_events'
         ? { document_id: docA, workspace_id: wsA, kind: 'retried' }
         : table === 'extraction_fields'
