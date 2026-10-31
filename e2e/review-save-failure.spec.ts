@@ -43,6 +43,22 @@ for (const { name, viewport } of [
       expect(await sql("select 1 from public.extraction_fields where document_id = $1 and path like 'line_items[1]%'", [id])).toEqual([])
     })
 
+    test('with the whole network down, the failed correction still asks to try again', async ({ page, context, baseURL }) => {
+      const user = await createUser()
+      const id = await seedDocument(user, { file: pngFile(`Offline ${name}.png`) })
+      await signIn(context, baseURL!, user)
+      await page.goto(`/documents/${id}`)
+      // The save, the status read after it and the reload all fail.
+      await page.route('**/rest/v1/**', (route) => route.abort())
+
+      await page.getByLabel('Vendor name', { exact: true }).fill('Offline Ltd')
+      await page.getByLabel('Vendor name', { exact: true }).press('Enter')
+
+      await expect(page.getByRole('main').getByRole('alert')).toHaveText('Vendor name could not be saved. Try again.')
+      await expect(page.getByLabel('Vendor name', { exact: true })).toHaveValue('Acme Supplies Ltd')
+      expect(await corrected(id, 'vendor_name')).toBeNull()
+    })
+
     test('a correction to a document that no longer needs review says so', async ({ page, context, baseURL }) => {
       const user = await createUser()
       const id = await seedDocument(user, { file: pngFile(`Approved elsewhere ${name}.png`) })

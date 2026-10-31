@@ -165,11 +165,13 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
       } catch (e) {
         console.error('A correction could not be saved.', e)
       }
-      // RLS updates no row once the document no longer needs review; its status says whether that is why.
+      // RLS updates no row once the document no longer needs review; its status says whether that is
+      // why. One read, not retried, so the message is not held back seconds on a network error.
       const current = await supabase
         .from('documents')
         .select('status')
         .eq('id', doc.id)
+        .retry(false)
         .maybeSingle<{ status: string }>()
         .then(({ data }) => data?.status ?? null, () => null)
       return saveFailure(fieldLabel(def!, row.path), current)
