@@ -25,6 +25,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { changeQueue } from '@/lib/documents/change-queue'
 import { loadReview, type ReviewData, type ReviewDocument } from '@/lib/documents/load-review'
 import {
   addLine,
@@ -99,22 +100,30 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
     setTicks(new Set(fresh.ticks))
   }
 
-  /** Runs one change; a refusal is shown, and the screen reloads so it shows what is stored. */
-  async function act(change: () => Promise<string | null>) {
-    setBusy(true)
-    setError(null)
-    try {
-      const refused = await change()
-      if (refused) {
+  // Changes run one at a time, in the order they were made. A field's save on blur does not disable
+  // the buttons: the click that blurred the field still lands, and its action runs after the save.
+  const [queue] = useState(() => changeQueue(() => setBusy(false)))
+
+  /**
+   * Runs one change after those before it; a refusal is shown, the changes waiting behind it are
+   * dropped, and the screen reloads so it shows what is stored. A clicked action disables the
+   * buttons until every change has finished.
+   */
+  function act(change: () => Promise<string | null>, { fromButton = true } = {}) {
+    if (fromButton) setBusy(true)
+    return queue(async () => {
+      setError(null)
+      try {
+        const refused = await change()
+        if (!refused) return true
         setError(refused)
         await reload()
+      } catch (e) {
+        console.error('A review change failed.', e)
+        setError('That change could not be saved. Reload the page and try again.')
       }
-    } catch (e) {
-      console.error('A review change failed.', e)
-      setError('That change could not be saved. Reload the page and try again.')
-    } finally {
-      setBusy(false)
-    }
+      return false
+    })
   }
 
   const saveField = (row: ReviewRow, typed: string) =>
@@ -130,7 +139,7 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
       if (error || !saved?.length) return `${fieldLabel(def!, row.path)} could not be saved: the document no longer needs review.`
       setRows((r) => applyCorrection(r, row.path, corrected))
       return null
-    })
+    }, { fromButton: false })
 
   const addLineAfter = (after: number) =>
     act(async () => {
