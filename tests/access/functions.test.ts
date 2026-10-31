@@ -19,6 +19,17 @@ const FUNCTIONS = [
   { signature: 'public.reserve_pages(uuid)', definer: false, roles: ['service_role'] },
   // Stands in for app_config.account_page_cap until milestone 5; reserve_pages runs as its caller.
   { signature: 'public.account_page_cap()', definer: false, roles: ['service_role'] },
+  // Milestone 5: the extraction pipeline.
+  { signature: 'public.release_pages(uuid)', definer: false, roles: ['service_role'] },
+  { signature: 'public.reserve_spend(uuid, numeric)', definer: false, roles: ['service_role'] },
+  { signature: 'public.settle_spend(uuid, numeric)', definer: false, roles: ['service_role'] },
+  { signature: 'public.record_extraction(uuid, uuid, jsonb)', definer: false, roles: ['service_role'] },
+  { signature: 'public.retry_document(uuid)', definer: true, roles: ['authenticated'] },
+  // The extract queue, reached only through these (Lead ruling 1 on #24).
+  { signature: 'public.extract_send(uuid)', definer: true, roles: ['service_role'] },
+  { signature: 'public.extract_read(integer, integer)', definer: true, roles: ['service_role'] },
+  { signature: 'public.extract_set_vt(bigint, integer)', definer: true, roles: ['service_role'] },
+  { signature: 'public.extract_archive(bigint)', definer: true, roles: ['service_role'] },
 ]
 
 const ROLES = ['public', 'anon', 'authenticated', 'service_role']
@@ -84,7 +95,15 @@ describe('tables', () => {
     expect(tables.map((t) => t.relname)).toEqual(
       expect.arrayContaining([
         'account_page_usage',
+        'ai_spend_days',
+        'ai_spend_periods',
+        'ai_spend_reservations',
+        'app_config',
+        'check_results',
+        'document_events',
         'documents',
+        'extraction_fields',
+        'extractions',
         'page_usage',
         'plan_limits',
         'profiles',
