@@ -40,7 +40,9 @@ export default defineConfig({
   projects: [
     { name: 'pause extraction', testMatch: /pause-extraction\.setup\.ts/, teardown: 'resume extraction' },
     { name: 'resume extraction', testMatch: /resume-extraction\.teardown\.ts/ },
-    { name: 'chromium', use: chrome, testIgnore: /extraction\.spec\.ts/, dependencies: ['pause extraction'] },
+    // The demo's sample files, uploaded to the local demo bucket (demo/upload.ts).
+    { name: 'demo files', testMatch: /demo-files\.setup\.ts/ },
+    { name: 'chromium', use: chrome, testIgnore: /extraction\.spec\.ts/, dependencies: ['pause extraction', 'demo files'] },
     { name: 'start extraction', testMatch: /start-extraction\.setup\.ts/, dependencies: ['chromium'] },
     { name: 'extraction', use: chrome, testMatch: /extraction\.spec\.ts/, dependencies: ['start extraction'] },
   ],

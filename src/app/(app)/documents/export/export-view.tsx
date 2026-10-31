@@ -10,28 +10,10 @@ import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { formatTime, isDocType } from '@/lib/documents/review'
 import { DOC_TYPE_LABELS } from '@/lib/documents/upload'
+import { FORMATS, MIME, save } from '@/lib/export/download'
 import { loadApproved, loadExportInput, type ApprovedDocument } from '@/lib/export/load'
 import { exportFileName, type ExportFormat } from '@/lib/export/model'
 import { createClient } from '@/lib/supabase/client'
-
-const FORMATS: { value: ExportFormat; label: string; hint: string }[] = [
-  { value: 'xlsx', label: 'XLSX', hint: 'one file with the sheets Documents and Line items' },
-  { value: 'csv', label: 'CSV', hint: 'a zip of documents.csv and line_items.csv' },
-]
-
-const MIME = { xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', csv: 'application/zip' }
-
-/** Hands the bytes to the browser as a download under the given name. */
-function save(bytes: Uint8Array, name: string, type: string) {
-  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  document.body.append(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 0)
-}
 
 function Step({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (

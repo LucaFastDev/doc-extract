@@ -76,7 +76,17 @@ async function refusal(error: unknown, fallback: string): Promise<string> {
 // as they are made, with the checks re-run in the browser after each; a tick for each failed
 // check; approval through approve-document; reopen, type change and delete. Every read and write
 // is the signed-in member's, through RLS and the review RPCs.
-export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData; amountTolerance: string }) {
+//
+// In demo mode (PRD F13 AC-5, F14 AC-3, F19 AC-7; Lead ruling 3 on #41) the screen shows a sample
+// from the demo bucket and keeps every correction, tick and line change in memory: nothing is
+// sent, so a reload shows the stored result again. It has no delete, approve, reopen, type change
+// or history; in their place is the sample's export.
+export interface DemoMode {
+  /** The export of the sample as currently edited. */
+  renderExport: (rows: ReviewRow[]) => ReactNode
+}
+
+export function ReviewScreen({ initial, amountTolerance, demo }: { initial: ReviewData; amountTolerance: string; demo?: DemoMode }) {
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
   const [data, setData] = useState(initial)
@@ -217,6 +227,10 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
     act(async () => {
       const corrected = correctionFor(row, typed)
       if (corrected === row.corrected_value) return null
+      if (demo) {
+        setRows((r) => applyCorrection(r, row.path, corrected))
+        return null
+      }
       try {
         const { data: saved, error } = await supabase
           .from('extraction_fields')
@@ -246,24 +260,30 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
 
   const addLineAfter = (after: number) =>
     act(async () => {
-      const { error } = await supabase.rpc('add_line_item', { document_id: doc.id, after_position: after })
-      if (error) return refusal(error, 'The line could not be added. Try again.')
+      if (!demo) {
+        const { error } = await supabase.rpc('add_line_item', { document_id: doc.id, after_position: after })
+        if (error) return refusal(error, 'The line could not be added. Try again.')
+      }
       setRows((r) => addLine(r, def!.lineFields, after))
       return null
     })
 
   const removeLine = (index: number) =>
     act(async () => {
-      const { error } = await supabase.rpc('delete_line_item', { document_id: doc.id, line_position: index })
-      if (error) return refusal(error, 'The line could not be deleted. Try again.')
+      if (!demo) {
+        const { error } = await supabase.rpc('delete_line_item', { document_id: doc.id, line_position: index })
+        if (error) return refusal(error, 'The line could not be deleted. Try again.')
+      }
       setRows((r) => deleteLine(r, index))
       return null
     })
 
   const setTicked = (checkId: string, ticked: boolean) =>
     act(async () => {
-      const { error } = await supabase.rpc('set_check_ticked', { document_id: doc.id, check_id: checkId, ticked })
-      if (error) return refusal(error, `${checkId} could not be ticked. Try again.`)
+      if (!demo) {
+        const { error } = await supabase.rpc('set_check_ticked', { document_id: doc.id, check_id: checkId, ticked })
+        if (error) return refusal(error, `${checkId} could not be ticked. Try again.`)
+      }
       setTicks((t) => {
         const next = new Set(t)
         if (ticked) next.add(checkId)
@@ -289,36 +309,41 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
       return null
     })
 
-  const canChangeType = (doc.status === 'needs_review' || doc.status === 'unsupported') && !doc.file_deleted_at
+  const canChangeType = !demo && (doc.status === 'needs_review' || doc.status === 'unsupported') && !doc.file_deleted_at
 
   return (
     <main className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <Link href="/documents" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <Link
+            href={demo ? '/demo' : '/documents'}
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
             <ArrowLeftIcon className="size-4" aria-hidden />
-            Documents
+            {demo ? 'Samples' : 'Documents'}
           </Link>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight [overflow-wrap:anywhere]">{doc.file_name}</h1>
           <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm">
             <Detail term="Type">{doc.doc_type ? (DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type) : 'None'}</Detail>
-            <Detail term="Status">{STATUS_LABELS[doc.status as ListedStatus] ?? doc.status}</Detail>
+            {!demo && <Detail term="Status">{STATUS_LABELS[doc.status as ListedStatus] ?? doc.status}</Detail>}
             {doc.page_count !== null && <Detail term="Pages">{doc.page_count}</Detail>}
           </dl>
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
-          {canChangeType && <ChangeType document={doc} onChanged={() => router.push('/documents')} />}
-          <DeleteDocument
-            document={doc}
-            onDeleted={() => router.push('/documents')}
-            trigger={
-              <Button type="button" variant="outline">
-                <Trash2Icon aria-hidden />
-                Delete
-              </Button>
-            }
-          />
-        </div>
+        {!demo && (
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {canChangeType && <ChangeType document={doc} onChanged={() => router.push('/documents')} />}
+            <DeleteDocument
+              document={doc}
+              onDeleted={() => router.push('/documents')}
+              trigger={
+                <Button type="button" variant="outline">
+                  <Trash2Icon aria-hidden />
+                  Delete
+                </Button>
+              }
+            />
+          </div>
+        )}
       </div>
 
       {doc.status === 'approved' && (
@@ -347,7 +372,12 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
               {doc.file_deleted_at && <>, on {formatTime(doc.file_deleted_at)}</>}. Its fields, checks and history are kept.
             </p>
           ) : (
-            <DocumentViewer storagePath={doc.storage_path} mimeType={doc.mime_type} fileName={doc.file_name} />
+            <DocumentViewer
+              storagePath={doc.storage_path}
+              mimeType={doc.mime_type}
+              fileName={doc.file_name}
+              bucket={demo ? 'demo' : 'documents'}
+            />
           )}
         </div>
 
@@ -371,7 +401,8 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
                   onTick={(id, ticked) => void setTicked(id, ticked)}
                 />
               </HeldBox>
-              {editable && (
+              {demo && demo.renderExport(rows)}
+              {editable && !demo && (
                 <HeldBox held={layout !== null} reorders className="flex flex-col gap-2">
                   <Button type="button" className="self-start" disabled={busy || unticked.length > 0} onClick={() => void approve()}>
                     Approve
@@ -399,7 +430,7 @@ export function ReviewScreen({ initial, amountTolerance }: { initial: ReviewData
               />
             </>
           )}
-          <History data={data} />
+          {!demo && <History data={data} />}
         </div>
       </div>
     </main>
