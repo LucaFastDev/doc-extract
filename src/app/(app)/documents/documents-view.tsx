@@ -314,7 +314,7 @@ export function DocumentsView({
           </p>
         )}
         {spend && (
-          <div aria-label="AI budget" className="grid gap-1">
+          <div role="group" aria-label="AI budget" className="grid gap-1">
             <p className="text-xs text-muted-foreground">{spend.usage}</p>
             {spend.notice && <p className="text-xs font-medium">{spend.notice}</p>}
           </div>
