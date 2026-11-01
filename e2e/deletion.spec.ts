@@ -123,7 +123,7 @@ for (const [width, viewport] of [
 
     test('a very long workspace name stays inside both dialogs', async ({ page, context, baseURL }) => {
       const owner = await createUser()
-      const name = 'Unbroken'.repeat(25)
+      const name = 'Unbroken'.repeat(13).slice(0, 100)
       await personalWorkspace(owner, name)
       await signIn(context, baseURL!, owner)
       await page.goto('/documents')

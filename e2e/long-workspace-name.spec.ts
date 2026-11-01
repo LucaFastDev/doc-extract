@@ -1,11 +1,12 @@
 import { expect, test, type Page } from '@playwright/test'
 import { createUser, signIn, sql } from './support/auth'
-import { personalWorkspace } from './support/workspace'
+import { personalWorkspace, switcher } from './support/workspace'
 
-// Issue #66 criteria 1 and 2: a current workspace named 200 characters with no spaces keeps every
-// signed-in page inside the window, at a phone's width and at a desktop's.
+// Issue #66 criteria 1 and 2: a current workspace named 100 characters, the most it can have (issue
+// #69), with no spaces keeps every signed-in page inside the window, at a phone's width and at a
+// desktop's.
 
-const NAME = 'W'.repeat(200)
+const NAME = 'W'.repeat(100)
 
 const VIEWPORTS = [
   ['phone', { width: 360, height: 740 }],
@@ -74,6 +75,51 @@ for (const [label, viewport] of VIEWPORTS) {
       await expect(page.getByRole('heading', { name: 'Billing' })).toBeVisible()
       await expect(page.getByText('The plan and pages of')).toContainText(NAME)
       await noSideScroll(page)
+    })
+
+    // Issue #69 criterion 6.
+    test('the create form stops at 100 characters and the new workspace shows its full name', async ({ page, context, baseURL }) => {
+      const user = await createUser()
+      await signIn(context, baseURL!, user)
+      await page.goto('/documents')
+
+      await switcher(page).click()
+      await page.getByRole('menuitem', { name: 'Create workspace' }).click()
+      const dialog = page.getByRole('dialog', { name: 'Create workspace' })
+      const field = dialog.getByLabel('Name')
+      await field.click()
+      await page.keyboard.insertText(`${NAME}W`)
+      await expect(field).toHaveValue(NAME)
+      await dialog.getByRole('button', { name: 'Create' }).click()
+
+      await expect(dialog).toBeHidden()
+      await expect(switcher(page)).toHaveAccessibleName(`Workspace: ${NAME}`)
+      await expect(page.getByText('No documents in')).toContainText(NAME)
+      await noSideScroll(page)
+      const rows = await sql(
+        `select 1 from public.workspace_members m join public.workspaces w on w.id = m.workspace_id
+         where m.user_id = $1 and w.name = $2`,
+        [user.id, NAME],
+      )
+      expect(rows).toHaveLength(1)
+    })
+
+    test('the rename form stops at 100 characters too, and the delete dialog’s typed name has no limit', async ({ page, context, baseURL }) => {
+      await signIn(context, baseURL!, await setUp(false))
+      await page.goto('/documents')
+
+      await switcher(page).click()
+      await page.getByRole('menuitem', { name: 'Rename workspace' }).click()
+      const rename = page.getByRole('dialog', { name: 'Rename workspace' })
+      await expect(rename.getByLabel('Name')).toHaveAttribute('maxlength', '100')
+      await page.keyboard.press('Escape')
+      await expect(rename).toBeHidden()
+
+      await switcher(page).click()
+      await page.getByRole('menuitem', { name: 'Delete workspace' }).click()
+      const typed = page.getByRole('dialog', { name: 'Delete workspace' }).getByRole('textbox')
+      await expect(typed).toBeVisible()
+      await expect(typed).not.toHaveAttribute('maxlength')
     })
   })
 }

@@ -47,6 +47,20 @@ describe('workspaces', () => {
     expect(data).toEqual([{ name: 'Acme books' }])
   })
 
+  it('refuses an owner’s rename to 101 characters through the API, and takes 100', async () => {
+    const before = await withDb((db) => db.query('select name from public.workspaces where id = $1', [wsA]))
+    const over = await a.client.from('workspaces').update({ name: 'n'.repeat(101) }).eq('id', wsA).select('name')
+    expect(over.error?.code).toBe('23514')
+    const after = await withDb((db) => db.query('select name from public.workspaces where id = $1', [wsA]))
+    expect(after.rows[0].name).toBe(before.rows[0].name)
+
+    for (const name of ['n'.repeat(100), '😀'.repeat(100)]) {
+      const { data, error } = await a.client.from('workspaces').update({ name }).eq('id', wsA).select('name')
+      expect(error).toBeNull()
+      expect(data).toEqual([{ name }])
+    }
+  })
+
   it('refuses a rename by a member who is not an owner', async () => {
     const { data } = await member.client.from('workspaces').update({ name: 'Taken over' }).eq('id', wsA).select('id')
     expect(data ?? []).toEqual([])
@@ -100,6 +114,28 @@ describe('create_workspace', () => {
     expect(error).not.toBeNull()
     const { data } = await user.client.from('workspaces').select('id')
     expect(data).toHaveLength(1)
+  })
+
+  it('refuses a name over 100 characters after the trim, and creates one of exactly 100', async () => {
+    const user = await signUp()
+    for (const name of ['n'.repeat(101), `  ${'n'.repeat(101)}  `, '😀'.repeat(101)]) {
+      const { error } = await user.client.rpc('create_workspace', { name })
+      expect(error?.code).toBe('22023')
+      expect(error?.message).toBe('a workspace name can have at most 100 characters')
+    }
+    const { data: none } = await user.client.from('workspaces').select('id')
+    expect(none).toHaveLength(1)
+
+    for (const [name, stored] of [
+      ['n'.repeat(100), 'n'.repeat(100)],
+      [`  ${'m'.repeat(100)}  `, 'm'.repeat(100)],
+      ['😀'.repeat(100), '😀'.repeat(100)],
+    ]) {
+      const { data: id, error } = await user.client.rpc('create_workspace', { name })
+      expect(error).toBeNull()
+      const ws = await user.client.from('workspaces').select('name').eq('id', id)
+      expect(ws.data).toEqual([{ name: stored }])
+    }
   })
 
   it('refuses anon', async () => {

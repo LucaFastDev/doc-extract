@@ -303,6 +303,11 @@ removes the file through the Storage API; its database part is `delete_document`
 
 ### 4.2 Tables
 
+`workspaces.name` and `profiles.display_name` are at most 100 characters (a check on `char_length`
+on each), and `create_workspace()` refuses a longer name. The sign-up trigger `handle_new_user()`
+cuts a longer name to its first 100 characters rather than refusing it, so a sign-up never fails
+because of a long name.
+
 **profiles**: one row per auth user, created by the trigger `handle_new_user()` on `auth.users`
 (section 4.1).
 
