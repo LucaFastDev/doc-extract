@@ -122,7 +122,7 @@ export function ExportView({ workspace }: { workspace: { id: string; name: strin
           Documents
         </Link>
         <h1 className="text-2xl font-semibold tracking-tight">Export</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">
           Approved documents of one type in <span className="font-medium text-foreground">{workspace.name}</span>, with
           corrected values where there are any.
         </p>

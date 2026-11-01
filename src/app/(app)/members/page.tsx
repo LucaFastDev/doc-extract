@@ -69,7 +69,7 @@ export default async function MembersPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">Members</h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground [overflow-wrap:anywhere]">
             People in <span className="font-medium text-foreground">{current.name}</span>.
           </p>
         </div>

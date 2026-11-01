@@ -13,6 +13,16 @@ export function isPublicPath(pathname: string): boolean {
   return PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
 }
 
+// The areas of the site that need a session: the signed-in pages, the invitation page and the API.
+// A path in none of these lists and under none of these prefixes is no route of ours, so a
+// signed-out visitor gets the site's 404 page for it instead of sign-in. A new top-level route
+// must be added to one list: a test reads src/app and fails for a route in neither.
+export const PROTECTED_PREFIXES = ['/documents', '/members', '/billing', '/invite', '/api']
+
+export function isProtectedPath(pathname: string): boolean {
+  return PROTECTED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+}
+
 const NEVER_RETURN_TO = ['/sign-in', '/auth/callback']
 
 // A backslash or a control character anywhere in the raw value.

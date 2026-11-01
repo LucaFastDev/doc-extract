@@ -295,7 +295,7 @@ test('an unknown slug and an unpublished sample show the not-found page', async 
   for (const slug of ['no-such-sample', 'invoice-total-mismatch.pdf']) {
     const response = await page.goto(`/demo/${slug}`)
     expect(response?.status()).toBe(404)
-    await expect(page.getByText('This page could not be found.')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()
   }
 
   // An unpublished sample: a row of its own, published = false, removed afterwards.
@@ -309,7 +309,7 @@ test('an unknown slug and an unpublished sample show the not-found page', async 
   try {
     const response = await page.goto(`/demo/${slug}`)
     expect(response?.status()).toBe(404)
-    await expect(page.getByText('This page could not be found.')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()
     await page.goto('/demo')
     await expect(page.getByText('Unpublished')).toHaveCount(0)
   } finally {
