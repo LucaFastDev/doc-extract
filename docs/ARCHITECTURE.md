@@ -720,6 +720,15 @@ that lands on another workspace, a member's, or a bare `?checkout=success`, is t
 no timer and nothing about a payment or about the workspace that paid. A cancelled Checkout returns
 to `/billing`, which runs no timer and shows no message (Lead rulings 6 and 8 on #50).
 
+The router rebuilds the view on in-app Back from its cached page, whose plan can be from before a
+webhook, and with no marker. So whenever the view mounts and is not re-reading, it reads the plan and
+the pages once in the browser, through RLS, with the same read the re-reads use, and shows what comes
+back, whichever way the plan moved. This covers owners and members, with or without a return before
+it. That read starts no timer, shows no "Checking your plan…" and no message, and leaves Upgrade
+enabled; if Upgrade is pressed before it lands, the route's 409 answers. A failed read is logged and
+the page keeps what it shows, with no error message. A return the page acts on makes no such read: its
+re-reads are the only ones (Lead ruling 9 on #50).
+
 `src/lib/supabase/server.ts` throws when `NEXT_PUBLIC_SUPABASE_URL` or
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` is unset, and its service-role client (`createServiceRoleClient`,
 milestone 7) throws when `SUPABASE_SERVICE_ROLE_KEY` is unset.

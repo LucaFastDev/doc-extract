@@ -1,4 +1,4 @@
-import { expect, test, type BrowserContext, type Page } from '@playwright/test'
+import { expect, test, type BrowserContext, type Page, type Route } from '@playwright/test'
 import { createUser, signIn, sql } from './support/auth'
 import { postEvent, postSubscriptionDeleted, postSubscriptionUpdated, setPagesUsed, setPlan, subscriptionFixture } from './support/stripe'
 import { addMember, expectNoSideScroll, personalWorkspace, switcher, useWorkspace } from './support/workspace'
@@ -50,6 +50,19 @@ function countPlanReads(page: Page) {
     if (request.method() === 'GET' && request.url().includes('/rest/v1/workspaces')) reads.count += 1
   })
   return reads
+}
+
+/**
+ * To the Members page through the menu, so Back stays inside the app. The menu can close by itself
+ * when it is clicked straight after a navigation, on any page, so a closed menu is tried again.
+ */
+async function goToMembers(page: Page) {
+  await expect(async () => {
+    await page.keyboard.press('Escape')
+    await switcher(page).click({ timeout: 1_000 })
+    await page.getByRole('menuitem', { name: 'Members' }).click({ timeout: 1_000 })
+  }).toPass()
+  await expect(page.getByRole('heading', { level: 1, name: 'Members' })).toBeVisible()
 }
 
 test.describe('no call reaches Stripe', () => {
@@ -308,10 +321,12 @@ test.describe('no call reaches Stripe', () => {
         await expect(figure(page, 'Current plan')).toHaveText('Free')
         await expect(page.getByRole('button', { name: 'Upgrade' })).toBeEnabled()
 
+        await expect.poll(() => reads.count).toBe(1)
+
         await page.clock.runFor(30_000)
 
         await expect(page.getByText(STILL_FREE)).toHaveCount(0)
-        expect(reads.count).toBe(0)
+        expect(reads.count).toBe(1)
       })
 
       test('returning from Checkout already on Pro runs no timer', async ({ page, context, baseURL }) => {
@@ -323,11 +338,12 @@ test.describe('no call reaches Stripe', () => {
         await page.clock.install()
         await page.goto(`/billing?checkout=success&workspace=${ws}`)
         await expect(figure(page, 'Current plan')).toHaveText('Pro')
+        await expect.poll(() => reads.count).toBe(1)
 
         await page.clock.runFor(30_000)
 
         await expect(page.getByText(STILL_FREE)).toHaveCount(0)
-        expect(reads.count).toBe(0)
+        expect(reads.count).toBe(1)
       })
 
       test('a reload after returning from Checkout does not start the re-reads again', async ({ page, context, baseURL }) => {
@@ -347,12 +363,13 @@ test.describe('no call reaches Stripe', () => {
         await expect(figure(page, 'Current plan')).toHaveText('Free')
         await expect(page).toHaveURL(/\/billing$/)
         await expect(page.getByText(CHECKING)).toHaveCount(0)
+        await expect.poll(() => reads.count).toBe(1)
 
         await page.clock.runFor(30_000)
 
         await expect(page.getByText(CHECKING)).toHaveCount(0)
         await expect(page.getByText(STILL_FREE)).toHaveCount(0)
-        expect(reads.count).toBe(0)
+        expect(reads.count).toBe(1)
       }
 
       test('a return naming another workspace is the plain page, and says nothing about the one that paid', async ({ page, context, baseURL, request }) => {
@@ -399,6 +416,139 @@ test.describe('no call reaches Stripe', () => {
 
         await expect(page.getByRole('button', { name: 'Upgrade' })).toHaveCount(0)
       })
+
+      // Lead ruling 9 on #50: the view reads the plan and the pages once when it mounts and is not
+      // re-reading, and shows what that read returns.
+      test('Back shows the plan as it is now, whichever way it moved', async ({ page, context, baseURL, request }) => {
+        const owner = await createUser('Olivia Owner')
+        const ws = await personalWorkspace(owner, 'Acme books')
+        await setPagesUsed(ws, 25)
+        await signIn(context, baseURL!, owner)
+        await page.goto('/billing')
+        await expectPlan(page, 'Free', '25', '0 of 20')
+
+        await goToMembers(page)
+        expect((await postSubscriptionUpdated(request, { ws })).status()).toBe(200)
+        await page.goBack()
+        await expectPlan(page, 'Pro', '25', '475 of 500')
+        await expect(page.getByRole('button', { name: 'Manage or cancel' })).toBeVisible()
+        await expect(page.getByRole('button', { name: 'Upgrade' })).toHaveCount(0)
+
+        await goToMembers(page)
+        expect((await postSubscriptionDeleted(request, { ws })).status()).toBe(200)
+        await page.goBack()
+        await expectPlan(page, 'Free', '25', '0 of 20')
+        await expect(page.getByRole('button', { name: 'Upgrade' })).toBeEnabled()
+        await expect(page.getByRole('button', { name: 'Manage or cancel' })).toHaveCount(0)
+      })
+
+      test('Back shows a member the plan as it is now, with neither button', async ({ page, context, baseURL, request }) => {
+        const owner = await createUser('Olivia Owner')
+        const ws = await personalWorkspace(owner, 'Acme books')
+        const member = await createUser('Mia Member')
+        await addMember(ws, member, 'member')
+        await signIn(context, baseURL!, member)
+        await useWorkspace(context, baseURL!, ws)
+        await page.goto('/billing')
+        await expectPlan(page, 'Free', '0', '20 of 20')
+
+        await goToMembers(page)
+        expect((await postSubscriptionUpdated(request, { ws })).status()).toBe(200)
+        await page.goBack()
+
+        await expectPlan(page, 'Pro', '0', '500 of 500')
+        await expect(page.getByRole('button', { name: 'Upgrade' })).toHaveCount(0)
+        await expect(page.getByRole('button', { name: 'Manage or cancel' })).toHaveCount(0)
+      })
+
+      test('Back after a return reads once, with no timer and nothing about a payment', async ({ page, context, baseURL }) => {
+        const owner = await createUser('Olivia Owner')
+        const ws = await personalWorkspace(owner, 'Acme books')
+        const reads = countPlanReads(page)
+        await signIn(context, baseURL!, owner)
+        await page.goto(`/billing?checkout=success&workspace=${ws}`)
+        await expect(page).toHaveURL(/\/billing$/)
+        await expect(page.getByText(CHECKING)).toBeVisible()
+
+        await goToMembers(page)
+        reads.count = 0
+        await page.goBack()
+
+        await expect(figure(page, 'Current plan')).toHaveText('Free')
+        await expect.poll(() => reads.count).toBe(1)
+        await page.waitForTimeout(2_500)
+        expect(reads.count).toBe(1)
+        await expect(page.getByText(CHECKING)).toHaveCount(0)
+        await expect(page.getByText(STILL_FREE)).toHaveCount(0)
+        await expect(page.getByRole('button', { name: 'Upgrade' })).toBeEnabled()
+      })
+
+      test('while the read on mount is on its way, Upgrade stays enabled and the page says nothing of it', async ({ page, context, baseURL, request }) => {
+        const owner = await createUser('Olivia Owner')
+        const ws = await personalWorkspace(owner, 'Acme books')
+        let release = () => {}
+        const held = new Promise<void>((resolve) => {
+          release = resolve
+        })
+        const reads = countPlanReads(page)
+        await page.route('**/rest/v1/workspaces*', async (route) => {
+          await held
+          await route.continue()
+        })
+        await signIn(context, baseURL!, owner)
+        await page.goto('/billing')
+        await expect.poll(() => reads.count).toBe(1)
+
+        await expect(figure(page, 'Current plan')).toHaveText('Free')
+        await expect(page.getByRole('button', { name: 'Upgrade' })).toBeEnabled()
+        await expect(page.getByText(CHECKING)).toHaveCount(0)
+        await expect(page.getByText(STILL_FREE)).toHaveCount(0)
+
+        expect((await postSubscriptionUpdated(request, { ws })).status()).toBe(200)
+        release()
+
+        await expect(figure(page, 'Current plan')).toHaveText('Pro')
+        await expect(page.getByRole('button', { name: 'Manage or cancel' })).toBeVisible()
+      })
+
+      for (const failure of [
+        {
+          name: 'the pages cannot be read',
+          url: '**/rest/v1/rpc/get_page_allowance*',
+          fail: (route: Route) => route.fulfill({ status: 500, json: { message: 'read failed' } }),
+        },
+        {
+          name: 'the network is gone',
+          url: '**/rest/v1/workspaces*',
+          fail: (route: Route) => route.abort(),
+        },
+      ]) {
+        test(`a failed read leaves the page as it is, with no error message, when ${failure.name}`, async ({ page, context, baseURL, request }) => {
+          const owner = await createUser('Olivia Owner')
+          const ws = await personalWorkspace(owner, 'Acme books')
+          await setPagesUsed(ws, 25)
+          const logged: string[] = []
+          page.on('console', (message) => {
+            if (message.type() === 'error') logged.push(message.text())
+          })
+          await signIn(context, baseURL!, owner)
+          await page.goto('/billing')
+          await expectPlan(page, 'Free', '25', '0 of 20')
+
+          await goToMembers(page)
+          expect((await postSubscriptionUpdated(request, { ws })).status()).toBe(200)
+          await page.route(failure.url, failure.fail)
+          await page.goBack()
+
+          // The Supabase client backs off and retries a read the network dropped, for 7 seconds.
+          await expect.poll(() => logged.filter((text) => text.includes('The plan could not be read.')).length, { timeout: 15_000 }).toBe(1)
+          await expectPlan(page, 'Free', '25', '0 of 20')
+          await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0)
+          await expect(page.getByText(CHECKING)).toHaveCount(0)
+          await expect(page.getByText(STILL_FREE)).toHaveCount(0)
+          await expect(page.getByRole('button', { name: 'Upgrade' })).toBeEnabled()
+        })
+      }
 
       test('the signed-in navigation opens the page for an owner and a member', async ({ page, context, baseURL }) => {
         const owner = await createUser('Olivia Owner')
