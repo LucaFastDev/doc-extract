@@ -11,7 +11,8 @@ export type PortalStripe = Pick<Stripe, 'billingPortal'>
 
 export interface CheckoutSettings {
   priceId: string
-  successUrl: string
+  /** Names the workspace going to Checkout, so its return can be told apart (Lead ruling 8 on #50). */
+  successUrl: (workspaceId: string) => string
   cancelUrl: string
 }
 
@@ -69,7 +70,7 @@ export async function createCheckout(
       ...(workspace.stripe_customer_id ? { customer: workspace.stripe_customer_id } : {}),
       metadata,
       subscription_data: { metadata },
-      success_url: successUrl,
+      success_url: successUrl(workspace.id),
       cancel_url: cancelUrl,
     })
     if (!session.url) throw new Error('Stripe returned a Checkout session with no URL.')
