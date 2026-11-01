@@ -17,13 +17,13 @@ for (const [label, viewport] of [
       expect(new URL(page.url()).pathname).toBe('/this-does-not-exist')
       await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()
       await expect(page.getByText('This page does not exist or has moved.')).toBeVisible()
-      await page.getByRole('link', { name: 'Go to the home page' }).click()
-      await expect(page).toHaveURL((url) => url.pathname === '/')
       const scroll = await page.evaluate(() => ({
         scrollWidth: document.documentElement.scrollWidth,
         clientWidth: document.documentElement.clientWidth,
       }))
       expect(scroll.scrollWidth).toBeLessThanOrEqual(scroll.clientWidth)
+      await page.getByRole('link', { name: 'Go to the home page' }).click()
+      await expect(page).toHaveURL((url) => url.pathname === '/')
     })
   })
 }
