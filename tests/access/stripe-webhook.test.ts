@@ -406,46 +406,132 @@ describe('events out of order (issue 73)', () => {
       })
     })
 
-    it.each([
-      ['null', null],
-      ['a different id', 'sub_older'],
-    ])('with an active retrieved status writes Pro and the new subscription when the workspace holds %s', async (_name, held) => {
+    it('writes every column from the retrieved subscription, not the event’s copy: status, customer, period end and set-to-end all differ', async () => {
       const ws = await newWorkspace()
-      await setWorkspace(ws, { stripe_subscription_id: held })
-      const sub = subscription({ metadata: { workspace_id: ws } })
+      const retrievedEnd = 1_900_000_000
+      const retrieved = subscription({
+        status: 'active',
+        cancel_at_period_end: true,
+        metadata: { workspace_id: ws },
+        items: { object: 'list', data: [{ id: 'si_1', current_period_end: retrievedEnd }] },
+      })
+      const stale = {
+        ...retrieved,
+        status: 'incomplete',
+        customer: `cus_${randomUUID()}`,
+        cancel_at_period_end: false,
+        items: { object: 'list', data: [{ id: 'si_1', current_period_end: 1_800_000_000 }] },
+      }
+      await setWorkspace(ws, { plan: 'pro', stripe_subscription_id: retrieved.id })
 
-      expect((await deliver(event('customer.subscription.updated', sub), retrieving(sub).stripe)).status).toBe(200)
+      expect((await deliver(event('customer.subscription.updated', stale), retrieving(retrieved).stripe)).status).toBe(200)
 
       expect(await workspace(ws)).toEqual({
         plan: 'pro',
-        stripe_customer_id: sub.customer,
-        stripe_subscription_id: sub.id,
+        stripe_customer_id: retrieved.customer,
+        stripe_subscription_id: retrieved.id,
+        plan_period_end: new Date(retrievedEnd * 1000),
+        plan_cancel_at_period_end: true,
+      })
+    })
+
+    it.each(
+      (['active', 'past_due'] as const).flatMap((status) => [
+        [status, 'null', null] as const,
+        [status, 'a different id', 'sub_older'] as const,
+      ]),
+    )('with a retrieved status of %s writes Pro and the new subscription when the workspace holds %s, whatever the event’s copy says', async (status, _name, held) => {
+      const ws = await newWorkspace()
+      await setWorkspace(ws, { stripe_subscription_id: held })
+      const retrieved = subscription({ status, metadata: { workspace_id: ws } })
+      const copy = { ...retrieved, status: 'incomplete' }
+
+      expect((await deliver(event('customer.subscription.updated', copy), retrieving(retrieved).stripe)).status).toBe(200)
+
+      expect(await workspace(ws)).toEqual({
+        plan: 'pro',
+        stripe_customer_id: retrieved.customer,
+        stripe_subscription_id: retrieved.id,
         plan_period_end: new Date(PERIOD_END_ISO),
         plan_cancel_at_period_end: false,
       })
     })
 
-    it('arriving before checkout.session.completed for a new subscription makes the workspace Pro with the new id', async () => {
+    it('arriving before checkout.session.completed for a new subscription makes the workspace Pro with the new id, whatever the event’s copy says', async () => {
       const ws = await newWorkspace()
-      const sub = subscription({ metadata: { workspace_id: ws } })
-      expect((await deliver(event('customer.subscription.updated', sub), retrieving(sub).stripe)).status).toBe(200)
-      expect(await workspace(ws)).toMatchObject({ plan: 'pro', stripe_subscription_id: sub.id })
+      const retrieved = subscription({ metadata: { workspace_id: ws } })
+      const copy = { ...retrieved, status: 'incomplete' }
+      expect((await deliver(event('customer.subscription.updated', copy), retrieving(retrieved).stripe)).status).toBe(200)
+      expect(await workspace(ws)).toMatchObject({ plan: 'pro', stripe_subscription_id: retrieved.id })
     })
 
-    it('with a retrieved status of unpaid and the id the workspace holds makes it Free, as today', async () => {
+    it('with a retrieved status of unpaid and the id the workspace holds makes it Free, whatever the event’s copy says', async () => {
       const ws = await newWorkspace()
-      const sub = subscription({ status: 'unpaid', metadata: { workspace_id: ws } })
-      await setWorkspace(ws, { plan: 'pro', stripe_subscription_id: sub.id })
+      const retrieved = subscription({ status: 'unpaid', metadata: { workspace_id: ws } })
+      const copy = { ...retrieved, status: 'active' }
+      await setWorkspace(ws, { plan: 'pro', stripe_subscription_id: retrieved.id })
 
-      expect((await deliver(event('customer.subscription.updated', sub), retrieving(sub).stripe)).status).toBe(200)
+      expect((await deliver(event('customer.subscription.updated', copy), retrieving(retrieved).stripe)).status).toBe(200)
 
       expect(await workspace(ws)).toEqual({
         plan: 'free',
-        stripe_customer_id: sub.customer,
-        stripe_subscription_id: sub.id,
+        stripe_customer_id: retrieved.customer,
+        stripe_subscription_id: retrieved.id,
         plan_period_end: new Date(PERIOD_END_ISO),
         plan_cancel_at_period_end: false,
       })
+    })
+
+    it('finds the workspace from the retrieved subscription: the event’s copy names A, the retrieved one names B, and only B changes', async () => {
+      const a = await newWorkspace()
+      const b = await newWorkspace()
+      const customerA = `cus_${randomUUID()}`
+      await setWorkspace(a, { stripe_customer_id: customerA })
+      const beforeA = await workspace(a)
+      const retrieved = subscription({ metadata: { workspace_id: b } })
+      const copy = { ...retrieved, customer: customerA, metadata: { workspace_id: a } }
+
+      expect((await deliver(event('customer.subscription.updated', copy), retrieving(retrieved).stripe)).status).toBe(200)
+
+      expect(await workspace(b)).toMatchObject({ plan: 'pro', stripe_subscription_id: retrieved.id })
+      expect(await workspace(a)).toEqual(beforeA)
+    })
+
+    it('finds the workspace from the retrieved subscription by customer too: the event’s copy names A, the retrieved one names B', async () => {
+      const a = await newWorkspace()
+      const b = await newWorkspace()
+      const customerA = `cus_${randomUUID()}`
+      const customerB = `cus_${randomUUID()}`
+      await setWorkspace(a, { stripe_customer_id: customerA })
+      await setWorkspace(b, { stripe_customer_id: customerB })
+      const beforeA = await workspace(a)
+      const retrieved = subscription({ customer: customerB })
+      const copy = { ...retrieved, customer: customerA }
+
+      expect((await deliver(event('customer.subscription.updated', copy), retrieving(retrieved).stripe)).status).toBe(200)
+
+      expect(await workspace(b)).toMatchObject({ plan: 'pro', stripe_subscription_id: retrieved.id })
+      expect(await workspace(a)).toEqual(beforeA)
+    })
+
+    it('answers 200, logs that no workspace is known and changes nothing when the event’s copy names a workspace and the retrieved subscription names none', async () => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const a = await newWorkspace()
+      const customerA = `cus_${randomUUID()}`
+      await setWorkspace(a, { stripe_customer_id: customerA })
+      const beforeA = await workspace(a)
+      const retrieved = subscription()
+      const copy = { ...retrieved, customer: customerA, metadata: { workspace_id: a } }
+      const body = event('customer.subscription.updated', copy)
+
+      expect((await deliver(body, retrieving(retrieved).stripe)).status).toBe(200)
+
+      expect(error).toHaveBeenCalledTimes(1)
+      const line = String(error.mock.calls[0].join(' '))
+      expect(line).toContain(body.id)
+      expect(line).toContain('names no known workspace')
+      expect(await workspace(a)).toEqual(beforeA)
+      expect((await eventRow(body.id)).processed_at).not.toBeNull()
     })
 
     it.each([
