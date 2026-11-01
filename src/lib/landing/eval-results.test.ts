@@ -66,9 +66,10 @@ describe('accuracyTables', () => {
     expect(table.rows[0]).toMatchObject({ header: '50%', lineItems: '–' })
   })
 
-  it('gives no table for no files, and skips a file that is not a results file', () => {
+  it('gives no table for no files, and fails on a value that is not a results file', () => {
     expect(accuracyTables([])).toEqual([])
-    expect(accuracyTables([{ date: '2026-11-04' }, 'nonsense', null])).toEqual([])
+    expect(() => accuracyTables([{ date: '2026-11-04' }])).toThrow('shape')
+    expect(() => accuracyTables(['nonsense'])).toThrow('shape')
   })
 })
 
@@ -80,9 +81,14 @@ describe('readEvalResults', () => {
     dir = mkdtempSync(join(tmpdir(), 'eval-results-'))
     writeFileSync(join(dir, '2026-11-04-claude-sonnet-5-5.json'), JSON.stringify(resultsFile('claude-sonnet-5-5', '2026-11-04', 0.9, 0.9)))
     writeFileSync(join(dir, '.gitkeep'), '')
-    writeFileSync(join(dir, 'broken.json'), '{ not json')
     const tables = accuracyTables(readEvalResults(dir))
     expect(tables.map((t) => t.model)).toEqual(['claude-sonnet-5-5'])
+  })
+
+  it('fails, naming the file, when a .json file is not JSON', () => {
+    dir = mkdtempSync(join(tmpdir(), 'eval-results-'))
+    writeFileSync(join(dir, 'broken.json'), '{ not json')
+    expect(() => readEvalResults(dir)).toThrow('broken.json')
   })
 
   it('gives no files for an empty or missing folder', () => {

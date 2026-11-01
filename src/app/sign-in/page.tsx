@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { safeNextPath } from '@/lib/auth/paths'
@@ -41,6 +42,14 @@ export default async function SignInPage({
           <GoogleSignInButton next={next} />
         </CardContent>
       </Card>
+      <nav aria-label="About" className="mt-4 flex justify-center gap-6 text-sm text-muted-foreground">
+        <Link href="/privacy" className="underline-offset-4 hover:underline">
+          Privacy
+        </Link>
+        <Link href="/terms" className="underline-offset-4 hover:underline">
+          Terms
+        </Link>
+      </nav>
     </main>
   )
 }
