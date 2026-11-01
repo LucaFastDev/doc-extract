@@ -20,3 +20,13 @@ function siteUrl(): URL {
 export function inviteUrl(token: string): string {
   return new URL(`/invite/${encodeURIComponent(token)}`, siteUrl()).toString()
 }
+
+/**
+ * The billing page, where Checkout and the customer portal return to (Lead ruling 6 on #50). Only a
+ * completed Checkout carries `?checkout=success`, which starts the page's re-reads of the plan.
+ */
+export function billingUrl(checkout?: 'success'): string {
+  const url = new URL('/billing', siteUrl())
+  if (checkout) url.searchParams.set('checkout', checkout)
+  return url.toString()
+}
