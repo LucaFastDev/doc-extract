@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page, type Route } from '@playwright/test'
 import { adminClient, apiUrl, createUser, signIn, sql, type TestUser } from './support/auth'
 import { pngFile } from './support/files'
 import { check, expectNoSideScroll, seedDocument } from './support/review'
@@ -137,6 +137,57 @@ test.describe('the AI budget line', () => {
   })
 })
 
+// Lead ruling 1 and 6 on #48: a budget fetch that fails hides the line, logs the error, and leaves
+// the rest of the list alone. These do not read the spend, so they need not run serially.
+test.describe('a failed budget fetch', () => {
+  const BUDGET = '**/rest/v1/rpc/get_budget_status'
+  const unavailable = (route: Route) => route.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"unavailable"}' })
+
+  function logErrors(page: Page) {
+    const errors: string[] = []
+    page.on('console', (message) => {
+      if (message.type() === 'error') errors.push(message.text())
+    })
+    return errors
+  }
+
+  test('on the first load shows no line, logs the error and still lists the documents', async ({ page, context, baseURL }) => {
+    const errors = logErrors(page)
+    const user = await createUser()
+    const name = `Listed ${randomUUID().slice(0, 6)}.png`
+    await queuedDocument(user, name)
+    await page.route(BUDGET, unavailable)
+    await signIn(context, baseURL!, user)
+    await page.goto('/documents')
+
+    await expect(page.getByText(name)).toBeVisible()
+    await expect.poll(() => errors.some((e) => e.includes('The AI budget could not be loaded.'))).toBe(true)
+    await expect(page.getByLabel('AI budget')).toHaveCount(0)
+    await expectNoSideScroll(page)
+  })
+
+  test('on the refetch after a Realtime status change hides the line that was showing', async ({ page, context, baseURL }) => {
+    const user = await createUser()
+    const id = await queuedDocument(user, `Refetch ${randomUUID().slice(0, 6)}.png`)
+    let failing = false
+    let failed = 0
+    await page.route(BUDGET, (route) => {
+      if (!failing) return route.continue()
+      failed++
+      return unavailable(route)
+    })
+    await signIn(context, baseURL!, user)
+    await page.goto('/documents')
+    await expect(page.getByTestId('live-status')).toHaveAttribute('data-state', 'subscribed')
+    await expect(page.getByLabel('AI budget')).toBeVisible()
+
+    failing = true
+    await sql("update public.documents set status = 'needs_review' where id = $1", [id])
+    await expect.poll(() => failed).toBeGreaterThanOrEqual(1)
+    await expect(page.getByLabel('AI budget')).toHaveCount(0)
+  })
+})
+
 test('anonymous visitors and the demo never ask for the budget', async ({ page, context, baseURL }) => {
   const asked: string[] = []
   page.on('request', (request) => {
@@ -173,7 +224,7 @@ for (const { name, viewport } of VIEWPORTS) {
 
       const purge = await runPurge()
       expect(purge.status).toBe(200)
-      expect(purge.body.files_removed).toBeGreaterThanOrEqual(1)
+      // Not a count: a run acts on every document, so a parallel run may have taken this one.
       const [doc] = await sql<{ deleted: boolean }>('select file_deleted_at is not null as deleted from public.documents where id = $1', [id])
       expect(doc.deleted).toBe(true)
       expect(await sql("select 1 from storage.objects where bucket_id = 'documents' and name = $1", [path])).toEqual([])
