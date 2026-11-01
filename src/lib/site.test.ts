@@ -7,8 +7,8 @@ describe('billingUrl', () => {
   })
 
   it('builds the billing page, with no marker, from SITE_URL', () => {
-    vi.stubEnv('SITE_URL', 'https://doc-extract.vercel.app/')
-    expect(billingUrl()).toBe('https://doc-extract.vercel.app/billing')
+    vi.stubEnv('SITE_URL', 'https://site.test/')
+    expect(billingUrl()).toBe('https://site.test/billing')
   })
 
   it('throws when SITE_URL is unset', () => {
@@ -23,9 +23,9 @@ describe('checkoutSuccessUrl', () => {
   })
 
   it('builds the return from a completed Checkout from SITE_URL, naming the workspace', () => {
-    vi.stubEnv('SITE_URL', 'https://doc-extract.vercel.app/')
+    vi.stubEnv('SITE_URL', 'https://site.test/')
     expect(checkoutSuccessUrl('11111111-2222-3333-4444-555555555555')).toBe(
-      'https://doc-extract.vercel.app/billing?checkout=success&workspace=11111111-2222-3333-4444-555555555555',
+      'https://site.test/billing?checkout=success&workspace=11111111-2222-3333-4444-555555555555',
     )
   })
 
@@ -41,18 +41,18 @@ describe('inviteUrl', () => {
   })
 
   it('builds <site>/invite/<token> from SITE_URL', () => {
-    vi.stubEnv('SITE_URL', 'https://doc-extract.vercel.app')
-    expect(inviteUrl('ab12')).toBe('https://doc-extract.vercel.app/invite/ab12')
+    vi.stubEnv('SITE_URL', 'https://site.test')
+    expect(inviteUrl('ab12')).toBe('https://site.test/invite/ab12')
   })
 
   it('ignores a trailing slash or a path on SITE_URL', () => {
-    vi.stubEnv('SITE_URL', 'https://doc-extract.vercel.app/some/path/')
-    expect(inviteUrl('ab12')).toBe('https://doc-extract.vercel.app/invite/ab12')
+    vi.stubEnv('SITE_URL', 'https://site.test/some/path/')
+    expect(inviteUrl('ab12')).toBe('https://site.test/invite/ab12')
   })
 
   it.each([
     ['unset', ''],
-    ['not a URL', 'doc-extract.vercel.app'],
+    ['not a URL', 'site.test'],
     ['not http', 'javascript:alert(1)'],
   ])('throws when SITE_URL is %s', (_name, value) => {
     vi.stubEnv('SITE_URL', value)

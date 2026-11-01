@@ -726,8 +726,9 @@ the pages once in the browser, through RLS, with the same read the re-reads use,
 back, whichever way the plan moved. This covers owners and members, with or without a return before
 it. That read starts no timer, shows no "Checking your plan…" and no message, and leaves Upgrade
 enabled; if Upgrade is pressed before it lands, the route's 409 answers. A failed read is logged and
-the page keeps what it shows, with no error message. A return the page acts on makes no such read: its
-re-reads are the only ones (Lead ruling 9 on #50).
+the page keeps what it shows, with no error message. A return the page acts on that finds the workspace
+on Free makes no such read: its re-reads are the only ones. One that finds it already on Pro starts no
+re-reads, so it makes this one read (Lead ruling 9 and choice 23 on #50).
 
 `src/lib/supabase/server.ts` throws when `NEXT_PUBLIC_SUPABASE_URL` or
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` is unset, and its service-role client (`createServiceRoleClient`,
