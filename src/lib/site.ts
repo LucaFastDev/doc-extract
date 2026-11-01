@@ -20,3 +20,19 @@ function siteUrl(): URL {
 export function inviteUrl(token: string): string {
   return new URL(`/invite/${encodeURIComponent(token)}`, siteUrl()).toString()
 }
+
+/** The billing page, where a cancelled Checkout and the customer portal return to (Lead ruling 6 on #50). */
+export function billingUrl(): string {
+  return new URL('/billing', siteUrl()).toString()
+}
+
+/**
+ * Where a completed Checkout returns to: the billing page, naming the workspace that went to Checkout
+ * (Lead ruling 8 on #50). The page acts on it only for that workspace and only for an owner of it.
+ */
+export function checkoutSuccessUrl(workspaceId: string): string {
+  const url = new URL('/billing', siteUrl())
+  url.searchParams.set('checkout', 'success')
+  url.searchParams.set('workspace', workspaceId)
+  return url.toString()
+}

@@ -177,7 +177,10 @@ src/
   lib/supabase/server.ts       the server client (createServerClient + cookies) and the service-role
                                client; `import 'server-only'`; throws if unset
   lib/supabase/proxy.ts        the proxy's session refresh (request and response cookies); throws if unset
-  lib/stripe.ts                server-only Stripe client; throws unless the key starts with sk_test_
+  instrumentation.ts           at server start, throws when STRIPE_SECRET_KEY is set and not sk_test_
+  lib/stripe.ts                the only Stripe client, server-only; throws unless the key starts with sk_test_
+  lib/stripe-key.ts            the one check of a key's value, used by both of the above
+  lib/billing/                 checkout, portal and webhook logic behind the route handlers; the plan shown on the page
   features/…                   upload, documents, review, export, billing, workspace, demo
 shared/doctypes/               one module per type (invoice, receipt, bank-statement, purchase-order,
                                delivery-note, quote): field set, record_<type> tool and its JSON
@@ -321,6 +324,7 @@ of `display_name` where `id = auth.uid()` (column grant). No insert or delete by
 | stripe_customer_id | text unique |
 | stripe_subscription_id | text |
 | plan_period_end | timestamptz |
+| plan_cancel_at_period_end | boolean not null default false: the subscription is set to end at `plan_period_end` rather than renew, so the billing page can say when without calling Stripe (milestone 9) |
 | created_by | uuid references profiles on delete set null |
 | created_at | timestamptz |
 
@@ -577,9 +581,12 @@ budget only through `rpc get_budget_status()` (section 4.1).
 |---|---|
 | id | text PK (Stripe event id) |
 | type | text |
-| received_at, processed_at | timestamptz |
+| received_at | timestamptz not null default now() |
+| processed_at | timestamptz |
 
-RLS: enabled, no client grants.
+An event counts as a duplicate only when its row has `processed_at` set; a row without it is an event
+whose processing failed, which is processed when Stripe sends it again (section 6.2, Lead ruling 3 on
+#50). RLS: enabled, no policy and no client grants; only the webhook's service-role client uses it.
 
 **demo_documents**
 
@@ -666,9 +673,9 @@ All run on the Node.js runtime and are short; none calls Claude.
 | Route | Caller | Auth | Does |
 |---|---|---|---|
 | `GET /auth/callback` | Google, through Supabase Auth | OAuth code (PKCE) | `exchangeCodeForSession`, which sets the session cookie; redirects to `next` if it is a path on this site, else to the document list (OQ-34). |
-| `POST /api/billing/checkout` | browser | session cookie | Server client; checks `is_owner` (OQ-20); creates a Stripe Checkout session in subscription mode for `STRIPE_PRICE_PRO`, with no trial (OQ-24), the workspace id as metadata; returns its URL. |
-| `POST /api/billing/portal` | browser | session cookie | Checks `is_owner`; creates a customer portal session; returns its URL (OQ-37). |
-| `POST /api/stripe/webhook` | Stripe | Stripe signature, no session | Reads the raw body (`request.text()`), verifies it with `stripe.webhooks.constructEvent` and `STRIPE_WEBHOOK_SECRET`; inserts the event id into `stripe_events` with the service-role client (a duplicate is acknowledged and skipped); on `checkout.session.completed` and `customer.subscription.updated` sets the workspace's plan, customer, subscription and period end; on `customer.subscription.deleted`, which Stripe sends at the end of a cancelled period, sets the plan to `free` (OQ-24, OQ-37). |
+| `POST /api/billing/checkout` | browser, with `{ workspaceId }` in the body | session cookie | `src/lib/billing/sessions.ts`. Server client; 401 with no session; checks `is_owner` (OQ-20), 403 otherwise, a body naming no workspace included; 409 to a workspace already on Pro. Creates a Stripe Checkout session in subscription mode for `STRIPE_PRICE_PRO`, with no trial (OQ-24), the workspace id in the metadata of both the session and the subscription, the workspace's `stripe_customer_id` when it has one, and success and cancel URLs from `SITE_URL` back to the billing page, the success URL naming the workspace (Lead rulings 2, 6 and 8 on #50); returns its URL. |
+| `POST /api/billing/portal` | browser, with `{ workspaceId }` in the body | session cookie | Same file and the same 401 and 403; 409 to a workspace with no Stripe customer. Creates a customer portal session returning to the billing page; returns its URL (OQ-37). |
+| `POST /api/stripe/webhook` | Stripe | Stripe signature, no session | `src/lib/billing/webhook.ts`. Reads the raw body (`request.text()`), verifies it with `Stripe.webhooks.constructEvent` and `STRIPE_WEBHOOK_SECRET`, answering 400 and changing nothing to a missing or wrong signature. With the service-role client: inserts the event into `stripe_events` on first sight; an event whose row has `processed_at` set is acknowledged and skipped; processes it; then sets `processed_at`. A processing failure answers 500 and leaves `processed_at` null, so Stripe's retry processes it (Lead ruling 3 on #50). `checkout.session.completed` reads the workspace from the session's metadata and the period end from the subscription, which it retrieves from Stripe, and sets `pro`, customer, subscription, period end and whether the subscription is set to end. `customer.subscription.updated` reads the workspace from the subscription's metadata, or else by `stripe_customer_id`, and sets the same columns: status `active` or `past_due` means `pro`, any other `free`. `customer.subscription.deleted`, which Stripe sends at the end of a cancelled period, finds the workspace the same way and always sets `free`, clearing the subscription and the period end and keeping the customer (rulings 2 and 4; OQ-24, OQ-37). An event naming no known workspace is logged as an error and answered 200, changing nothing; any other type is acknowledged with 200. |
 | `DELETE /api/documents/[id]` | browser, after the user confirms (PRD US-19.1) | session cookie | `src/lib/documents/delete.ts`. A caller with no session gets 401. Reads the document with the server client, as the caller, so RLS returns it only to a member of its workspace; otherwise 404, and nothing changes. Checks `is_member(workspace_id)`; any member, owner or member, may delete any document of the workspace (OQ-20). With the service-role client: unless `file_deleted_at` is set, removes the object at `storage_path` in `documents` through the Storage API (an object already gone counts as removed); then `rpc delete_document(id)`, which in one transaction locks the row `for update`, calls `release_pages` if the status is `queued`, `waiting_budget` or `processing` (pages held, not yet used, PRD US-19.1 AC-5), and deletes the row, which cascades to its fields, check results, ticks, history and extractions. Pages already counted stay in `page_usage` and `account_page_usage`, which are not keyed by document, so they are not refunded (PRD US-19.1 AC-4); spend already recorded in `ai_spend_periods` and `ai_spend_days` stays too, and `ai_spend_reservations.document_id` and a later document's `duplicate_of` become null. If removing the file fails, it stops before deleting the row and returns 500, so it is safe to run again. Returns 204. |
 | `DELETE /api/workspaces/[id]` | browser | session cookie | Checks `is_owner`. With the service-role client: cancels an active subscription at once in Stripe; removes every object under `{id}/` in `documents` through the Storage API, in batches of 100; then deletes the `workspaces` row, which cascades. If removing files fails, it stops before deleting the row and returns 500, so it is safe to run again (OQ-17, OQ-30). |
 | `DELETE /api/account` | browser | session cookie | Refuses with 409 while the caller is the only owner of a workspace that has other members (OQ-20). Deletes, as above, every workspace where the caller is the only member; then `auth.admin.deleteUser(caller)`, which cascades to `profiles`, memberships and `account_page_usage`, and sets the caller's audit columns elsewhere to null (OQ-30). |
@@ -688,8 +695,42 @@ The current workspace is a `workspace` cookie holding its id, set by the switche
 against the user's memberships on every use and falls back to the personal workspace (the first
 one joined); it only chooses what to show and is never trusted for access, which RLS decides.
 
-`src/lib/stripe.ts` throws if `STRIPE_SECRET_KEY` does not start with `sk_test_` (PRD US-11.1
-AC-4). `src/lib/supabase/server.ts` throws when `NEXT_PUBLIC_SUPABASE_URL` or
+A live Stripe key is refused twice, through one pure function, `stripeKeyProblem` in
+`src/lib/stripe-key.ts` (PRD US-11.1 AC-4, Lead ruling 1 on #50). `src/lib/stripe.ts`, the only place
+that creates a Stripe client, throws on use when `STRIPE_SECRET_KEY` is unset or does not start with
+`sk_test_`; nothing calls Stripe at import, so the build needs no Stripe variable. Separately,
+`register()` in `src/instrumentation.ts` throws at server start when the key is set and does not
+start with `sk_test_`. Next.js then answers 500 to every request, though `next start`'s process
+stays up. An unset key does not stop the server, because the demo and the landing page run without
+Stripe. The client pins the API version `stripe@23.1.0` is typed against, `2026-10-28.endive`, which
+keeps the period end on the subscription's item.
+
+**The billing page** (`src/app/(app)/billing/`, PRD US-11.1) is read by its server component as the
+user. Owners and members see the plan, the pages from `get_page_allowance`, each plan's limits and
+price from `get_plan_limits` and the test-mode notice; only an owner gets Upgrade or "Manage or
+cancel", and a Pro plan set to end shows the date. A completed Checkout returns to
+`/billing?checkout=success&workspace=<workspace id>`. On every return the page takes the marker and
+the workspace out with `router.replace('/billing')`, so the router and the history entry drop them
+too and a reload, a workspace switch or a rename runs no timer. The server component acts on the
+return only when the marker is `checkout=success`, its `workspace` is the current workspace and the
+viewer is an owner of it (`checkoutReturn` in `src/lib/billing/plan.ts`). Then the page re-reads the
+plan through RLS every 2 seconds for at most 20 seconds, and stops once it is Pro; still Free after
+that, it says "Your payment went through. Your plan will update shortly." Every other return, one
+that lands on another workspace, a member's, or a bare `?checkout=success`, is the plain page, with
+no timer and nothing about a payment or about the workspace that paid. A cancelled Checkout returns
+to `/billing`, which runs no timer and shows no message (Lead rulings 6 and 8 on #50).
+
+The router rebuilds the view on in-app Back from its cached page, whose plan can be from before a
+webhook, and with no marker. So whenever the view mounts and is not re-reading, it reads the plan and
+the pages once in the browser, through RLS, with the same read the re-reads use, and shows what comes
+back, whichever way the plan moved. This covers owners and members, with or without a return before
+it. That read starts no timer, shows no "Checking your plan…" and no message, and leaves Upgrade
+enabled; if Upgrade is pressed before it lands, the route's 409 answers. A failed read is logged and
+the page keeps what it shows, with no error message. A return the page acts on that finds the workspace
+on Free makes no such read: its re-reads are the only ones. One that finds it already on Pro starts no
+re-reads, so it makes this one read (Lead ruling 9 and choice 23 on #50).
+
+`src/lib/supabase/server.ts` throws when `NEXT_PUBLIC_SUPABASE_URL` or
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` is unset, and its service-role client (`createServiceRoleClient`,
 milestone 7) throws when `SUPABASE_SERVICE_ROLE_KEY` is unset.
 
@@ -1027,8 +1068,8 @@ written `'=1+1`. Parsed numbers and full dates are never changed, so `-12.50` st
 | `NEXT_PUBLIC_SUPABASE_URL` | browser and server modules | `http://127.0.0.1:54321` (from `supabase status`) | the production project URL; Vercel, Production env |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | browser and server modules | local anon key | the production anon (publishable) key; Vercel |
 | `SUPABASE_SERVICE_ROLE_KEY` | route handlers: Stripe webhook, document, workspace and account deletion (server only) | local service role key | the production service role key; Vercel, Production env, sensitive (secret) |
-| `STRIPE_SECRET_KEY` | billing, webhook, workspace and account deletion route handlers (server only) | a test key (`sk_test_…`) or empty, Stripe mocked in tests | a test key (`sk_test_…`); Vercel, sensitive (secret) |
-| `STRIPE_WEBHOOK_SECRET` | webhook route handler (server only) | from `stripe listen` | the test-mode endpoint's signing secret; Vercel, sensitive (secret) |
+| `STRIPE_SECRET_KEY` | billing, webhook, workspace and account deletion route handlers, and the check at server start (server only) | a test key (`sk_test_…`) or empty; empty in tests, which fake the client (Lead ruling 7 on #50) | a test key (`sk_test_…`); Vercel, sensitive (secret) |
+| `STRIPE_WEBHOOK_SECRET` | webhook route handler (server only) | from `stripe listen`; in e2e the test-only value `playwright.config.ts` gives its dev server, which the specs sign fixture events with | the test-mode endpoint's signing secret; Vercel, sensitive (secret) |
 | `STRIPE_PRICE_PRO` | checkout route handler (server only) | a test price id | the test-mode Pro price id ($19 a month); Vercel |
 | `SITE_URL` | invitation links `<site>/invite/<token>` (`src/lib/site.ts`), checkout and portal return URLs (server only) | `http://localhost:<port>`; the e2e config gives its dev server its own address | `https://<project>.vercel.app`; Vercel |
 | `ANTHROPIC_API_KEY` | process-queue; the eval runner, from the operator's own shell (`eval/README.md`) | a dummy value | the production key; Supabase function secrets (secret). The eval uses the operator's own key, never this one |
@@ -1151,9 +1192,10 @@ needed. It does not add secrets to CI.
 8. **Export**: CSV writer with tests; zip of the two CSV files; XLSX with two sheets; export UI
    choosing a type, then approved documents of that type.
 9. **Billing**: `/api/billing/checkout`, `/api/billing/portal`, `/api/stripe/webhook`,
-   `src/lib/stripe.ts` with the live-key refusal, `stripe_events`; billing page with the plan, its
-   limits and price from `get_plan_limits`, pages left and the test-mode notice; webhook tested with
-   signed fixture events (`stripe.webhooks.generateTestHeaderString`).
+   `src/lib/stripe.ts` and `src/instrumentation.ts` with the live-key refusal, `stripe_events`;
+   billing page with the plan, its limits and price from `get_plan_limits`, pages left and the
+   test-mode notice; webhook tested with signed fixture events
+   (`stripe.webhooks.generateTestHeaderString`).
 10. **Retention and budget display**: `purge-files` and its cron job, stale-row and reservation
     sweep, `get_budget_status`, "$x of $10 used this month" and the waiting notice for signed-in
     users.
