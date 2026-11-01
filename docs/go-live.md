@@ -37,6 +37,10 @@ domain (OQ-27). `<site>` below means that address.
       `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO` and `SITE_URL`, the first
       three marked Sensitive. Pass: every name present; none of them has a `NEXT_PUBLIC_` prefix;
       `SITE_URL` is `<site>`. Values are never copied here.
+- [ ] **Portfolio link**: Vercel → the doc-extract project → Settings → Environment Variables →
+      Production holds `NEXT_PUBLIC_PORTFOLIO_URL`, the operator's portfolio URL (an `https://`
+      address; it is public, so it is not marked Sensitive). A changed value takes effect on the
+      next deployment. Pass: the landing page footer on `<site>` shows a Portfolio link to that URL.
 - [ ] **Vercel project**: Settings → Git: the production branch is `main`; Settings → Build: the
       framework preset is Next.js. Pass: the latest production deploy was built from `main`.
 - [ ] **No secret in the browser**: on `<site>`, open the browser's developer tools, search the
