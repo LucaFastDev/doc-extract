@@ -55,8 +55,8 @@ domain (OQ-27). `<site>` below means that address.
       `ANTHROPIC_BASE_URL` with no default and fails at startup without them (its Logs say
       "ANTHROPIC_API_KEY is not set").
 - [ ] **Vault**: SQL editor, `select name from vault.decrypted_secrets where name in
-      ('functions_base_url', 'cron_secret')`: the entries the `process-queue` cron job reads
-      (section 12), created with `select vault.create_secret('<value>', '<name>')`. Pass: both
+      ('functions_base_url', 'cron_secret')`: the entries the `process-queue` and `purge-files`
+      cron jobs read (section 12), created with `select vault.create_secret('<value>', '<name>')`. Pass: both
       names present; `select decrypted_secret from vault.decrypted_secrets where name =
       'functions_base_url'` is `https://<prod ref>.supabase.co/functions/v1` (no trailing slash);
       the Vault `cron_secret` equals the `CRON_SECRET` function secret, which shows as the job's
@@ -210,6 +210,54 @@ a Vercel route handler that uses `SUPABASE_SERVICE_ROLE_KEY` (sections 4.1, 5, 6
       `<workspace>/<document>/original`, and `select pages_used from page_usage` is the same as
       before (PRD US-19.1 AC-4).
 
+## Retention and the budget line
+
+Milestone 10: a pg_cron job posts to the `purge-files` Edge Function daily at 03:00 UTC, which
+removes the files of documents 7 days old, the uploads left for an hour (giving their pages back)
+and the spend reservations a killed run left; a second job deletes pg_cron's run log older than 7
+days; the document list shows the AI budget from `get_budget_status()` (sections 7 and 8;
+OQ-14, OQ-22, OQ-23, OQ-39). Nothing new is secret: the job reuses the `CRON_SECRET` function
+secret and the two Vault entries `process-queue` already reads (Environment and secrets above).
+
+- [ ] `purge-files` is deployed from the release's commit **without JWT verification**, because
+      pg_cron calls it with `CRON_SECRET`, not a user's JWT: `supabase functions deploy
+      purge-files --no-verify-jwt --project-ref <prod ref>`. Pass: Dashboard → Edge Functions
+      lists `purge-files` with "Enforce JWT verification" off and the release's deploy time, and
+      `curl -X POST https://<prod ref>.supabase.co/functions/v1/purge-files` with no
+      `x-cron-secret` header is answered 401 (and removes nothing).
+- [ ] The jobs are present after the migration `20261101130000_retention_budget.sql`: SQL editor,
+      `select jobname, schedule, active, command like '%/purge-files%' as calls_purge from cron.job
+      where jobname in ('purge-files', 'cron-history-cleanup') order by jobname`. Pass: two rows,
+      both `active`; `cron-history-cleanup` at `30 3 * * *` with `calls_purge` false;
+      `purge-files` at `0 3 * * *` with `calls_purge` true.
+- [ ] A run's result, after 03:00 UTC: SQL editor, `select d.status, d.return_message,
+      d.start_time from cron.job_run_details d join cron.job j using (jobid) where j.jobname =
+      'purge-files' order by d.start_time desc limit 3`. Pass: one row a day, `succeeded`. That
+      row says only that the request was sent; the function's answer is in `select status_code,
+      content, created from net._http_response where content like '%files_removed%' order by id
+      desc limit 1`, which pg_net keeps for about 6 hours, so check before 09:00 UTC. Pass:
+      `status_code` 200 and `content` such as `{"files_removed":3,"files_failed":0,
+      "stale_uploads_removed":0,"reservations_released":0}`, with `files_failed` 0; a 401 means the
+      Vault `cron_secret` and the `CRON_SECRET` function secret differ. Edge Functions →
+      `purge-files` → Logs shows the same invocation answered 200, with no "could not remove" line.
+- [ ] Nothing older is left: SQL editor, `select count(*) from documents where created_at < now() -
+      interval '8 days' and file_deleted_at is null` (Pass: 0), `select count(*) from documents
+      where status = 'uploading' and created_at < now() - interval '1 day'` (Pass: 0), and `select
+      count(*) from ai_spend_reservations where settled_at is null and created_at < now() -
+      interval '1 day'` (Pass: 0).
+- [ ] The cron log is trimmed: SQL editor, `select count(*) from cron.job_run_details where
+      start_time < now() - interval '8 days'`. Pass: 0, once the job has run.
+- [ ] The demo's files stay: the Demo item's query below still shows seven rows with `uploaded`
+      true after a purge run (US-14.1 AC-3).
+- [ ] Pass: signed in on `<site>/documents`, the upload area shows "$x of $10 used this month",
+      where x is `select round(spent_usd, 2) from ai_spend_periods where period_start =
+      date_trunc('month', now() at time zone 'utc')::date` (or $0.00 with no row). It adds "Today's
+      AI limit is reached…" or "This month's AI limit is reached…" only while a limit is reached.
+      `get_budget_status()` answers signed-in users only, so the SQL editor, which has no user,
+      gets "sign in to see the AI budget" from it.
+- [ ] Pass: in a private window, signed out, `<site>` and `<site>/demo` work, and the browser's
+      network panel shows no request to `get_budget_status`.
+
 ## Demo
 
 Milestone 11: `/demo` and `/demo/<slug>` show seven fictitious samples on the review screen, read
@@ -294,8 +342,8 @@ out links to the wrong place, and an unset one makes creating an invitation fail
       1` and `select * from ai_spend_days order by day desc limit 1`. Pass: `cap_usd` is 10.00 and
       2.00 respectively, and in each row `spent_usd + reserved_usd` is at most `cap_usd`.
 - [ ] Waiting work: SQL editor, `select count(*) from documents where status = 'waiting_budget'`.
-      Pass: 0, unless `get_budget_status()` reports the daily ceiling or the monthly cap reached
-      (OQ-23).
+      Pass: 0, unless the document list's budget line on `<site>/documents` says the daily
+      ceiling or the monthly cap is reached (OQ-23).
 
 ## Payments (Stripe, test mode only)
 
@@ -341,7 +389,8 @@ This app takes **no real payments**. Every item here checks that only test mode 
 ## Scheduled jobs
 
 - [ ] SQL editor, `select jobname, schedule, active from cron.job`. Pass: `process-queue` (every 10
-      seconds) and `purge-files` (daily at 03:00 UTC) are listed and `active`.
+      seconds), `purge-files` (daily at 03:00 UTC) and `cron-history-cleanup` (daily at 03:30 UTC)
+      are listed and `active`.
 - [ ] `process-queue` job runs reach the function: SQL editor, `select status_code, content,
       error_msg, created from net._http_response order by id desc limit 10`. Pass: recent rows are
       200 with `{"outcome": …}`; a 401 means the Vault `cron_secret` and the `CRON_SECRET` function

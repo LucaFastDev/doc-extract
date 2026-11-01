@@ -271,14 +271,14 @@ A function not in this table is added to it, by the same rule, in the milestone 
 | `line_item_fields(doc_type text) → table (name text, kind text, ord int)`, `immutable` | `add_line_item` (as its owner) | invoker | `set search_path = ''` | revoke execute from public; no grant | each type's line-item cells, as `lineFields` in `shared/doctypes/`; an access test compares the two |
 | `line_item_count(document_id uuid) → int`, `shift_line_items(document_id uuid, after int, delta int)`, `lock_document_for_review(document_id uuid, statuses text[], refusal text) → documents` | the review RPCs (as their owner) | invoker | `set search_path = ''` | revoke execute from public; no grant | helpers: the number of lines, moving lines by one (through a temporary prefix, since paths are unique), and the review RPCs' shared membership and status check under a row lock |
 | `retry_document(document_id uuid)` | browser | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | checks `is_member`, status `failed` and that the file is not deleted; resets `attempts`, reserves pages and sends to the queue, none of which clients may do (OQ-10) |
-| `get_budget_status() → (spent_usd numeric, cap_usd numeric, daily_reached boolean, monthly_reached boolean, resumes_at timestamptz)` | browser, signed in | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | reads `ai_spend_periods`, `ai_spend_days` and `app_config`, which have no client grants; signed-in users only (OQ-22) |
+| `get_budget_status() → (spent_usd numeric, cap_usd numeric, daily_reached boolean, monthly_reached boolean, resumes_at timestamptz)`, `stable` | browser, signed in (the document list) | definer | `set search_path = ''` | revoke execute from public; grant execute to `authenticated` | reads `ai_spend_periods`, `ai_spend_days` and `app_config`, which have no client grants; signed-in users only (OQ-22), and it refuses a call with no `auth.uid()`; section 7 says what it returns |
 | `get_plan_limits() → table (plan text, pages_per_period int, monthly_price_usd numeric)`, `stable` | browser and server components, signed in or not | definer | `set search_path = ''` | revoke execute from public; grant execute to `anon`, `authenticated` | reads `plan_limits`, which has RLS and no select policy; `anon` because the landing page shows the plans to visitors who are not signed in (OQ-27) |
 | `reserve_pages(document_id uuid) → boolean` | `submit-document` (service role), `retry_document`, `change_document_type` | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | `service_role` bypasses RLS, so definer is not needed |
 | `account_page_cap() → int`, `stable`: the account lifetime cap, `app_config.account_page_cap` (10, OQ-2); null turns the account cap off | `reserve_pages` (as the service role), `get_page_allowance` (as its owner) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | its callers may read `app_config` (the service role and `postgres`); it held the constant 10 until milestone 5 added `app_config` and gave it a read of that column |
-| `release_pages(document_id uuid)` | `process-queue` (through `record_extraction`), `submit-document` (service role), `delete_document` | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages`; subtracts from the `page_usage` row of the month the pages were counted against (`documents.pages_period_start`), never from the current one |
+| `release_pages(document_id uuid)` | `process-queue` (through `record_extraction`), `submit-document` (service role), `purge-files` (service role), `delete_document` | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages`; subtracts from the `page_usage` row of the month the pages were counted against (`documents.pages_period_start`), never from the current one |
 | `reserve_spend(document_id uuid, estimate numeric) → (reservation uuid, refused_by text)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages`; decides with `app_config.spend_cap_usd` and `daily_cap_usd` on every call (section 7) |
 | `settle_spend(reservation uuid, actual_cost numeric)` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
-| `release_stale_spend_reservations() → int` | `purge-files` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages` |
+| `release_stale_spend_reservations() → int` | `purge-files` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages`; section 7: releases every reservation unsettled after 15 minutes from the month and day rows it was added to, marks it settled, and returns how many |
 | `record_extraction(document_id uuid, reservation uuid, result jsonb) → text` | `process-queue` (service role) | invoker | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `reserve_pages`; one attempt in one transaction (section 6.3 step 8). Since milestone 6 it also stores `duplicate_key` and runs the duplicate query (step 7) under a transaction-scoped advisory lock per workspace, taken before the document row, so two documents of a workspace record one after the other (Lead ruling 1 on #27). Earlier means created earlier, then by id (ruling 2); a document counts while it is `queued`, `waiting_budget`, `processing`, `needs_review` or `approved`, file deleted or not, and not while `rejected`, `failed` or `unsupported` (ruling 3 on the worker's questions). It flags the recording document against the earliest earlier match, and every later match in `needs_review` that points to no document or to one created after the recording one; an approved document is left as it is (ruling 2 on the worker's questions). Since milestone 7 a document that reaches `needs_review` also gets an `extracted` event |
 | `extract_send(document_id uuid) → bigint` | `submit-document` (service role), `retry_document` (as its owner) | definer | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | sends `{document_id}` to the pgmq queue `extract`; the service role has no grants on `pgmq`, which the API does not expose |
 | `extract_read(vt int, qty int) → table (msg_id bigint, read_ct int, enqueued_at timestamptz, message jsonb)` | `process-queue` (service role) | definer | `set search_path = ''` | revoke execute from public; grant execute to `service_role` | as `extract_send`: `pgmq.read` on `extract` only |
@@ -660,7 +660,7 @@ role: by `purge-files` (section 8) and by the deletion route handlers (section 6
 | `submit-document` | browser | user JWT | Checks membership and status `uploading`; downloads the object; checks magic bytes match the MIME type; refuses an image whose object is over 7.5 MB (7,500,000 bytes, #28); counts pages (PDF via pdf-lib; image = 1, OQ-2) and refuses more than 10 (OQ-4); computes SHA-256; `reserve_pages(document)` (atomic; refuses over the workspace's monthly allowance or the account's lifetime cap); sets status `queued`; `extract_send(document)`, which sends `{document_id}` to the queue `extract`. A refusal sets status `rejected` with the reason and returns 409. If setting `queued` or the send fails, it calls `release_pages`, sets status `rejected` ("could not be queued") and returns 500, so no document holds pages without a message (Lead ruling on #20). It does not check the spend cap: work at the cap waits (OQ-23). |
 | `process-queue` | pg_cron via pg_net | shared secret header `x-cron-secret`, checked against `CRON_SECRET`; JWT verification off | Reads one message (`extract_read(vt => 300, qty => 1)`), extracts it (6.3), archives it or delays it. Answers 401 without the right header. |
 | `approve-document` | browser | user JWT | Reads the document and its fields as the caller, so a non-member gets 404; checks status `needs_review` (else 409); re-runs the type's checks on the corrected values (`recheck`, `shared/doctypes/review.ts`) with `app_config.amount_tolerance` and today's UTC date, and passes them, the values it checked and the flags to `approve_document` (service role), which in one transaction refuses if a value changed meanwhile (409, "try again"), re-runs U1 against the database with the corrected key fields and updates `duplicate_key` and `duplicate_of` (Lead ruling 2 on #32), upserts the check results and the fields' flags (low confidence as extracted, `check_failed`, `duplicate`, `currency_guessed`), and refuses with 409, naming them, while any stored fail, a newly failing U1 among them, has no tick (OQ-11); otherwise sets `approved`, `approved_by`, `approved_at` and writes an `approved` event. A refusal keeps the stored checks, so the screen shows a new failure with its tick box. |
-| `purge-files` | pg_cron via pg_net | shared secret header | Section 8. |
+| `purge-files` | pg_cron via pg_net | shared secret header `x-cron-secret`, checked against `CRON_SECRET` by the same code as `process-queue` (`_shared/cron.ts`); JWT verification off | Section 8. Answers 401 without the right header, and does nothing. |
 
 Every function reads its settings through `_shared/env.ts`, which throws at startup when a required
 variable is unset; nothing has a default that points at a real service. Stripe is not used by any
@@ -865,30 +865,78 @@ Console's monthly spend limit for the production key is $10 (go-live), so an err
 accounting cannot spend more. The eval (F16) uses the operator's own key and never touches these
 tables (OQ-26).
 
-`get_budget_status()` returns this month's `spent_usd` and `cap_usd` for "$x of $10 used this
-month", and whether the daily ceiling or the monthly cap is reached, meaning the budget left is
-below the estimate for a one-page document, with the time waiting work resumes: the next UTC
-midnight, or the first day of the next UTC month (OQ-22, OQ-23).
+**Stale reservations** (milestone 10). A reservation still unsettled 15 minutes after it was made
+belongs to a `process-queue` run that was killed (section 6.4), since Claude's 120-second timeout
+and the Edge Function's time limit end a run long before that. `release_stale_spend_reservations()`,
+called once by each `purge-files` run (section 8), locks every such reservation, takes its estimate
+out of `reserved_usd` on the month row and the day row it was added to (never the current ones,
+which may be later), adds nothing to `spent_usd`, and sets `settled_at`, so it is released once and
+a late `settle_spend` for it changes nothing. It returns how many it released.
+
+**The budget line** (OQ-22, OQ-23, Lead ruling 1 on #48). `get_budget_status()` returns this UTC
+month's `spent_usd` (0 with no row yet) and `cap_usd`, which is `app_config.spend_cap_usd` read now,
+not the cap the row recorded. `monthly_reached` and `daily_reached` say whether the budget left,
+the cap less what is spent and what is reserved, is below the estimate for a one-page document
+(the formula above with one page, rounded up to the micro-dollar as `process-queue` sends it): that
+is exactly when `reserve_spend` would refuse one, so exactly one page's estimate left is not
+reached. `resumes_at` is the next UTC midnight for the daily ceiling, the first day of the next UTC
+month for the monthly cap, the later of the two (the month) when both are reached, and null when
+neither is. Only signed-in members call it, from the document list: anonymous visitors and the demo
+never do.
+
+The document list shows it beside the pages left, in the upload area, for every member: "$1.23 of
+$10 used this month", the spend rounded to cents (half a cent up) and the cap without cents when
+whole (`src/lib/documents/budget.ts`). While the daily ceiling is reached it adds "Today's AI limit
+is reached. Waiting documents resume at <time>."; while the monthly cap is reached, or both, "This
+month's AI limit is reached. Waiting documents resume on <date>." The time and date are in the
+viewer's own time zone and locale (`Intl.DateTimeFormat`: the locale's short time, hour and minute;
+the date as day and month). The list fetches it on load and again whenever its Realtime
+subscription (section 4.3) reports a document whose status differs from the one it last saw, with
+no polling timer; only the latest answer is shown. A failed fetch hides the line and logs the
+error, and never blocks the list.
 
 ## 8. 7-day deletion
 
-A pg_cron job (`purge-files`, daily at 03:00 UTC) calls the `purge-files` function through pg_net.
-The function:
+A pg_cron job (`purge-files`, daily at 03:00 UTC, migration `20261101130000_retention_budget.sql`)
+calls the `purge-files` function through pg_net, as the `process-queue` job calls its function: the
+functions' base URL and `CRON_SECRET` from Vault (section 12), the secret in the `x-cron-secret`
+header. The function answers 401, and does nothing, without the right header. Otherwise, with the
+service role (`supabase/functions/purge-files/`; its steps in `purge.ts`, unit tested):
 
 1. Selects documents with `created_at < now() - interval '7 days'` and `file_deleted_at is null`,
-   on every plan (OQ-14), in batches of 100.
-2. Removes their objects with the Storage API (`storage.from('documents').remove(paths)`); direct
-   deletes from `storage.objects` leave the files behind and are not used.
-3. Sets `file_deleted_at` for each object that was removed. One that failed keeps
-   `file_deleted_at` null and is retried on the next run. Running daily keeps every file under
-   8 days old, the bound in PRD US-14.1 AC-1 (OQ-39).
-4. Removes `uploading` rows older than one hour and their objects, and calls
-   `release_stale_spend_reservations()` (section 6.4).
+   in any status, on every plan (OQ-14), in batches of 100, ordered by id, each batch after the
+   last id of the one before.
+2. Removes each batch's objects with one Storage API call
+   (`storage.from('documents').remove(paths)`); direct deletes from `storage.objects` leave the
+   files behind and are not used. The Storage API removes a batch or fails it whole, and reports no
+   error for an object already gone, which therefore counts as removed.
+3. Sets `file_deleted_at` on the documents of a batch whose removal succeeded, and only on those. A
+   failed batch keeps `file_deleted_at` null, is counted as failed, and is retried on the next run
+   (PRD US-14.1 AC-2); this run goes on with the next batch. If marking a removed batch fails, it
+   is counted as failed too, and the next run finds its objects already gone and marks them.
+   Running daily keeps every file under 8 days old, the bound in PRD US-14.1 AC-1 (OQ-39).
+4. Removes documents in status `uploading` created more than one hour ago, 100 at a time, each
+   with its object: the object first (an upload whose object cannot be removed stays, pages and
+   all, for the next run); then, when `pages_reserved` is set, `release_pages`, because a document
+   left `uploading` after `submit-document` failed past `reserve_pages` holds pages the account and
+   the workspace get back (Lead ruling 3 on #48); then the row, only while it is still `uploading`.
+   Last, it calls `release_stale_spend_reservations()` (section 7).
 
-Only files are deleted: fields, checks, ticks and history stay until the document, the workspace
-or the account is deleted (OQ-14, OQ-20, OQ-30). A document whose file is deleted cannot be
-retried or change type. The `demo` bucket is never touched. The function's run is logged in
-`cron.job_run_details`, and the function returns how many files it removed and how many failed.
+It returns JSON with the four counts: `files_removed`, `files_failed`, `stale_uploads_removed` and
+`reservations_released`. pg_cron logs the run in `cron.job_run_details`, and pg_net keeps the
+function's answer in `net._http_response` for a few hours (docs/go-live.md, Scheduled jobs).
+
+Only files are deleted: fields, line items, checks, ticks, history and the approval stay until the
+document, the workspace or the account is deleted (PRD US-14.1 AC-5; OQ-14, OQ-20, OQ-30). The
+review screen then says the file was deleted 7 days after upload (PRD US-5.1 AC-8, milestone 7). A
+document whose file is deleted cannot be retried or change type. The purge reads only `documents`
+rows and removes only from the `documents` bucket: it never lists or removes anything in the
+`demo` bucket, and never selects `demo_documents` rows (US-14.1 AC-3, Lead ruling 5 on #48).
+
+**Cron log cleanup** (Lead ruling 2 on #48). pg_cron logs every run of every job in
+`cron.job_run_details`; the `process-queue` job alone adds about 8,600 rows a day. A second job,
+`cron-history-cleanup`, daily at 03:30 UTC, deletes the rows whose `start_time` is more than 7 days
+ago, in plain SQL with no function call.
 
 ## 9. Calling Claude
 
@@ -1077,7 +1125,7 @@ written `'=1+1`. Parsed numbers and full dates are never changed, so `-12.50` st
 | `CLAUDE_MODEL` | process-queue locally: optional, overrides `app_config.model` when set (the eval takes `--model` instead) | unset, or a model to try | never set: `app_config.model` in the database decides |
 | `CRON_SECRET` | process-queue, purge-files (checked) and pg_cron (sent) | any random string | random 32 bytes; function secrets and Supabase Vault (secret) |
 | `app_config.extract_concurrency` (a column, not a variable; Lead ruling 3 on #24) | pg_cron job, read on every run | 1 | 2; set with SQL (go-live) |
-| Vault `functions_base_url` and `cron_secret` | pg_cron job | `http://kong:8000/functions/v1` and the local secret, from `supabase/seed.sql` | `https://<prod ref>.supabase.co/functions/v1` and the production `CRON_SECRET`; Supabase Vault (go-live) |
+| Vault `functions_base_url` and `cron_secret` | pg_cron jobs `process-queue` and `purge-files` | `http://kong:8000/functions/v1` and the local secret, from `supabase/seed.sql` | `https://<prod ref>.supabase.co/functions/v1` and the production `CRON_SECRET`; Supabase Vault (go-live) |
 | Google OAuth client id and secret | Supabase Auth | `env()` in `config.toml`, from `supabase/.env` | Supabase dashboard → Auth → Providers → Google (secret) |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | all Edge Functions | provided by the local runtime | provided by Supabase |
 | `SUPABASE_ANON_KEY` | `submit-document`, to read as the caller through RLS | provided by the local runtime | provided by Supabase |
