@@ -1,0 +1,146 @@
+{
+  "document": "delivery-note-03.pdf",
+  "doc_type": "delivery_note",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "en"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "GBP"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "GBP"
+    },
+    {
+      "path": "supplier_name",
+      "kind": "text",
+      "value": "Hollowreed Ceramics"
+    },
+    {
+      "path": "customer_name",
+      "kind": "text",
+      "value": "Old Ferry Guesthouse"
+    },
+    {
+      "path": "ship_to_address",
+      "kind": "text",
+      "value": "The Slipway, Gullhaven GH2 1PJ, Examplia"
+    },
+    {
+      "path": "delivery_note_number",
+      "kind": "text",
+      "value": "HRC-0577"
+    },
+    {
+      "path": "po_number",
+      "kind": "text",
+      "value": "OFG-112"
+    },
+    {
+      "path": "carrier",
+      "kind": "text",
+      "value": "Puffin Parcel Lines"
+    },
+    {
+      "path": "tracking_number",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "delivery_date",
+      "kind": "date",
+      "value": "2026-10-08"
+    },
+    {
+      "path": "total_packages",
+      "kind": "number",
+      "value": "4"
+    },
+    {
+      "path": "total_quantity",
+      "kind": "number",
+      "value": "74"
+    },
+    {
+      "path": "line_items[0].item_code",
+      "kind": "text",
+      "value": "HRC-MUG-08"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Stoneware mug, sea green"
+    },
+    {
+      "path": "line_items[0].quantity_ordered",
+      "kind": "number",
+      "value": "24"
+    },
+    {
+      "path": "line_items[0].quantity_delivered",
+      "kind": "number",
+      "value": "24"
+    },
+    {
+      "path": "line_items[0].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[1].item_code",
+      "kind": "text",
+      "value": "HRC-PLT-26"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Dinner plate, 26 cm"
+    },
+    {
+      "path": "line_items[1].quantity_ordered",
+      "kind": "number",
+      "value": "30"
+    },
+    {
+      "path": "line_items[1].quantity_delivered",
+      "kind": "number",
+      "value": "30"
+    },
+    {
+      "path": "line_items[1].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[2].item_code",
+      "kind": "text",
+      "value": "HRC-BWL-15"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "Breakfast bowl, 15 cm"
+    },
+    {
+      "path": "line_items[2].quantity_ordered",
+      "kind": "number",
+      "value": "20"
+    },
+    {
+      "path": "line_items[2].quantity_delivered",
+      "kind": "number",
+      "value": "20"
+    },
+    {
+      "path": "line_items[2].unit",
+      "kind": "text",
+      "value": "pcs"
+    }
+  ]
+}

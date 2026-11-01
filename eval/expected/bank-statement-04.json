@@ -1,0 +1,946 @@
+{
+  "document": "bank-statement-04.pdf",
+  "doc_type": "bank_statement",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "fr"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "bank_name",
+      "kind": "text",
+      "value": "Banque Coopérative du Littoral"
+    },
+    {
+      "path": "account_holder",
+      "kind": "text",
+      "value": "Boulangerie Les Trois Épis"
+    },
+    {
+      "path": "account_number_last4",
+      "kind": "text",
+      "value": "1763"
+    },
+    {
+      "path": "iban_last4",
+      "kind": "text",
+      "value": "6333"
+    },
+    {
+      "path": "statement_period_start",
+      "kind": "date",
+      "value": "2026-08-01"
+    },
+    {
+      "path": "statement_period_end",
+      "kind": "date",
+      "value": "2026-08-31"
+    },
+    {
+      "path": "opening_balance",
+      "kind": "amount",
+      "value": "6815.22"
+    },
+    {
+      "path": "closing_balance",
+      "kind": "amount",
+      "value": "14729.37"
+    },
+    {
+      "path": "total_credits",
+      "kind": "amount",
+      "value": "19698.20"
+    },
+    {
+      "path": "total_debits",
+      "kind": "amount",
+      "value": "11784.05"
+    },
+    {
+      "path": "line_items[0].date",
+      "kind": "date",
+      "value": "2026-08-01"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Remise carte bancaire"
+    },
+    {
+      "path": "line_items[0].reference",
+      "kind": "text",
+      "value": "RCB 0108"
+    },
+    {
+      "path": "line_items[0].amount",
+      "kind": "amount",
+      "value": "1120.40"
+    },
+    {
+      "path": "line_items[0].balance",
+      "kind": "amount",
+      "value": "7935.62"
+    },
+    {
+      "path": "line_items[1].date",
+      "kind": "date",
+      "value": "2026-08-01"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Loyer local commercial"
+    },
+    {
+      "path": "line_items[1].reference",
+      "kind": "text",
+      "value": "LOYER 08"
+    },
+    {
+      "path": "line_items[1].amount",
+      "kind": "amount",
+      "value": "-1400.00"
+    },
+    {
+      "path": "line_items[1].balance",
+      "kind": "amount",
+      "value": "6535.62"
+    },
+    {
+      "path": "line_items[2].date",
+      "kind": "date",
+      "value": "2026-08-02"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "Remise carte bancaire"
+    },
+    {
+      "path": "line_items[2].reference",
+      "kind": "text",
+      "value": "RCB 0208"
+    },
+    {
+      "path": "line_items[2].amount",
+      "kind": "amount",
+      "value": "985.10"
+    },
+    {
+      "path": "line_items[2].balance",
+      "kind": "amount",
+      "value": "7520.72"
+    },
+    {
+      "path": "line_items[3].date",
+      "kind": "date",
+      "value": "2026-08-03"
+    },
+    {
+      "path": "line_items[3].description",
+      "kind": "text",
+      "value": "Remise espèces"
+    },
+    {
+      "path": "line_items[3].reference",
+      "kind": "text",
+      "value": "ESP 0308"
+    },
+    {
+      "path": "line_items[3].amount",
+      "kind": "amount",
+      "value": "640.00"
+    },
+    {
+      "path": "line_items[3].balance",
+      "kind": "amount",
+      "value": "8160.72"
+    },
+    {
+      "path": "line_items[4].date",
+      "kind": "date",
+      "value": "2026-08-04"
+    },
+    {
+      "path": "line_items[4].description",
+      "kind": "text",
+      "value": "Prélèvement Minoterie du Moulin"
+    },
+    {
+      "path": "line_items[4].reference",
+      "kind": "text",
+      "value": "MIN 4471"
+    },
+    {
+      "path": "line_items[4].amount",
+      "kind": "amount",
+      "value": "-1236.80"
+    },
+    {
+      "path": "line_items[4].balance",
+      "kind": "amount",
+      "value": "6923.92"
+    },
+    {
+      "path": "line_items[5].date",
+      "kind": "date",
+      "value": "2026-08-05"
+    },
+    {
+      "path": "line_items[5].description",
+      "kind": "text",
+      "value": "Remise carte bancaire"
+    },
+    {
+      "path": "line_items[5].reference",
+      "kind": "text",
+      "value": "RCB 0508"
+    },
+    {
+      "path": "line_items[5].amount",
+      "kind": "amount",
+      "value": "874.25"
+    },
+    {
+      "path": "line_items[5].balance",
+      "kind": "amount",
+      "value": "7798.17"
+    },
+    {
+      "path": "line_items[6].date",
+      "kind": "date",
+      "value": "2026-08-06"
+    },
+    {
+      "path": "line_items[6].description",
+      "kind": "text",
+      "value": "Prélèvement Électricité Littorale"
+    },
+    {
+      "path": "line_items[6].reference",
+      "kind": "text",
+      "value": "ELEC 08"
+    },
+    {
+      "path": "line_items[6].amount",
+      "kind": "amount",
+      "value": "-412.60"
+    },
+    {
+      "path": "line_items[6].balance",
+      "kind": "amount",
+      "value": "7385.57"
+    },
+    {
+      "path": "line_items[7].date",
+      "kind": "date",
+      "value": "2026-08-07"
+    },
+    {
+      "path": "line_items[7].description",
+      "kind": "text",
+      "value": "Remise carte bancaire"
+    },
+    {
+      "path": "line_items[7].reference",
+      "kind": "text",
+      "value": "RCB 0708"
+    },
+    {
+      "path": "line_items[7].amount",
+      "kind": "amount",
+      "value": "1032.75"
+    },
+    {
+      "path": "line_items[7].balance",
+      "kind": "amount",
+      "value": "8418.32"
+    },
+    {
+      "path": "line_items[8].date",
+      "kind": "date",
+      "value": "2026-08-08"
+    },
+    {
+      "path": "line_items[8].description",
+      "kind": "text",
+      "value": "Achat Crèmerie Lactalune"
+    },
+    {
+      "path": "line_items[8].reference",
+      "kind": "text",
+      "value": "CRL 0808"
+    },
+    {
+      "path": "line_items[8].amount",
+      "kind": "amount",
+      "value": "-318.45"
+    },
+    {
+      "path": "line_items[8].balance",
+      "kind": "amount",
+      "value": "8099.87"
+    },
+    {
+      "path": "line_items[9].date",
+      "kind": "date",
+      "value": "2026-08-09"
+    },
+    {
+      "path": "line_items[9].description",
+      "kind": "text",
+      "value": "Remise carte bancaire"
+    },
+    {
+      "path": "line_items[9].reference",
+      "kind": "text",
+      "value": "RCB 0908"
+    },
+    {
+      "path": "line_items[9].amount",
+      "kind": "amount",
+      "value": "1210.90"
+    },
+    {
+      "path": "line_items[9].balance",
+      "kind": "amount",
+      "value": "9310.77"
+    },
+    {
+      "path": "line_items[10].date",
+      "kind": "date",
+      "value": "2026-08-10"
+    },
+    {
+      "path": "line_items[10].description",
+      "kind": "text",
+      "value": "Remise espèces"
+    },
+    {
+      "path": "line_items[10].reference",
+      "kind": "text",
+      "value": "ESP 1008"
+    },
+    {
+      "path": "line_items[10].amount",
+      "kind": "amount",
+      "value": "715.00"
+    },
+    {
+      "path": "line_items[10].balance",
+      "kind": "amount",
+      "value": "10025.77"
+    },
+    {
+      "path": "line_items[11].date",
+      "kind": "date",
+      "value": "2026-08-11"
+    },
+    {
+      "path": "line_items[11].description",
+      "kind": "text",
+      "value": "Prélèvement Assurance Phare"
+    },
+    {
+      "path": "line_items[11].reference",
+      "kind": "text",
+      "value": "ASS 08"
+    },
+    {
+      "path": "line_items[11].amount",
+      "kind": "amount",
+      "value": "-96.30"
+    },
+    {
+      "path": "line_items[11].balance",
+      "kind": "amount",
+      "value": "9929.47"
+    },
+    {
+      "path": "line_items[12].date",
+      "kind": "date",
+      "value": "2026-08-12"
+    },
+    {
+      "path": "line_items[12].description",
+      "kind": "text",
+      "value": "Remise carte bancaire"
+    },
+    {
+      "path": "line_items[12].reference",
+      "kind": "text",
+      "value": "RCB 1208"
+    },
+    {
+      "path": "line_items[12].amount",
+      "kind": "amount",
+      "value": "902.35"
+    },
+    {
+      "path": "line_items[12].balance",
+      "kind": "amount",
+      "value": "10831.82"
+    },
+    {
+      "path": "line_items[13].date",
+      "kind": "date",
+      "value": "2026-08-13"
+    },
+    {
+      "path": "line_items[13].description",
+      "kind": "text",
+      "value": "Salaires juillet"
+    },
+    {
+      "path": "line_items[13].reference",
+      "kind": "text",
+      "value": "SAL 07"
+    },
+    {
+      "path": "line_items[13].amount",
+      "kind": "amount",
+      "value": "-4820.00"
+    },
+    {
+      "path": "line_items[13].balance",
+      "kind": "amount",
+      "value": "6011.82"
+    },
+    {
+      "path": "line_items[14].date",
+      "kind": "date",
+      "value": "2026-08-14"
+    },
+    {
+      "path": "line_items[14].description",
+      "kind": "text",
+      "value": "Remise carte bancaire"
+    },
+    {
+      "path": "line_items[14].reference",
+      "kind": "text",
+      "value": "RCB 1408"
+    },
+    {
+      "path": "line_items[14].amount",
+      "kind": "amount",
+      "value": "1144.60"
+    },
+    {
+      "path": "line_items[14].balance",
+      "kind": "amount",
+      "value": "7156.42"
+    },
+    {
+      "path": "line_items[15].date",
+      "kind": "date",
+      "value": "2026-08-15"
+    },
+    {
+      "path": "line_items[15].description",
+      "kind": "text",
+      "value": "Remise carte bancaire"
+    },
+    {
+      "path": "line_items[15].reference",
+      "kind": "text",
+      "value": "RCB 1508"
+    },
+    {
+      "path": "line_items[15].amount",
+      "kind": "amount",
+      "value": "1388.20"
+    },
+    {
+      "path": "line_items[15].balance",
+      "kind": "amount",
+      "value": "8544.62"
+    },
+    {
+      "path": "line_items[16].date",
+      "kind": "date",
+      "value": "2026-08-16"
+    },
+    {
+      "path": "line_items[16].description",
+      "kind": "text",
+      "value": "Remise espèces"
+    },
+    {
+      "path": "line_items[16].reference",
+      "kind": "text",
+      "value": "ESP 1608"
+    },
+    {
+      "path": "line_items[16].amount",
+      "kind": "amount",
+      "value": "590.00"
+    },
+    {
+      "path": "line_items[16].balance",
+      "kind": "amount",
+      "value": "9134.62"
+    },
+    {
+      "path": "line_items[17].date",
+      "kind": "date",
+      "value": "2026-08-17"
+    },
+    {
+      "path": "line_items[17].description",
+      "kind": "text",
+      "value": "Achat Emballages Kraftine"
+    },
+    {
+      "path": "line_items[17].reference",
+      "kind": "text",
+      "value": "EMB 1708"
+    },
+    {
+      "path": "line_items[17].amount",
+      "kind": "amount",
+      "value": "-264.90"
+    },
+    {
+      "path": "line_items[17].balance",
+      "kind": "amount",
+      "value": "8869.72"
+    },
+    {
+      "path": "line_items[18].date",
+      "kind": "date",
+      "value": "2026-08-18"
+    },
+    {
+      "path": "line_items[18].description",
+      "kind": "text",
+      "value": "Remise carte bancaire"
+    },
+    {
+      "path": "line_items[18].reference",
+      "kind": "text",
+      "value": "RCB 1808"
+    },
+    {
+      "path": "line_items[18].amount",
+      "kind": "amount",
+      "value": "956.45"
+    },
+    {
+      "path": "line_items[18].balance",
+      "kind": "amount",
+      "value": "9826.17"
+    },
+    {
+      "path": "line_items[19].date",
+      "kind": "date",
+      "value": "2026-08-19"
+    },
+    {
+      "path": "line_items[19].description",
+      "kind": "text",
+      "value": "Prélèvement Eau de Brisemer"
+    },
+    {
+      "path": "line_items[19].reference",
+      "kind": "text",
+      "value": "EAU 08"
+    },
+    {
+      "path": "line_items[19].amount",
+      "kind": "amount",
+      "value": "-58.70"
+    },
+    {
+      "path": "line_items[19].balance",
+      "kind": "amount",
+      "value": "9767.47"
+    },
+    {
+      "path": "line_items[20].date",
+      "kind": "date",
+      "value": "2026-08-20"
+    },
+    {
+      "path": "line_items[20].description",
+      "kind": "text",
+      "value": "Remise carte bancaire"
+    },
+    {
+      "path": "line_items[20].reference",
+      "kind": "text",
+      "value": "RCB 2008"
+    },
+    {
+      "path": "line_items[20].amount",
+      "kind": "amount",
+      "value": "1018.30"
+    },
+    {
+      "path": "line_items[20].balance",
+      "kind": "amount",
+      "value": "10785.77"
+    },
+    {
+      "path": "line_items[21].date",
+      "kind": "date",
+      "value": "2026-08-21"
+    },
+    {
+      "path": "line_items[21].description",
+      "kind": "text",
+      "value": "Prélèvement Minoterie du Moulin"
+    },
+    {
+      "path": "line_items[21].reference",
+      "kind": "text",
+      "value": "MIN 4502"
+    },
+    {
+      "path": "line_items[21].amount",
+      "kind": "amount",
+      "value": "-1189.40"
+    },
+    {
+      "path": "line_items[21].balance",
+      "kind": "amount",
+      "value": "9596.37"
+    },
+    {
+      "path": "line_items[22].date",
+      "kind": "date",
+      "value": "2026-08-22"
+    },
+    {
+      "path": "line_items[22].description",
+      "kind": "text",
+      "value": "Remise carte bancaire"
+    },
+    {
+      "path": "line_items[22].reference",
+      "kind": "text",
+      "value": "RCB 2208"
+    },
+    {
+      "path": "line_items[22].amount",
+      "kind": "amount",
+      "value": "1265.85"
+    },
+    {
+      "path": "line_items[22].balance",
+      "kind": "amount",
+      "value": "10862.22"
+    },
+    {
+      "path": "line_items[23].date",
+      "kind": "date",
+      "value": "2026-08-23"
+    },
+    {
+      "path": "line_items[23].description",
+      "kind": "text",
+      "value": "Remise espèces"
+    },
+    {
+      "path": "line_items[23].reference",
+      "kind": "text",
+      "value": "ESP 2308"
+    },
+    {
+      "path": "line_items[23].amount",
+      "kind": "amount",
+      "value": "682.00"
+    },
+    {
+      "path": "line_items[23].balance",
+      "kind": "amount",
+      "value": "11544.22"
+    },
+    {
+      "path": "line_items[24].date",
+      "kind": "date",
+      "value": "2026-08-24"
+    },
+    {
+      "path": "line_items[24].description",
+      "kind": "text",
+      "value": "Achat Crèmerie Lactalune"
+    },
+    {
+      "path": "line_items[24].reference",
+      "kind": "text",
+      "value": "CRL 2408"
+    },
+    {
+      "path": "line_items[24].amount",
+      "kind": "amount",
+      "value": "-342.15"
+    },
+    {
+      "path": "line_items[24].balance",
+      "kind": "amount",
+      "value": "11202.07"
+    },
+    {
+      "path": "line_items[25].date",
+      "kind": "date",
+      "value": "2026-08-25"
+    },
+    {
+      "path": "line_items[25].description",
+      "kind": "text",
+      "value": "Remise carte bancaire"
+    },
+    {
+      "path": "line_items[25].reference",
+      "kind": "text",
+      "value": "RCB 2508"
+    },
+    {
+      "path": "line_items[25].amount",
+      "kind": "amount",
+      "value": "890.60"
+    },
+    {
+      "path": "line_items[25].balance",
+      "kind": "amount",
+      "value": "12092.67"
+    },
+    {
+      "path": "line_items[26].date",
+      "kind": "date",
+      "value": "2026-08-26"
+    },
+    {
+      "path": "line_items[26].description",
+      "kind": "text",
+      "value": "Entretien four, Fourneaux Dorés"
+    },
+    {
+      "path": "line_items[26].reference",
+      "kind": "text",
+      "value": "FD 2608"
+    },
+    {
+      "path": "line_items[26].amount",
+      "kind": "amount",
+      "value": "-385.00"
+    },
+    {
+      "path": "line_items[26].balance",
+      "kind": "amount",
+      "value": "11707.67"
+    },
+    {
+      "path": "line_items[27].date",
+      "kind": "date",
+      "value": "2026-08-27"
+    },
+    {
+      "path": "line_items[27].description",
+      "kind": "text",
+      "value": "Remise carte bancaire"
+    },
+    {
+      "path": "line_items[27].reference",
+      "kind": "text",
+      "value": "RCB 2708"
+    },
+    {
+      "path": "line_items[27].amount",
+      "kind": "amount",
+      "value": "1097.15"
+    },
+    {
+      "path": "line_items[27].balance",
+      "kind": "amount",
+      "value": "12804.82"
+    },
+    {
+      "path": "line_items[28].date",
+      "kind": "date",
+      "value": "2026-08-28"
+    },
+    {
+      "path": "line_items[28].description",
+      "kind": "text",
+      "value": "Remboursement prêt matériel"
+    },
+    {
+      "path": "line_items[28].reference",
+      "kind": "text",
+      "value": "PRET 08"
+    },
+    {
+      "path": "line_items[28].amount",
+      "kind": "amount",
+      "value": "-650.00"
+    },
+    {
+      "path": "line_items[28].balance",
+      "kind": "amount",
+      "value": "12154.82"
+    },
+    {
+      "path": "line_items[29].date",
+      "kind": "date",
+      "value": "2026-08-29"
+    },
+    {
+      "path": "line_items[29].description",
+      "kind": "text",
+      "value": "Remise carte bancaire"
+    },
+    {
+      "path": "line_items[29].reference",
+      "kind": "text",
+      "value": "RCB 2908"
+    },
+    {
+      "path": "line_items[29].amount",
+      "kind": "amount",
+      "value": "1302.40"
+    },
+    {
+      "path": "line_items[29].balance",
+      "kind": "amount",
+      "value": "13457.22"
+    },
+    {
+      "path": "line_items[30].date",
+      "kind": "date",
+      "value": "2026-08-30"
+    },
+    {
+      "path": "line_items[30].description",
+      "kind": "text",
+      "value": "Remise espèces"
+    },
+    {
+      "path": "line_items[30].reference",
+      "kind": "text",
+      "value": "ESP 3008"
+    },
+    {
+      "path": "line_items[30].amount",
+      "kind": "amount",
+      "value": "705.00"
+    },
+    {
+      "path": "line_items[30].balance",
+      "kind": "amount",
+      "value": "14162.22"
+    },
+    {
+      "path": "line_items[31].date",
+      "kind": "date",
+      "value": "2026-08-30"
+    },
+    {
+      "path": "line_items[31].description",
+      "kind": "text",
+      "value": "Achat Farines du Val"
+    },
+    {
+      "path": "line_items[31].reference",
+      "kind": "text",
+      "value": "FDV 3008"
+    },
+    {
+      "path": "line_items[31].amount",
+      "kind": "amount",
+      "value": "-574.25"
+    },
+    {
+      "path": "line_items[31].balance",
+      "kind": "amount",
+      "value": "13587.97"
+    },
+    {
+      "path": "line_items[32].date",
+      "kind": "date",
+      "value": "2026-08-31"
+    },
+    {
+      "path": "line_items[32].description",
+      "kind": "text",
+      "value": "Remise carte bancaire"
+    },
+    {
+      "path": "line_items[32].reference",
+      "kind": "text",
+      "value": "RCB 3108"
+    },
+    {
+      "path": "line_items[32].amount",
+      "kind": "amount",
+      "value": "1176.90"
+    },
+    {
+      "path": "line_items[32].balance",
+      "kind": "amount",
+      "value": "14764.87"
+    },
+    {
+      "path": "line_items[33].date",
+      "kind": "date",
+      "value": "2026-08-31"
+    },
+    {
+      "path": "line_items[33].description",
+      "kind": "text",
+      "value": "Cotisation carte professionnelle"
+    },
+    {
+      "path": "line_items[33].reference",
+      "kind": "text",
+      "value": "COT 08"
+    },
+    {
+      "path": "line_items[33].amount",
+      "kind": "amount",
+      "value": "-14.50"
+    },
+    {
+      "path": "line_items[33].balance",
+      "kind": "amount",
+      "value": "14750.37"
+    },
+    {
+      "path": "line_items[34].date",
+      "kind": "date",
+      "value": "2026-08-31"
+    },
+    {
+      "path": "line_items[34].description",
+      "kind": "text",
+      "value": "Frais de tenue de compte"
+    },
+    {
+      "path": "line_items[34].reference",
+      "kind": "text",
+      "value": "FRAIS 08"
+    },
+    {
+      "path": "line_items[34].amount",
+      "kind": "amount",
+      "value": "-21.00"
+    },
+    {
+      "path": "line_items[34].balance",
+      "kind": "amount",
+      "value": "14729.37"
+    }
+  ]
+}

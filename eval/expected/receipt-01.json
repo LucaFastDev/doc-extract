@@ -1,0 +1,141 @@
+{
+  "document": "receipt-01.png",
+  "doc_type": "receipt",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "en"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "merchant_name",
+      "kind": "text",
+      "value": "WREN AND KETTLE CAFE"
+    },
+    {
+      "path": "merchant_address",
+      "kind": "text",
+      "value": "3 MARKET STEPS, DUNMORROW, EXAMPLIA"
+    },
+    {
+      "path": "merchant_tax_id",
+      "kind": "text",
+      "value": "EX 448 2210 19"
+    },
+    {
+      "path": "receipt_number",
+      "kind": "text",
+      "value": "102394"
+    },
+    {
+      "path": "payment_method",
+      "kind": "text",
+      "value": "VISA"
+    },
+    {
+      "path": "card_last4",
+      "kind": "text",
+      "value": "6630"
+    },
+    {
+      "path": "transaction_date",
+      "kind": "date",
+      "value": "2026-10-02"
+    },
+    {
+      "path": "transaction_time",
+      "kind": "text",
+      "value": "08:41"
+    },
+    {
+      "path": "subtotal",
+      "kind": "amount",
+      "value": "15.10"
+    },
+    {
+      "path": "tax_total",
+      "kind": "amount",
+      "value": "1.51"
+    },
+    {
+      "path": "tip",
+      "kind": "amount",
+      "value": "1.00"
+    },
+    {
+      "path": "total",
+      "kind": "amount",
+      "value": "17.61"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "LATTE"
+    },
+    {
+      "path": "line_items[0].quantity",
+      "kind": "number",
+      "value": "2"
+    },
+    {
+      "path": "line_items[0].unit_price",
+      "kind": "amount",
+      "value": "3.20"
+    },
+    {
+      "path": "line_items[0].amount",
+      "kind": "amount",
+      "value": "6.40"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "CROISSANT"
+    },
+    {
+      "path": "line_items[1].quantity",
+      "kind": "number",
+      "value": "2"
+    },
+    {
+      "path": "line_items[1].unit_price",
+      "kind": "amount",
+      "value": "2.60"
+    },
+    {
+      "path": "line_items[1].amount",
+      "kind": "amount",
+      "value": "5.20"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "ORANGE JUICE"
+    },
+    {
+      "path": "line_items[2].quantity",
+      "kind": "number",
+      "value": "1"
+    },
+    {
+      "path": "line_items[2].unit_price",
+      "kind": "amount",
+      "value": "3.50"
+    },
+    {
+      "path": "line_items[2].amount",
+      "kind": "amount",
+      "value": "3.50"
+    }
+  ]
+}

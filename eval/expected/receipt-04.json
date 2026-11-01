@@ -1,0 +1,121 @@
+{
+  "document": "receipt-04.pdf",
+  "doc_type": "receipt",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "fr"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "€"
+    },
+    {
+      "path": "merchant_name",
+      "kind": "text",
+      "value": "Taxis Mouette Bleue"
+    },
+    {
+      "path": "merchant_address",
+      "kind": "text",
+      "value": "12 avenue des Goélands, 34567 Portvent, Exemplie"
+    },
+    {
+      "path": "merchant_tax_id",
+      "kind": "text",
+      "value": "EX52774019336"
+    },
+    {
+      "path": "receipt_number",
+      "kind": "text",
+      "value": "88412"
+    },
+    {
+      "path": "payment_method",
+      "kind": "text",
+      "value": "Carte bancaire"
+    },
+    {
+      "path": "card_last4",
+      "kind": "text",
+      "value": "7314"
+    },
+    {
+      "path": "transaction_date",
+      "kind": "date",
+      "value": "2026-10-21"
+    },
+    {
+      "path": "transaction_time",
+      "kind": "text",
+      "value": "06:05"
+    },
+    {
+      "path": "subtotal",
+      "kind": "amount",
+      "value": "41.00"
+    },
+    {
+      "path": "tax_total",
+      "kind": "amount",
+      "value": "4.10"
+    },
+    {
+      "path": "tip",
+      "kind": "amount",
+      "value": "2.00"
+    },
+    {
+      "path": "total",
+      "kind": "amount",
+      "value": "47.10"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Course Gare Centrale - Aéroport"
+    },
+    {
+      "path": "line_items[0].quantity",
+      "kind": "number",
+      "value": "1"
+    },
+    {
+      "path": "line_items[0].unit_price",
+      "kind": "amount",
+      "value": "38.00"
+    },
+    {
+      "path": "line_items[0].amount",
+      "kind": "amount",
+      "value": "38.00"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Supplément bagage"
+    },
+    {
+      "path": "line_items[1].quantity",
+      "kind": "number",
+      "value": "2"
+    },
+    {
+      "path": "line_items[1].unit_price",
+      "kind": "amount",
+      "value": "1.50"
+    },
+    {
+      "path": "line_items[1].amount",
+      "kind": "amount",
+      "value": "3.00"
+    }
+  ]
+}

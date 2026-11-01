@@ -1,0 +1,286 @@
+{
+  "document": "invoice-02.pdf",
+  "doc_type": "invoice",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "de"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "€"
+    },
+    {
+      "path": "vendor_name",
+      "kind": "text",
+      "value": "Mühlbach Werkzeughandel GmbH"
+    },
+    {
+      "path": "vendor_address",
+      "kind": "text",
+      "value": "Ambossweg 14, 34567 Hammerfeld, Examplien"
+    },
+    {
+      "path": "vendor_tax_id",
+      "kind": "text",
+      "value": "EX318552904"
+    },
+    {
+      "path": "customer_name",
+      "kind": "text",
+      "value": "Brückner & Söhne Metallbau KG"
+    },
+    {
+      "path": "customer_address",
+      "kind": "text",
+      "value": "Funkenstraße 3, 76543 Glutstadt, Examplien"
+    },
+    {
+      "path": "customer_tax_id",
+      "kind": "text",
+      "value": "EX771204335"
+    },
+    {
+      "path": "invoice_number",
+      "kind": "text",
+      "value": "RE-2026-0917"
+    },
+    {
+      "path": "purchase_order_number",
+      "kind": "text",
+      "value": "B-44812"
+    },
+    {
+      "path": "payment_terms",
+      "kind": "text",
+      "value": "Zahlbar innerhalb von 14 Tagen"
+    },
+    {
+      "path": "invoice_date",
+      "kind": "date",
+      "value": "2026-09-17"
+    },
+    {
+      "path": "due_date",
+      "kind": "date",
+      "value": "2026-10-01"
+    },
+    {
+      "path": "subtotal",
+      "kind": "amount",
+      "value": "495.60"
+    },
+    {
+      "path": "tax_total",
+      "kind": "amount",
+      "value": "89.41"
+    },
+    {
+      "path": "shipping",
+      "kind": "amount",
+      "value": "0.00"
+    },
+    {
+      "path": "discount_total",
+      "kind": "amount",
+      "value": "25.00"
+    },
+    {
+      "path": "total",
+      "kind": "amount",
+      "value": "560.01"
+    },
+    {
+      "path": "amount_paid",
+      "kind": "amount",
+      "value": "200.00"
+    },
+    {
+      "path": "amount_due",
+      "kind": "amount",
+      "value": "360.01"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Akku-Bohrschrauber 18 V"
+    },
+    {
+      "path": "line_items[0].item_code",
+      "kind": "text",
+      "value": "MW-1042"
+    },
+    {
+      "path": "line_items[0].quantity",
+      "kind": "number",
+      "value": "2"
+    },
+    {
+      "path": "line_items[0].unit",
+      "kind": "text",
+      "value": "Stk"
+    },
+    {
+      "path": "line_items[0].unit_price",
+      "kind": "amount",
+      "value": "129.00"
+    },
+    {
+      "path": "line_items[0].tax_rate",
+      "kind": "percent",
+      "value": "19"
+    },
+    {
+      "path": "line_items[0].amount",
+      "kind": "amount",
+      "value": "258.00"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Bohrersatz HSS, 19-teilig"
+    },
+    {
+      "path": "line_items[1].item_code",
+      "kind": "text",
+      "value": "MW-2210"
+    },
+    {
+      "path": "line_items[1].quantity",
+      "kind": "number",
+      "value": "4"
+    },
+    {
+      "path": "line_items[1].unit",
+      "kind": "text",
+      "value": "Satz"
+    },
+    {
+      "path": "line_items[1].unit_price",
+      "kind": "amount",
+      "value": "23.50"
+    },
+    {
+      "path": "line_items[1].tax_rate",
+      "kind": "percent",
+      "value": "19"
+    },
+    {
+      "path": "line_items[1].amount",
+      "kind": "amount",
+      "value": "94.00"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "Schutzbrille, klar"
+    },
+    {
+      "path": "line_items[2].item_code",
+      "kind": "text",
+      "value": "MW-3307"
+    },
+    {
+      "path": "line_items[2].quantity",
+      "kind": "number",
+      "value": "12"
+    },
+    {
+      "path": "line_items[2].unit",
+      "kind": "text",
+      "value": "Stk"
+    },
+    {
+      "path": "line_items[2].unit_price",
+      "kind": "amount",
+      "value": "4.80"
+    },
+    {
+      "path": "line_items[2].tax_rate",
+      "kind": "percent",
+      "value": "19"
+    },
+    {
+      "path": "line_items[2].amount",
+      "kind": "amount",
+      "value": "57.60"
+    },
+    {
+      "path": "line_items[3].description",
+      "kind": "text",
+      "value": "Werkbankauflage, Gummi"
+    },
+    {
+      "path": "line_items[3].item_code",
+      "kind": "text",
+      "value": "MW-0815"
+    },
+    {
+      "path": "line_items[3].quantity",
+      "kind": "number",
+      "value": "2.5"
+    },
+    {
+      "path": "line_items[3].unit",
+      "kind": "text",
+      "value": "m"
+    },
+    {
+      "path": "line_items[3].unit_price",
+      "kind": "amount",
+      "value": "18.60"
+    },
+    {
+      "path": "line_items[3].tax_rate",
+      "kind": "percent",
+      "value": "19"
+    },
+    {
+      "path": "line_items[3].amount",
+      "kind": "amount",
+      "value": "46.50"
+    },
+    {
+      "path": "line_items[4].description",
+      "kind": "text",
+      "value": "Arbeitshandschuhe, Gr. 10"
+    },
+    {
+      "path": "line_items[4].item_code",
+      "kind": "text",
+      "value": "MW-5120"
+    },
+    {
+      "path": "line_items[4].quantity",
+      "kind": "number",
+      "value": "10"
+    },
+    {
+      "path": "line_items[4].unit",
+      "kind": "text",
+      "value": "Paar"
+    },
+    {
+      "path": "line_items[4].unit_price",
+      "kind": "amount",
+      "value": "3.95"
+    },
+    {
+      "path": "line_items[4].tax_rate",
+      "kind": "percent",
+      "value": "19"
+    },
+    {
+      "path": "line_items[4].amount",
+      "kind": "amount",
+      "value": "39.50"
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "document": "delivery-note-05.pdf",
+  "doc_type": "delivery_note",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "en"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "supplier_name",
+      "kind": "text",
+      "value": "Juniper Steel Fabrication"
+    },
+    {
+      "path": "customer_name",
+      "kind": "text",
+      "value": "Cinderpine Brewing Collective"
+    },
+    {
+      "path": "ship_to_address",
+      "kind": "text",
+      "value": "Warehouse B, 81 Hopvine Street, Barleyport, EX 00981, Examplia"
+    },
+    {
+      "path": "delivery_note_number",
+      "kind": "text",
+      "value": "JSF-DN-1206"
+    },
+    {
+      "path": "po_number",
+      "kind": "text",
+      "value": "2026-0457"
+    },
+    {
+      "path": "carrier",
+      "kind": "text",
+      "value": "Red Mesa Freight"
+    },
+    {
+      "path": "tracking_number",
+      "kind": "text",
+      "value": "RMF 8830 2214 7"
+    },
+    {
+      "path": "delivery_date",
+      "kind": "date",
+      "value": "2026-10-27"
+    },
+    {
+      "path": "total_packages",
+      "kind": "number",
+      "value": "5"
+    },
+    {
+      "path": "total_quantity",
+      "kind": "number",
+      "value": null
+    },
+    {
+      "path": "line_items[0].item_code",
+      "kind": "text",
+      "value": "JSF-FV-500"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Fermentation vessel, 500 L"
+    },
+    {
+      "path": "line_items[0].quantity_ordered",
+      "kind": "number",
+      "value": "2"
+    },
+    {
+      "path": "line_items[0].quantity_delivered",
+      "kind": "number",
+      "value": "2"
+    },
+    {
+      "path": "line_items[0].unit",
+      "kind": "text",
+      "value": "ea"
+    },
+    {
+      "path": "line_items[1].item_code",
+      "kind": "text",
+      "value": "JSF-VL-02"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Sanitary valve, 2 in"
+    },
+    {
+      "path": "line_items[1].quantity_ordered",
+      "kind": "number",
+      "value": "6"
+    },
+    {
+      "path": "line_items[1].quantity_delivered",
+      "kind": "number",
+      "value": "6"
+    },
+    {
+      "path": "line_items[1].unit",
+      "kind": "text",
+      "value": "ea"
+    },
+    {
+      "path": "line_items[2].item_code",
+      "kind": "text",
+      "value": "JSF-CL-15"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "Tri-clamp, 1.5 in"
+    },
+    {
+      "path": "line_items[2].quantity_ordered",
+      "kind": "number",
+      "value": "24"
+    },
+    {
+      "path": "line_items[2].quantity_delivered",
+      "kind": "number",
+      "value": "20"
+    },
+    {
+      "path": "line_items[2].unit",
+      "kind": "text",
+      "value": "ea"
+    }
+  ]
+}

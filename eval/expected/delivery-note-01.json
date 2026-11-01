@@ -1,0 +1,146 @@
+{
+  "document": "delivery-note-01.pdf",
+  "doc_type": "delivery_note",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "en"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "supplier_name",
+      "kind": "text",
+      "value": "Ferrocline Components Ltd"
+    },
+    {
+      "path": "customer_name",
+      "kind": "text",
+      "value": "Harrowgate Robotics Ltd"
+    },
+    {
+      "path": "ship_to_address",
+      "kind": "text",
+      "value": "Bay 4, 9 Gearwheel Park, Coilbridge CB7 2RQ, Examplia"
+    },
+    {
+      "path": "delivery_note_number",
+      "kind": "text",
+      "value": "FC-DN-30981"
+    },
+    {
+      "path": "po_number",
+      "kind": "text",
+      "value": "HR-PO-5540"
+    },
+    {
+      "path": "carrier",
+      "kind": "text",
+      "value": "Swiftlark Couriers"
+    },
+    {
+      "path": "tracking_number",
+      "kind": "text",
+      "value": "SLC-55821-0442"
+    },
+    {
+      "path": "delivery_date",
+      "kind": "date",
+      "value": "2026-09-14"
+    },
+    {
+      "path": "total_packages",
+      "kind": "number",
+      "value": "3"
+    },
+    {
+      "path": "total_quantity",
+      "kind": "number",
+      "value": "64"
+    },
+    {
+      "path": "line_items[0].item_code",
+      "kind": "text",
+      "value": "FC-SRV-12"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Servo motor, 12 V"
+    },
+    {
+      "path": "line_items[0].quantity_ordered",
+      "kind": "number",
+      "value": "8"
+    },
+    {
+      "path": "line_items[0].quantity_delivered",
+      "kind": "number",
+      "value": "8"
+    },
+    {
+      "path": "line_items[0].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[1].item_code",
+      "kind": "text",
+      "value": "FC-BRK-03"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Mounting bracket, steel"
+    },
+    {
+      "path": "line_items[1].quantity_ordered",
+      "kind": "number",
+      "value": "16"
+    },
+    {
+      "path": "line_items[1].quantity_delivered",
+      "kind": "number",
+      "value": "16"
+    },
+    {
+      "path": "line_items[1].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[2].item_code",
+      "kind": "text",
+      "value": "FC-CBL-50"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "Signal cable, 50 cm"
+    },
+    {
+      "path": "line_items[2].quantity_ordered",
+      "kind": "number",
+      "value": "40"
+    },
+    {
+      "path": "line_items[2].quantity_delivered",
+      "kind": "number",
+      "value": "40"
+    },
+    {
+      "path": "line_items[2].unit",
+      "kind": "text",
+      "value": "pcs"
+    }
+  ]
+}

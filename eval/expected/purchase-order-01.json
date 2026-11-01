@@ -1,0 +1,176 @@
+{
+  "document": "purchase-order-01.pdf",
+  "doc_type": "purchase_order",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "en"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "buyer_name",
+      "kind": "text",
+      "value": "Harrowgate Robotics Ltd"
+    },
+    {
+      "path": "buyer_address",
+      "kind": "text",
+      "value": "9 Gearwheel Park, Coilbridge CB7 2RQ, Examplia"
+    },
+    {
+      "path": "supplier_name",
+      "kind": "text",
+      "value": "Ferrocline Components Ltd"
+    },
+    {
+      "path": "supplier_address",
+      "kind": "text",
+      "value": "60 Rivet Row, Boltham BH4 9DD, Examplia"
+    },
+    {
+      "path": "ship_to_address",
+      "kind": "text",
+      "value": "Bay 4, 9 Gearwheel Park, Coilbridge CB7 2RQ, Examplia"
+    },
+    {
+      "path": "po_number",
+      "kind": "text",
+      "value": "HR-PO-5540"
+    },
+    {
+      "path": "payment_terms",
+      "kind": "text",
+      "value": "Net 30"
+    },
+    {
+      "path": "order_date",
+      "kind": "date",
+      "value": "2026-09-08"
+    },
+    {
+      "path": "requested_delivery_date",
+      "kind": "date",
+      "value": null
+    },
+    {
+      "path": "subtotal",
+      "kind": "amount",
+      "value": "480.00"
+    },
+    {
+      "path": "tax_total",
+      "kind": "amount",
+      "value": "94.05"
+    },
+    {
+      "path": "shipping",
+      "kind": "amount",
+      "value": "15.00"
+    },
+    {
+      "path": "total",
+      "kind": "amount",
+      "value": "589.05"
+    },
+    {
+      "path": "line_items[0].item_code",
+      "kind": "text",
+      "value": "FC-SRV-12"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Servo motor, 12 V"
+    },
+    {
+      "path": "line_items[0].quantity",
+      "kind": "number",
+      "value": "8"
+    },
+    {
+      "path": "line_items[0].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[0].unit_price",
+      "kind": "amount",
+      "value": "46.50"
+    },
+    {
+      "path": "line_items[0].amount",
+      "kind": "amount",
+      "value": "372.00"
+    },
+    {
+      "path": "line_items[1].item_code",
+      "kind": "text",
+      "value": "FC-BRK-03"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Mounting bracket, steel"
+    },
+    {
+      "path": "line_items[1].quantity",
+      "kind": "number",
+      "value": "16"
+    },
+    {
+      "path": "line_items[1].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[1].unit_price",
+      "kind": "amount",
+      "value": "3.75"
+    },
+    {
+      "path": "line_items[1].amount",
+      "kind": "amount",
+      "value": "60.00"
+    },
+    {
+      "path": "line_items[2].item_code",
+      "kind": "text",
+      "value": "FC-CBL-50"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "Signal cable, 50 cm"
+    },
+    {
+      "path": "line_items[2].quantity",
+      "kind": "number",
+      "value": "40"
+    },
+    {
+      "path": "line_items[2].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[2].unit_price",
+      "kind": "amount",
+      "value": "1.20"
+    },
+    {
+      "path": "line_items[2].amount",
+      "kind": "amount",
+      "value": "48.00"
+    }
+  ]
+}

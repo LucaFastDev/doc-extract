@@ -489,8 +489,8 @@ export function receiptLines(s: SampleValues = RECEIPT_PHOTO): ReceiptLine[] {
   ]
 }
 
-/** A 5 × 7 dot-matrix font: each glyph's rows, # for a dot. */
-const GLYPHS: Record<string, string> = {
+/** A 5 × 7 dot-matrix font: each glyph's rows, # for a dot. The eval's receipt photos use it too. */
+export const GLYPHS: Record<string, string> = {
   A: '.###.|#...#|#...#|#####|#...#|#...#|#...#',
   B: '####.|#...#|#...#|####.|#...#|#...#|####.',
   C: '.###.|#...#|#....|#....|#....|#...#|.###.',
@@ -536,7 +536,7 @@ const GLYPHS: Record<string, string> = {
 }
 
 /** A deterministic pseudo-random sequence (a 32-bit LCG), so the photo is the same on every run. */
-function seeded(seed: number) {
+export function seeded(seed: number) {
   let state = seed >>> 0
   return () => {
     state = (Math.imul(state, 1664525) + 1013904223) >>> 0
@@ -567,7 +567,7 @@ function chunk(type: string, data: Uint8Array): Uint8Array {
 }
 
 /** An 8-bit greyscale PNG of the pixels, row by row. */
-function png(width: number, height: number, pixels: Uint8Array): Uint8Array {
+export function png(width: number, height: number, pixels: Uint8Array): Uint8Array {
   const raw = new Uint8Array(height * (width + 1))
   for (let y = 0; y < height; y++) raw.set(pixels.subarray(y * width, (y + 1) * width), y * (width + 1) + 1)
   const header = new Uint8Array(13)

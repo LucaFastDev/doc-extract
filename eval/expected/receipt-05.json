@@ -1,0 +1,141 @@
+{
+  "document": "receipt-05.pdf",
+  "doc_type": "receipt",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "en"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "USD"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "USD"
+    },
+    {
+      "path": "merchant_name",
+      "kind": "text",
+      "value": "Saffron Lane Kitchen"
+    },
+    {
+      "path": "merchant_address",
+      "kind": "text",
+      "value": "208 Juniper Avenue, Wexford Hollow, EX 00733, Examplia"
+    },
+    {
+      "path": "merchant_tax_id",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "receipt_number",
+      "kind": "text",
+      "value": "SLK-55019"
+    },
+    {
+      "path": "payment_method",
+      "kind": "text",
+      "value": "Amex"
+    },
+    {
+      "path": "card_last4",
+      "kind": "text",
+      "value": "1005"
+    },
+    {
+      "path": "transaction_date",
+      "kind": "date",
+      "value": "2026-10-24"
+    },
+    {
+      "path": "transaction_time",
+      "kind": "text",
+      "value": "19:42"
+    },
+    {
+      "path": "subtotal",
+      "kind": "amount",
+      "value": "46.65"
+    },
+    {
+      "path": "tax_total",
+      "kind": "amount",
+      "value": "3.03"
+    },
+    {
+      "path": "tip",
+      "kind": "amount",
+      "value": "5.00"
+    },
+    {
+      "path": "total",
+      "kind": "amount",
+      "value": "54.68"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Chicken tikka bowl"
+    },
+    {
+      "path": "line_items[0].quantity",
+      "kind": "number",
+      "value": "2"
+    },
+    {
+      "path": "line_items[0].unit_price",
+      "kind": "amount",
+      "value": "13.95"
+    },
+    {
+      "path": "line_items[0].amount",
+      "kind": "amount",
+      "value": "27.90"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Garlic naan"
+    },
+    {
+      "path": "line_items[1].quantity",
+      "kind": "number",
+      "value": "3"
+    },
+    {
+      "path": "line_items[1].unit_price",
+      "kind": "amount",
+      "value": "3.25"
+    },
+    {
+      "path": "line_items[1].amount",
+      "kind": "amount",
+      "value": "9.75"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "Mango lassi"
+    },
+    {
+      "path": "line_items[2].quantity",
+      "kind": "number",
+      "value": "2"
+    },
+    {
+      "path": "line_items[2].unit_price",
+      "kind": "amount",
+      "value": "4.50"
+    },
+    {
+      "path": "line_items[2].amount",
+      "kind": "amount",
+      "value": "9.00"
+    }
+  ]
+}

@@ -1,0 +1,121 @@
+{
+  "document": "delivery-note-04.pdf",
+  "doc_type": "delivery_note",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "fr"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "supplier_name",
+      "kind": "text",
+      "value": "Atelier Verlaine Graphisme SARL"
+    },
+    {
+      "path": "customer_name",
+      "kind": "text",
+      "value": "Librairie du Héron Bleu"
+    },
+    {
+      "path": "ship_to_address",
+      "kind": "text",
+      "value": "31 quai des Lanternes, 23456 Roseval, Exemplie"
+    },
+    {
+      "path": "delivery_note_number",
+      "kind": "text",
+      "value": "BL-0342"
+    },
+    {
+      "path": "po_number",
+      "kind": "text",
+      "value": "BC-1187"
+    },
+    {
+      "path": "carrier",
+      "kind": "text",
+      "value": "Transports Albatros"
+    },
+    {
+      "path": "tracking_number",
+      "kind": "text",
+      "value": "TA-2209-77314"
+    },
+    {
+      "path": "delivery_date",
+      "kind": "date",
+      "value": "2026-09-24"
+    },
+    {
+      "path": "total_packages",
+      "kind": "number",
+      "value": "2"
+    },
+    {
+      "path": "total_quantity",
+      "kind": "number",
+      "value": "650"
+    },
+    {
+      "path": "line_items[0].item_code",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Affiches A2, impression quadrichromie"
+    },
+    {
+      "path": "line_items[0].quantity_ordered",
+      "kind": "number",
+      "value": null
+    },
+    {
+      "path": "line_items[0].quantity_delivered",
+      "kind": "number",
+      "value": "150"
+    },
+    {
+      "path": "line_items[0].unit",
+      "kind": "text",
+      "value": "ex."
+    },
+    {
+      "path": "line_items[1].item_code",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Marque-pages illustrés"
+    },
+    {
+      "path": "line_items[1].quantity_ordered",
+      "kind": "number",
+      "value": null
+    },
+    {
+      "path": "line_items[1].quantity_delivered",
+      "kind": "number",
+      "value": "500"
+    },
+    {
+      "path": "line_items[1].unit",
+      "kind": "text",
+      "value": "ex."
+    }
+  ]
+}

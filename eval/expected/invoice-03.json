@@ -1,0 +1,1091 @@
+{
+  "document": "invoice-03.pdf",
+  "doc_type": "invoice",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "en"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "USD"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "USD"
+    },
+    {
+      "path": "vendor_name",
+      "kind": "text",
+      "value": "Bluegill Lab Provisions Inc."
+    },
+    {
+      "path": "vendor_address",
+      "kind": "text",
+      "value": "1400 Mockingbird Loop, Fairhaven Bluffs, EX 00412, Examplia"
+    },
+    {
+      "path": "vendor_tax_id",
+      "kind": "text",
+      "value": "EX-58-2201947"
+    },
+    {
+      "path": "customer_name",
+      "kind": "text",
+      "value": "Cinderpine Brewing Collective"
+    },
+    {
+      "path": "customer_address",
+      "kind": "text",
+      "value": "77 Hopvine Street, Barleyport, EX 00981, Examplia"
+    },
+    {
+      "path": "customer_tax_id",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "invoice_number",
+      "kind": "text",
+      "value": "BLP-008812"
+    },
+    {
+      "path": "purchase_order_number",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "payment_terms",
+      "kind": "text",
+      "value": "Net 45"
+    },
+    {
+      "path": "invoice_date",
+      "kind": "date",
+      "value": "2026-10-06"
+    },
+    {
+      "path": "due_date",
+      "kind": "date",
+      "value": "2026-11-20"
+    },
+    {
+      "path": "subtotal",
+      "kind": "amount",
+      "value": "1665.00"
+    },
+    {
+      "path": "tax_total",
+      "kind": "amount",
+      "value": "141.08"
+    },
+    {
+      "path": "shipping",
+      "kind": "amount",
+      "value": "45.00"
+    },
+    {
+      "path": "discount_total",
+      "kind": "amount",
+      "value": "0.00"
+    },
+    {
+      "path": "total",
+      "kind": "amount",
+      "value": "1851.08"
+    },
+    {
+      "path": "amount_paid",
+      "kind": "amount",
+      "value": null
+    },
+    {
+      "path": "amount_due",
+      "kind": "amount",
+      "value": "1851.08"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Nitrile gloves, size M (100)"
+    },
+    {
+      "path": "line_items[0].item_code",
+      "kind": "text",
+      "value": "BLP-1001"
+    },
+    {
+      "path": "line_items[0].quantity",
+      "kind": "number",
+      "value": "10"
+    },
+    {
+      "path": "line_items[0].unit",
+      "kind": "text",
+      "value": "box"
+    },
+    {
+      "path": "line_items[0].unit_price",
+      "kind": "amount",
+      "value": "9.80"
+    },
+    {
+      "path": "line_items[0].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[0].amount",
+      "kind": "amount",
+      "value": "98.00"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Nitrile gloves, size L (100)"
+    },
+    {
+      "path": "line_items[1].item_code",
+      "kind": "text",
+      "value": "BLP-1002"
+    },
+    {
+      "path": "line_items[1].quantity",
+      "kind": "number",
+      "value": "10"
+    },
+    {
+      "path": "line_items[1].unit",
+      "kind": "text",
+      "value": "box"
+    },
+    {
+      "path": "line_items[1].unit_price",
+      "kind": "amount",
+      "value": "9.80"
+    },
+    {
+      "path": "line_items[1].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[1].amount",
+      "kind": "amount",
+      "value": "98.00"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "pH test strips, 0-14 (100)"
+    },
+    {
+      "path": "line_items[2].item_code",
+      "kind": "text",
+      "value": "BLP-1110"
+    },
+    {
+      "path": "line_items[2].quantity",
+      "kind": "number",
+      "value": "6"
+    },
+    {
+      "path": "line_items[2].unit",
+      "kind": "text",
+      "value": "pack"
+    },
+    {
+      "path": "line_items[2].unit_price",
+      "kind": "amount",
+      "value": "7.45"
+    },
+    {
+      "path": "line_items[2].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[2].amount",
+      "kind": "amount",
+      "value": "44.70"
+    },
+    {
+      "path": "line_items[3].description",
+      "kind": "text",
+      "value": "Glass beaker, 250 ml"
+    },
+    {
+      "path": "line_items[3].item_code",
+      "kind": "text",
+      "value": "BLP-1204"
+    },
+    {
+      "path": "line_items[3].quantity",
+      "kind": "number",
+      "value": "12"
+    },
+    {
+      "path": "line_items[3].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[3].unit_price",
+      "kind": "amount",
+      "value": "4.60"
+    },
+    {
+      "path": "line_items[3].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[3].amount",
+      "kind": "amount",
+      "value": "55.20"
+    },
+    {
+      "path": "line_items[4].description",
+      "kind": "text",
+      "value": "Glass beaker, 1000 ml"
+    },
+    {
+      "path": "line_items[4].item_code",
+      "kind": "text",
+      "value": "BLP-1205"
+    },
+    {
+      "path": "line_items[4].quantity",
+      "kind": "number",
+      "value": "6"
+    },
+    {
+      "path": "line_items[4].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[4].unit_price",
+      "kind": "amount",
+      "value": "9.25"
+    },
+    {
+      "path": "line_items[4].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[4].amount",
+      "kind": "amount",
+      "value": "55.50"
+    },
+    {
+      "path": "line_items[5].description",
+      "kind": "text",
+      "value": "Graduated cylinder, 100 ml"
+    },
+    {
+      "path": "line_items[5].item_code",
+      "kind": "text",
+      "value": "BLP-1310"
+    },
+    {
+      "path": "line_items[5].quantity",
+      "kind": "number",
+      "value": "4"
+    },
+    {
+      "path": "line_items[5].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[5].unit_price",
+      "kind": "amount",
+      "value": "11.90"
+    },
+    {
+      "path": "line_items[5].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[5].amount",
+      "kind": "amount",
+      "value": "47.60"
+    },
+    {
+      "path": "line_items[6].description",
+      "kind": "text",
+      "value": "Hydrometer, 1.000-1.100"
+    },
+    {
+      "path": "line_items[6].item_code",
+      "kind": "text",
+      "value": "BLP-1402"
+    },
+    {
+      "path": "line_items[6].quantity",
+      "kind": "number",
+      "value": "3"
+    },
+    {
+      "path": "line_items[6].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[6].unit_price",
+      "kind": "amount",
+      "value": "18.50"
+    },
+    {
+      "path": "line_items[6].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[6].amount",
+      "kind": "amount",
+      "value": "55.50"
+    },
+    {
+      "path": "line_items[7].description",
+      "kind": "text",
+      "value": "Refractometer, Brix 0-32"
+    },
+    {
+      "path": "line_items[7].item_code",
+      "kind": "text",
+      "value": "BLP-1415"
+    },
+    {
+      "path": "line_items[7].quantity",
+      "kind": "number",
+      "value": "1"
+    },
+    {
+      "path": "line_items[7].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[7].unit_price",
+      "kind": "amount",
+      "value": "64.00"
+    },
+    {
+      "path": "line_items[7].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[7].amount",
+      "kind": "amount",
+      "value": "64.00"
+    },
+    {
+      "path": "line_items[8].description",
+      "kind": "text",
+      "value": "Sanitiser concentrate, 5 L"
+    },
+    {
+      "path": "line_items[8].item_code",
+      "kind": "text",
+      "value": "BLP-1520"
+    },
+    {
+      "path": "line_items[8].quantity",
+      "kind": "number",
+      "value": "4"
+    },
+    {
+      "path": "line_items[8].unit",
+      "kind": "text",
+      "value": "can"
+    },
+    {
+      "path": "line_items[8].unit_price",
+      "kind": "amount",
+      "value": "27.30"
+    },
+    {
+      "path": "line_items[8].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[8].amount",
+      "kind": "amount",
+      "value": "109.20"
+    },
+    {
+      "path": "line_items[9].description",
+      "kind": "text",
+      "value": "Spray bottle, 1 L"
+    },
+    {
+      "path": "line_items[9].item_code",
+      "kind": "text",
+      "value": "BLP-1522"
+    },
+    {
+      "path": "line_items[9].quantity",
+      "kind": "number",
+      "value": "8"
+    },
+    {
+      "path": "line_items[9].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[9].unit_price",
+      "kind": "amount",
+      "value": "3.15"
+    },
+    {
+      "path": "line_items[9].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[9].amount",
+      "kind": "amount",
+      "value": "25.20"
+    },
+    {
+      "path": "line_items[10].description",
+      "kind": "text",
+      "value": "Sample vials, 50 ml (24)"
+    },
+    {
+      "path": "line_items[10].item_code",
+      "kind": "text",
+      "value": "BLP-1601"
+    },
+    {
+      "path": "line_items[10].quantity",
+      "kind": "number",
+      "value": "5"
+    },
+    {
+      "path": "line_items[10].unit",
+      "kind": "text",
+      "value": "pack"
+    },
+    {
+      "path": "line_items[10].unit_price",
+      "kind": "amount",
+      "value": "12.40"
+    },
+    {
+      "path": "line_items[10].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[10].amount",
+      "kind": "amount",
+      "value": "62.00"
+    },
+    {
+      "path": "line_items[11].description",
+      "kind": "text",
+      "value": "Vial labels, waterproof (500)"
+    },
+    {
+      "path": "line_items[11].item_code",
+      "kind": "text",
+      "value": "BLP-1602"
+    },
+    {
+      "path": "line_items[11].quantity",
+      "kind": "number",
+      "value": "2"
+    },
+    {
+      "path": "line_items[11].unit",
+      "kind": "text",
+      "value": "roll"
+    },
+    {
+      "path": "line_items[11].unit_price",
+      "kind": "amount",
+      "value": "8.90"
+    },
+    {
+      "path": "line_items[11].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[11].amount",
+      "kind": "amount",
+      "value": "17.80"
+    },
+    {
+      "path": "line_items[12].description",
+      "kind": "text",
+      "value": "Digital thermometer probe"
+    },
+    {
+      "path": "line_items[12].item_code",
+      "kind": "text",
+      "value": "BLP-1710"
+    },
+    {
+      "path": "line_items[12].quantity",
+      "kind": "number",
+      "value": "3"
+    },
+    {
+      "path": "line_items[12].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[12].unit_price",
+      "kind": "amount",
+      "value": "22.75"
+    },
+    {
+      "path": "line_items[12].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[12].amount",
+      "kind": "amount",
+      "value": "68.25"
+    },
+    {
+      "path": "line_items[13].description",
+      "kind": "text",
+      "value": "Pipette tips, 1 ml (1000)"
+    },
+    {
+      "path": "line_items[13].item_code",
+      "kind": "text",
+      "value": "BLP-1801"
+    },
+    {
+      "path": "line_items[13].quantity",
+      "kind": "number",
+      "value": "2"
+    },
+    {
+      "path": "line_items[13].unit",
+      "kind": "text",
+      "value": "box"
+    },
+    {
+      "path": "line_items[13].unit_price",
+      "kind": "amount",
+      "value": "15.60"
+    },
+    {
+      "path": "line_items[13].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[13].amount",
+      "kind": "amount",
+      "value": "31.20"
+    },
+    {
+      "path": "line_items[14].description",
+      "kind": "text",
+      "value": "Micropipette, 100-1000 ul"
+    },
+    {
+      "path": "line_items[14].item_code",
+      "kind": "text",
+      "value": "BLP-1802"
+    },
+    {
+      "path": "line_items[14].quantity",
+      "kind": "number",
+      "value": "1"
+    },
+    {
+      "path": "line_items[14].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[14].unit_price",
+      "kind": "amount",
+      "value": "129.00"
+    },
+    {
+      "path": "line_items[14].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[14].amount",
+      "kind": "amount",
+      "value": "129.00"
+    },
+    {
+      "path": "line_items[15].description",
+      "kind": "text",
+      "value": "Petri dishes, 90 mm (500)"
+    },
+    {
+      "path": "line_items[15].item_code",
+      "kind": "text",
+      "value": "BLP-1905"
+    },
+    {
+      "path": "line_items[15].quantity",
+      "kind": "number",
+      "value": "1"
+    },
+    {
+      "path": "line_items[15].unit",
+      "kind": "text",
+      "value": "case"
+    },
+    {
+      "path": "line_items[15].unit_price",
+      "kind": "amount",
+      "value": "58.20"
+    },
+    {
+      "path": "line_items[15].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[15].amount",
+      "kind": "amount",
+      "value": "58.20"
+    },
+    {
+      "path": "line_items[16].description",
+      "kind": "text",
+      "value": "Yeast nutrient, 500 g"
+    },
+    {
+      "path": "line_items[16].item_code",
+      "kind": "text",
+      "value": "BLP-2001"
+    },
+    {
+      "path": "line_items[16].quantity",
+      "kind": "number",
+      "value": "4"
+    },
+    {
+      "path": "line_items[16].unit",
+      "kind": "text",
+      "value": "tub"
+    },
+    {
+      "path": "line_items[16].unit_price",
+      "kind": "amount",
+      "value": "13.80"
+    },
+    {
+      "path": "line_items[16].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[16].amount",
+      "kind": "amount",
+      "value": "55.20"
+    },
+    {
+      "path": "line_items[17].description",
+      "kind": "text",
+      "value": "Lab notebook, A4, grid"
+    },
+    {
+      "path": "line_items[17].item_code",
+      "kind": "text",
+      "value": "BLP-2010"
+    },
+    {
+      "path": "line_items[17].quantity",
+      "kind": "number",
+      "value": "6"
+    },
+    {
+      "path": "line_items[17].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[17].unit_price",
+      "kind": "amount",
+      "value": "5.40"
+    },
+    {
+      "path": "line_items[17].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[17].amount",
+      "kind": "amount",
+      "value": "32.40"
+    },
+    {
+      "path": "line_items[18].description",
+      "kind": "text",
+      "value": "Wash bottle, 500 ml"
+    },
+    {
+      "path": "line_items[18].item_code",
+      "kind": "text",
+      "value": "BLP-2104"
+    },
+    {
+      "path": "line_items[18].quantity",
+      "kind": "number",
+      "value": "6"
+    },
+    {
+      "path": "line_items[18].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[18].unit_price",
+      "kind": "amount",
+      "value": "4.95"
+    },
+    {
+      "path": "line_items[18].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[18].amount",
+      "kind": "amount",
+      "value": "29.70"
+    },
+    {
+      "path": "line_items[19].description",
+      "kind": "text",
+      "value": "Funnel set, polypropylene"
+    },
+    {
+      "path": "line_items[19].item_code",
+      "kind": "text",
+      "value": "BLP-2203"
+    },
+    {
+      "path": "line_items[19].quantity",
+      "kind": "number",
+      "value": "2"
+    },
+    {
+      "path": "line_items[19].unit",
+      "kind": "text",
+      "value": "set"
+    },
+    {
+      "path": "line_items[19].unit_price",
+      "kind": "amount",
+      "value": "9.60"
+    },
+    {
+      "path": "line_items[19].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[19].amount",
+      "kind": "amount",
+      "value": "19.20"
+    },
+    {
+      "path": "line_items[20].description",
+      "kind": "text",
+      "value": "Safety goggles, anti-fog"
+    },
+    {
+      "path": "line_items[20].item_code",
+      "kind": "text",
+      "value": "BLP-2301"
+    },
+    {
+      "path": "line_items[20].quantity",
+      "kind": "number",
+      "value": "8"
+    },
+    {
+      "path": "line_items[20].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[20].unit_price",
+      "kind": "amount",
+      "value": "6.70"
+    },
+    {
+      "path": "line_items[20].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[20].amount",
+      "kind": "amount",
+      "value": "53.60"
+    },
+    {
+      "path": "line_items[21].description",
+      "kind": "text",
+      "value": "Lab coat, white, size L"
+    },
+    {
+      "path": "line_items[21].item_code",
+      "kind": "text",
+      "value": "BLP-2402"
+    },
+    {
+      "path": "line_items[21].quantity",
+      "kind": "number",
+      "value": "4"
+    },
+    {
+      "path": "line_items[21].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[21].unit_price",
+      "kind": "amount",
+      "value": "24.50"
+    },
+    {
+      "path": "line_items[21].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[21].amount",
+      "kind": "amount",
+      "value": "98.00"
+    },
+    {
+      "path": "line_items[22].description",
+      "kind": "text",
+      "value": "Magnetic stir bar set"
+    },
+    {
+      "path": "line_items[22].item_code",
+      "kind": "text",
+      "value": "BLP-2510"
+    },
+    {
+      "path": "line_items[22].quantity",
+      "kind": "number",
+      "value": "1"
+    },
+    {
+      "path": "line_items[22].unit",
+      "kind": "text",
+      "value": "set"
+    },
+    {
+      "path": "line_items[22].unit_price",
+      "kind": "amount",
+      "value": "19.90"
+    },
+    {
+      "path": "line_items[22].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[22].amount",
+      "kind": "amount",
+      "value": "19.90"
+    },
+    {
+      "path": "line_items[23].description",
+      "kind": "text",
+      "value": "Magnetic stirrer, 5 L"
+    },
+    {
+      "path": "line_items[23].item_code",
+      "kind": "text",
+      "value": "BLP-2511"
+    },
+    {
+      "path": "line_items[23].quantity",
+      "kind": "number",
+      "value": "1"
+    },
+    {
+      "path": "line_items[23].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[23].unit_price",
+      "kind": "amount",
+      "value": "142.00"
+    },
+    {
+      "path": "line_items[23].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[23].amount",
+      "kind": "amount",
+      "value": "142.00"
+    },
+    {
+      "path": "line_items[24].description",
+      "kind": "text",
+      "value": "Tubing, silicone, 10 m"
+    },
+    {
+      "path": "line_items[24].item_code",
+      "kind": "text",
+      "value": "BLP-2602"
+    },
+    {
+      "path": "line_items[24].quantity",
+      "kind": "number",
+      "value": "2"
+    },
+    {
+      "path": "line_items[24].unit",
+      "kind": "text",
+      "value": "roll"
+    },
+    {
+      "path": "line_items[24].unit_price",
+      "kind": "amount",
+      "value": "31.20"
+    },
+    {
+      "path": "line_items[24].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[24].amount",
+      "kind": "amount",
+      "value": "62.40"
+    },
+    {
+      "path": "line_items[25].description",
+      "kind": "text",
+      "value": "Hose clamps, stainless (20)"
+    },
+    {
+      "path": "line_items[25].item_code",
+      "kind": "text",
+      "value": "BLP-2703"
+    },
+    {
+      "path": "line_items[25].quantity",
+      "kind": "number",
+      "value": "3"
+    },
+    {
+      "path": "line_items[25].unit",
+      "kind": "text",
+      "value": "pack"
+    },
+    {
+      "path": "line_items[25].unit_price",
+      "kind": "amount",
+      "value": "8.35"
+    },
+    {
+      "path": "line_items[25].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[25].amount",
+      "kind": "amount",
+      "value": "25.05"
+    },
+    {
+      "path": "line_items[26].description",
+      "kind": "text",
+      "value": "Cleaning brushes, assorted"
+    },
+    {
+      "path": "line_items[26].item_code",
+      "kind": "text",
+      "value": "BLP-2804"
+    },
+    {
+      "path": "line_items[26].quantity",
+      "kind": "number",
+      "value": "2"
+    },
+    {
+      "path": "line_items[26].unit",
+      "kind": "text",
+      "value": "set"
+    },
+    {
+      "path": "line_items[26].unit_price",
+      "kind": "amount",
+      "value": "11.10"
+    },
+    {
+      "path": "line_items[26].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[26].amount",
+      "kind": "amount",
+      "value": "22.20"
+    },
+    {
+      "path": "line_items[27].description",
+      "kind": "text",
+      "value": "Storage rack, 4 tiers"
+    },
+    {
+      "path": "line_items[27].item_code",
+      "kind": "text",
+      "value": "BLP-2905"
+    },
+    {
+      "path": "line_items[27].quantity",
+      "kind": "number",
+      "value": "1"
+    },
+    {
+      "path": "line_items[27].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[27].unit_price",
+      "kind": "amount",
+      "value": "86.00"
+    },
+    {
+      "path": "line_items[27].tax_rate",
+      "kind": "percent",
+      "value": null
+    },
+    {
+      "path": "line_items[27].amount",
+      "kind": "amount",
+      "value": "86.00"
+    }
+  ]
+}

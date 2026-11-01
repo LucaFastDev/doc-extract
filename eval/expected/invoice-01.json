@@ -1,0 +1,251 @@
+{
+  "document": "invoice-01.pdf",
+  "doc_type": "invoice",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "en"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "vendor_name",
+      "kind": "text",
+      "value": "Thistledown Office Supply Co."
+    },
+    {
+      "path": "vendor_address",
+      "kind": "text",
+      "value": "22 Quarry Mews, Ashbourne Vale AV3 8LT, Examplia"
+    },
+    {
+      "path": "vendor_tax_id",
+      "kind": "text",
+      "value": "EX204118377"
+    },
+    {
+      "path": "customer_name",
+      "kind": "text",
+      "value": "Harrowgate Robotics Ltd"
+    },
+    {
+      "path": "customer_address",
+      "kind": "text",
+      "value": "9 Gearwheel Park, Coilbridge CB7 2RQ, Examplia"
+    },
+    {
+      "path": "customer_tax_id",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "invoice_number",
+      "kind": "text",
+      "value": "TOS-24-01187"
+    },
+    {
+      "path": "purchase_order_number",
+      "kind": "text",
+      "value": "HR-PO-5521"
+    },
+    {
+      "path": "payment_terms",
+      "kind": "text",
+      "value": "Net 30"
+    },
+    {
+      "path": "invoice_date",
+      "kind": "date",
+      "value": "2026-09-03"
+    },
+    {
+      "path": "due_date",
+      "kind": "date",
+      "value": "2026-10-03"
+    },
+    {
+      "path": "subtotal",
+      "kind": "amount",
+      "value": "400.20"
+    },
+    {
+      "path": "tax_total",
+      "kind": "amount",
+      "value": "78.32"
+    },
+    {
+      "path": "shipping",
+      "kind": "amount",
+      "value": "12.00"
+    },
+    {
+      "path": "discount_total",
+      "kind": "amount",
+      "value": "0.00"
+    },
+    {
+      "path": "total",
+      "kind": "amount",
+      "value": "490.52"
+    },
+    {
+      "path": "amount_paid",
+      "kind": "amount",
+      "value": null
+    },
+    {
+      "path": "amount_due",
+      "kind": "amount",
+      "value": "490.52"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Laser printer toner, black"
+    },
+    {
+      "path": "line_items[0].item_code",
+      "kind": "text",
+      "value": "TOS-P-201"
+    },
+    {
+      "path": "line_items[0].quantity",
+      "kind": "number",
+      "value": "3"
+    },
+    {
+      "path": "line_items[0].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[0].unit_price",
+      "kind": "amount",
+      "value": "64.90"
+    },
+    {
+      "path": "line_items[0].tax_rate",
+      "kind": "percent",
+      "value": "19"
+    },
+    {
+      "path": "line_items[0].amount",
+      "kind": "amount",
+      "value": "194.70"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Archive boxes, pack of 10"
+    },
+    {
+      "path": "line_items[1].item_code",
+      "kind": "text",
+      "value": "TOS-S-118"
+    },
+    {
+      "path": "line_items[1].quantity",
+      "kind": "number",
+      "value": "6"
+    },
+    {
+      "path": "line_items[1].unit",
+      "kind": "text",
+      "value": "pack"
+    },
+    {
+      "path": "line_items[1].unit_price",
+      "kind": "amount",
+      "value": "14.25"
+    },
+    {
+      "path": "line_items[1].tax_rate",
+      "kind": "percent",
+      "value": "19"
+    },
+    {
+      "path": "line_items[1].amount",
+      "kind": "amount",
+      "value": "85.50"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "Ergonomic footrest"
+    },
+    {
+      "path": "line_items[2].item_code",
+      "kind": "text",
+      "value": "TOS-D-044"
+    },
+    {
+      "path": "line_items[2].quantity",
+      "kind": "number",
+      "value": "2"
+    },
+    {
+      "path": "line_items[2].unit",
+      "kind": "text",
+      "value": "pcs"
+    },
+    {
+      "path": "line_items[2].unit_price",
+      "kind": "amount",
+      "value": "39.00"
+    },
+    {
+      "path": "line_items[2].tax_rate",
+      "kind": "percent",
+      "value": "19"
+    },
+    {
+      "path": "line_items[2].amount",
+      "kind": "amount",
+      "value": "78.00"
+    },
+    {
+      "path": "line_items[3].description",
+      "kind": "text",
+      "value": "Whiteboard markers, assorted (12)"
+    },
+    {
+      "path": "line_items[3].item_code",
+      "kind": "text",
+      "value": "TOS-C-310"
+    },
+    {
+      "path": "line_items[3].quantity",
+      "kind": "number",
+      "value": "5"
+    },
+    {
+      "path": "line_items[3].unit",
+      "kind": "text",
+      "value": "set"
+    },
+    {
+      "path": "line_items[3].unit_price",
+      "kind": "amount",
+      "value": "8.40"
+    },
+    {
+      "path": "line_items[3].tax_rate",
+      "kind": "percent",
+      "value": "19"
+    },
+    {
+      "path": "line_items[3].amount",
+      "kind": "amount",
+      "value": "42.00"
+    }
+  ]
+}

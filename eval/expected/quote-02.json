@@ -1,0 +1,171 @@
+{
+  "document": "quote-02.pdf",
+  "doc_type": "quote",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "it"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "€"
+    },
+    {
+      "path": "supplier_name",
+      "kind": "text",
+      "value": "Fornaci Ventodoro S.r.l."
+    },
+    {
+      "path": "supplier_address",
+      "kind": "text",
+      "value": "Via delle Ceramiche 18, 45678 Collerosa, Esemplia"
+    },
+    {
+      "path": "customer_name",
+      "kind": "text",
+      "value": "Trattoria Il Gabbiano"
+    },
+    {
+      "path": "customer_address",
+      "kind": "text",
+      "value": "Piazza del Porto 3, 56789 Marebello, Esemplia"
+    },
+    {
+      "path": "quote_number",
+      "kind": "text",
+      "value": "PV-2026-211"
+    },
+    {
+      "path": "payment_terms",
+      "kind": "text",
+      "value": "Pagamento a 30 giorni"
+    },
+    {
+      "path": "quote_date",
+      "kind": "date",
+      "value": "2026-10-09"
+    },
+    {
+      "path": "valid_until",
+      "kind": "date",
+      "value": "2026-11-08"
+    },
+    {
+      "path": "subtotal",
+      "kind": "amount",
+      "value": "3734.00"
+    },
+    {
+      "path": "discount_total",
+      "kind": "amount",
+      "value": "150.00"
+    },
+    {
+      "path": "tax_total",
+      "kind": "amount",
+      "value": "788.48"
+    },
+    {
+      "path": "total",
+      "kind": "amount",
+      "value": "4372.48"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "Forno a legna, diametro 90 cm"
+    },
+    {
+      "path": "line_items[0].item_code",
+      "kind": "text",
+      "value": "FV-FL-90"
+    },
+    {
+      "path": "line_items[0].quantity",
+      "kind": "number",
+      "value": "1"
+    },
+    {
+      "path": "line_items[0].unit",
+      "kind": "text",
+      "value": "pz"
+    },
+    {
+      "path": "line_items[0].unit_price",
+      "kind": "amount",
+      "value": "3200.00"
+    },
+    {
+      "path": "line_items[0].amount",
+      "kind": "amount",
+      "value": "3200.00"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "Installazione e collaudo"
+    },
+    {
+      "path": "line_items[1].item_code",
+      "kind": "text",
+      "value": "FV-INS-1"
+    },
+    {
+      "path": "line_items[1].quantity",
+      "kind": "number",
+      "value": "1"
+    },
+    {
+      "path": "line_items[1].unit",
+      "kind": "text",
+      "value": "pz"
+    },
+    {
+      "path": "line_items[1].unit_price",
+      "kind": "amount",
+      "value": "450.00"
+    },
+    {
+      "path": "line_items[1].amount",
+      "kind": "amount",
+      "value": "450.00"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "Pala per pizza, alluminio"
+    },
+    {
+      "path": "line_items[2].item_code",
+      "kind": "text",
+      "value": "FV-PL-3"
+    },
+    {
+      "path": "line_items[2].quantity",
+      "kind": "number",
+      "value": "3"
+    },
+    {
+      "path": "line_items[2].unit",
+      "kind": "text",
+      "value": "pz"
+    },
+    {
+      "path": "line_items[2].unit_price",
+      "kind": "amount",
+      "value": "28.00"
+    },
+    {
+      "path": "line_items[2].amount",
+      "kind": "amount",
+      "value": "84.00"
+    }
+  ]
+}

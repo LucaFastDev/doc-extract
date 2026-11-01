@@ -1,0 +1,161 @@
+{
+  "document": "receipt-02.png",
+  "doc_type": "receipt",
+  "fields": [
+    {
+      "path": "language",
+      "kind": "text",
+      "value": "de"
+    },
+    {
+      "path": "currency",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "currency_as_printed",
+      "kind": "text",
+      "value": "EUR"
+    },
+    {
+      "path": "merchant_name",
+      "kind": "text",
+      "value": "BAECKEREI KORNBLUME"
+    },
+    {
+      "path": "merchant_address",
+      "kind": "text",
+      "value": "LINDENPLATZ 7, 12345 MEHLINGEN"
+    },
+    {
+      "path": "merchant_tax_id",
+      "kind": "text",
+      "value": "EX 271 093 554"
+    },
+    {
+      "path": "receipt_number",
+      "kind": "text",
+      "value": "0583"
+    },
+    {
+      "path": "payment_method",
+      "kind": "text",
+      "value": "BAR"
+    },
+    {
+      "path": "card_last4",
+      "kind": "text",
+      "value": null
+    },
+    {
+      "path": "transaction_date",
+      "kind": "date",
+      "value": "2026-10-10"
+    },
+    {
+      "path": "transaction_time",
+      "kind": "text",
+      "value": "07:15"
+    },
+    {
+      "path": "subtotal",
+      "kind": "amount",
+      "value": "14.20"
+    },
+    {
+      "path": "tax_total",
+      "kind": "amount",
+      "value": "0.99"
+    },
+    {
+      "path": "tip",
+      "kind": "amount",
+      "value": "0.00"
+    },
+    {
+      "path": "total",
+      "kind": "amount",
+      "value": "15.19"
+    },
+    {
+      "path": "line_items[0].description",
+      "kind": "text",
+      "value": "ROGGENBROT"
+    },
+    {
+      "path": "line_items[0].quantity",
+      "kind": "number",
+      "value": "1"
+    },
+    {
+      "path": "line_items[0].unit_price",
+      "kind": "amount",
+      "value": "3.90"
+    },
+    {
+      "path": "line_items[0].amount",
+      "kind": "amount",
+      "value": "3.90"
+    },
+    {
+      "path": "line_items[1].description",
+      "kind": "text",
+      "value": "BREZEL"
+    },
+    {
+      "path": "line_items[1].quantity",
+      "kind": "number",
+      "value": "4"
+    },
+    {
+      "path": "line_items[1].unit_price",
+      "kind": "amount",
+      "value": "0.85"
+    },
+    {
+      "path": "line_items[1].amount",
+      "kind": "amount",
+      "value": "3.40"
+    },
+    {
+      "path": "line_items[2].description",
+      "kind": "text",
+      "value": "KAFFEE"
+    },
+    {
+      "path": "line_items[2].quantity",
+      "kind": "number",
+      "value": "2"
+    },
+    {
+      "path": "line_items[2].unit_price",
+      "kind": "amount",
+      "value": "2.40"
+    },
+    {
+      "path": "line_items[2].amount",
+      "kind": "amount",
+      "value": "4.80"
+    },
+    {
+      "path": "line_items[3].description",
+      "kind": "text",
+      "value": "APFELTASCHE"
+    },
+    {
+      "path": "line_items[3].quantity",
+      "kind": "number",
+      "value": "1"
+    },
+    {
+      "path": "line_items[3].unit_price",
+      "kind": "amount",
+      "value": "2.10"
+    },
+    {
+      "path": "line_items[3].amount",
+      "kind": "amount",
+      "value": "2.10"
+    }
+  ]
+}
