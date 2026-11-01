@@ -1,5 +1,7 @@
+import { readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_PATH, isPublicPath, safeNextPath, signInPath, signInUrl } from './paths'
+import { DEFAULT_PATH, isProtectedPath, isPublicPath, safeNextPath, signInPath, signInUrl } from './paths'
 
 describe('safeNextPath', () => {
   it('keeps a path on this site, with its query and hash', () => {
@@ -75,6 +77,42 @@ describe('isPublicPath', () => {
       expect(isPublicPath(path)).toBe(false)
     },
   )
+})
+
+describe('isProtectedPath', () => {
+  it.each(['/documents', '/documents/export', '/documents/1', '/members', '/billing', '/invite/abc', '/api/documents/1'])(
+    '%s is protected',
+    (path) => {
+      expect(isProtectedPath(path)).toBe(true)
+    },
+  )
+
+  it.each(['/this-does-not-exist', '/settings', '/documentsx', '/membership'])('%s is no route of ours', (path) => {
+    expect(isProtectedPath(path)).toBe(false)
+  })
+
+  // The proxy lets a path that is neither public nor protected through to the 404 page, so a route
+  // added to src/app and put in neither list would be open to a signed-out visitor at the proxy.
+  it('covers every route in src/app, as public or protected', () => {
+    const app = join(process.cwd(), 'src/app')
+    const routes = new Set<string>()
+    const walk = (dir: string, segments: string[]) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (entry.isDirectory()) {
+          const group = entry.name.startsWith('(') && entry.name.endsWith(')')
+          walk(join(dir, entry.name), group ? segments : [...segments, entry.name])
+        } else if (/^(page|route)\.(tsx?|jsx?)$/.test(entry.name) && segments.length > 0) {
+          // A dynamic segment, [id], stands for any value.
+          routes.add(`/${segments.map((s) => s.replace(/^\[.*\]$/, 'x')).join('/')}`)
+        }
+      }
+    }
+    walk(app, [])
+    expect(routes.size).toBeGreaterThan(5)
+    for (const route of routes) {
+      expect(isPublicPath(route) || isProtectedPath(route), route).toBe(true)
+    }
+  })
 })
 
 describe('signInUrl', () => {

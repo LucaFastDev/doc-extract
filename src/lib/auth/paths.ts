@@ -4,13 +4,24 @@
 /** Where a signed-in user lands when no return-to path is given: the document list. */
 export const DEFAULT_PATH = '/documents'
 
-// Pages a signed-out visitor may open. Everything else sends them to sign-in.
+// Pages a signed-out visitor may open. A protected page not listed here sends them to sign-in; an
+// address under neither list is no route and answers 404 (see PROTECTED_PREFIXES below).
 const PUBLIC_PATHS = ['/', '/sign-in', '/privacy', '/terms', '/auth/callback', '/api/stripe/webhook']
 const PUBLIC_PREFIXES = ['/demo']
 
 export function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.includes(pathname)) return true
   return PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+}
+
+// The areas of the site that need a session: the signed-in pages, the invitation page and the API.
+// A path in none of these lists and under none of these prefixes is no route of ours, so a
+// signed-out visitor gets the site's 404 page for it instead of sign-in. A new top-level route
+// must be added to one list: a test reads src/app and fails for a route in neither.
+export const PROTECTED_PREFIXES = ['/documents', '/members', '/billing', '/invite', '/api']
+
+export function isProtectedPath(pathname: string): boolean {
+  return PROTECTED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
 }
 
 const NEVER_RETURN_TO = ['/sign-in', '/auth/callback']
