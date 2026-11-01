@@ -45,6 +45,9 @@ const FUNCTIONS = [
   { signature: 'public.line_item_count(uuid)', definer: false, roles: [] },
   { signature: 'public.shift_line_items(uuid, integer, integer)', definer: false, roles: [] },
   { signature: 'public.lock_document_for_review(uuid, text[], text)', definer: false, roles: [] },
+  // Milestone 10: the budget line and the purge job's sweep.
+  { signature: 'public.get_budget_status()', definer: true, roles: ['authenticated'] },
+  { signature: 'public.release_stale_spend_reservations()', definer: false, roles: ['service_role'] },
 ]
 
 const ROLES = ['public', 'anon', 'authenticated', 'service_role']

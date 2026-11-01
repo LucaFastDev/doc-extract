@@ -79,6 +79,11 @@ inspector_port = 12083
 [functions.process-queue]
 verify_jwt = false
 
+# The same for the daily purge-files job (ARCHITECTURE.md section 8); production deploys it with
+# --no-verify-jwt too.
+[functions.purge-files]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 58327
