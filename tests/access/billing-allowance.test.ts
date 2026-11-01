@@ -12,18 +12,19 @@ import { adminClient, createDocument, personalWorkspaceId, signUp, type TestUser
 
 const SECRET = 'whsec_local_test_only'
 const MONTH = "date_trunc('month', now() at time zone 'utc')::date"
-const stripe = {} as WebhookStripe
 
 async function deliver(type: string, subscription: Record<string, unknown>) {
+  // customer.subscription.updated retrieves the current subscription: here, the one the event carries.
+  const stripe = { subscriptions: { retrieve: async () => subscription } } as unknown as WebhookStripe
   const payload = JSON.stringify({ id: `evt_${randomUUID()}`, object: 'event', type, data: { object: subscription } })
   const signature = Stripe.webhooks.generateTestHeaderString({ payload, secret: SECRET })
   const result = await handleStripeWebhook(payload, signature, { admin: adminClient, stripe: () => stripe, secret: () => SECRET })
   expect(result.status).toBe(200)
 }
 
-function subscription(ws: string, status: string) {
+function subscription(ws: string, status: string, id = `sub_${randomUUID()}`) {
   return {
-    id: `sub_${randomUUID()}`,
+    id,
     object: 'subscription',
     customer: `cus_${randomUUID()}`,
     status,
@@ -69,11 +70,13 @@ describe('US-11.1 AC-7: the allowance through a plan change', () => {
   it('refuses a further upload to a workspace that drops from Pro to Free with more than 20 pages used, and keeps them counted', async () => {
     const user = await signUp()
     const ws = await personalWorkspaceId(user)
-    await deliver('customer.subscription.updated', subscription(ws, 'active'))
+    const held = `sub_${randomUUID()}`
+    await deliver('customer.subscription.updated', subscription(ws, 'active', held))
     await setPagesUsed(ws, 30)
     expect(await limit(user, ws)).toBe(500)
 
-    await deliver('customer.subscription.deleted', subscription(ws, 'canceled'))
+    // The deletion names the subscription the workspace holds; one for another subscription is ignored.
+    await deliver('customer.subscription.deleted', subscription(ws, 'canceled', held))
 
     expect(await limit(user, ws)).toBe(20)
     expect(await pagesUsed(ws)).toBe(30)
