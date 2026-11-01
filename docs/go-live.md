@@ -225,7 +225,7 @@ secret and the two Vault entries `process-queue` already reads (Environment and 
       lists `purge-files` with "Enforce JWT verification" off and the release's deploy time, and
       `curl -X POST https://<prod ref>.supabase.co/functions/v1/purge-files` with no
       `x-cron-secret` header is answered 401 (and removes nothing).
-- [ ] The jobs are present after the migration `20261101031050_retention_budget.sql`: SQL editor,
+- [ ] The jobs are present after the migration `20261101130000_retention_budget.sql`: SQL editor,
       `select jobname, schedule, active, command like '%/purge-files%' as calls_purge from cron.job
       where jobname in ('purge-files', 'cron-history-cleanup') order by jobname`. Pass: two rows,
       both `active`; `cron-history-cleanup` at `30 3 * * *` with `calls_purge` false;

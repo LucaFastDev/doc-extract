@@ -897,7 +897,7 @@ error, and never blocks the list.
 
 ## 8. 7-day deletion
 
-A pg_cron job (`purge-files`, daily at 03:00 UTC, migration `20261101031050_retention_budget.sql`)
+A pg_cron job (`purge-files`, daily at 03:00 UTC, migration `20261101130000_retention_budget.sql`)
 calls the `purge-files` function through pg_net, as the `process-queue` job calls its function: the
 functions' base URL and `CRON_SECRET` from Vault (section 12), the secret in the `x-cron-secret`
 header. The function answers 401, and does nothing, without the right header. Otherwise, with the
