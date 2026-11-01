@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { createUser, signIn, sql, type TestUser } from './support/auth'
-import { postSubscriptionUpdated } from './support/stripe'
+import { proPlan, setPlan } from './support/stripe'
 import { addMember, personalWorkspace, switcher, useWorkspace } from './support/workspace'
 
 // The billing page's re-reads and its payment message belong to the workspace that went to Checkout
@@ -48,7 +48,7 @@ test('a Checkout return while another tab has switched workspace says nothing ab
   await otherTab.close()
 
   // The payment completes for the paid workspace, and Stripe sends the first tab back.
-  expect((await postSubscriptionUpdated(request, { ws: paid })).status()).toBe(200)
+  await setPlan(paid, proPlan(paid))
   await page.goto('/billing?checkout=success')
 
   // Whichever workspace the page now shows, it must not claim a payment for one that made none.

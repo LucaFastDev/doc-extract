@@ -1,6 +1,6 @@
 import { expect, test, type BrowserContext, type Page, type Route } from '@playwright/test'
 import { createUser, signIn, sql } from './support/auth'
-import { postEvent, postSubscriptionDeleted, postSubscriptionUpdated, setPagesUsed, setPlan, subscriptionFixture } from './support/stripe'
+import { postEvent, postSubscriptionDeleted, proPlan, setPagesUsed, setPlan, subscriptionFixture } from './support/stripe'
 import { addMember, expectNoSideScroll, personalWorkspace, switcher, useWorkspace } from './support/workspace'
 
 // The billing page and its routes (PRD US-11.1, OQ-20, OQ-24, OQ-36, OQ-37, OQ-45; issue #50). No
@@ -224,26 +224,26 @@ test.describe('no call reaches Stripe', () => {
         await page.goto('/billing')
         await expectPlan(page, 'Free', '30', '0 of 20')
 
-        expect((await postSubscriptionUpdated(request, { ws })).status()).toBe(200)
+        await setPlan(ws, proPlan(ws))
         await page.reload()
         await expectPlan(page, 'Pro', '30', '470 of 500')
         await expect(page.getByRole('button', { name: 'Manage or cancel' })).toBeVisible()
         await expect(yourPlan(page)).not.toContainText('ends on')
 
-        // 2030-03-17, in Unix seconds.
-        expect((await postSubscriptionUpdated(request, { ws, cancelAtPeriodEnd: true, periodEnd: 1_900_000_000 })).status()).toBe(200)
+        // 2030-03-17.
+        await setPlan(ws, proPlan(ws, { cancelAtPeriodEnd: true }))
         await page.reload()
         await expectPlan(page, 'Pro', '30', '470 of 500')
         await expect(yourPlan(page)).toContainText('Your Pro plan ends on 17 March 2030.')
 
-        expect((await postSubscriptionDeleted(request, { ws })).status()).toBe(200)
+        expect((await postSubscriptionDeleted(request, { ws, id: `sub_${ws}` })).status()).toBe(200)
         await page.reload()
         await expectPlan(page, 'Free', '30', '0 of 20')
         await expect(page.getByRole('button', { name: 'Upgrade' })).toBeVisible()
         await checkSideScroll(page)
       })
 
-      test('after returning from Checkout, the page picks up the new plan by itself and stops', async ({ page, context, baseURL, request }) => {
+      test('after returning from Checkout, the page picks up the new plan by itself and stops', async ({ page, context, baseURL }) => {
         const owner = await createUser('Olivia Owner')
         const ws = await personalWorkspace(owner, 'Acme books')
         const reads = countPlanReads(page)
@@ -251,7 +251,7 @@ test.describe('no call reaches Stripe', () => {
         await page.goto(`/billing?checkout=success&workspace=${ws}`)
         await expect(figure(page, 'Current plan')).toHaveText('Free')
 
-        expect((await postSubscriptionUpdated(request, { ws })).status()).toBe(200)
+        await setPlan(ws, proPlan(ws))
 
         await expectPlan(page, 'Pro', '0', '500 of 500')
         await expect(page.getByRole('button', { name: 'Manage or cancel' })).toBeVisible()
@@ -372,7 +372,7 @@ test.describe('no call reaches Stripe', () => {
         expect(reads.count).toBe(1)
       }
 
-      test('a return naming another workspace is the plain page, and says nothing about the one that paid', async ({ page, context, baseURL, request }) => {
+      test('a return naming another workspace is the plain page, and says nothing about the one that paid', async ({ page, context, baseURL }) => {
         const owner = await createUser('Olivia Owner')
         const unpaid = await personalWorkspace(owner, 'Unpaid workspace')
         const [{ id: paid }] = await sql<{ id: string }>('insert into public.workspaces (name, created_by) values ($1, $2) returning id', [
@@ -380,7 +380,7 @@ test.describe('no call reaches Stripe', () => {
           owner.id,
         ])
         await addMember(paid, owner, 'owner')
-        expect((await postSubscriptionUpdated(request, { ws: paid })).status()).toBe(200)
+        await setPlan(paid, proPlan(paid))
         const reads = countPlanReads(page)
         await signIn(context, baseURL!, owner)
         await useWorkspace(context, baseURL!, unpaid)
@@ -428,21 +428,21 @@ test.describe('no call reaches Stripe', () => {
         await expectPlan(page, 'Free', '25', '0 of 20')
 
         await goToMembers(page)
-        expect((await postSubscriptionUpdated(request, { ws })).status()).toBe(200)
+        await setPlan(ws, proPlan(ws))
         await page.goBack()
         await expectPlan(page, 'Pro', '25', '475 of 500')
         await expect(page.getByRole('button', { name: 'Manage or cancel' })).toBeVisible()
         await expect(page.getByRole('button', { name: 'Upgrade' })).toHaveCount(0)
 
         await goToMembers(page)
-        expect((await postSubscriptionDeleted(request, { ws })).status()).toBe(200)
+        expect((await postSubscriptionDeleted(request, { ws, id: `sub_${ws}` })).status()).toBe(200)
         await page.goBack()
         await expectPlan(page, 'Free', '25', '0 of 20')
         await expect(page.getByRole('button', { name: 'Upgrade' })).toBeEnabled()
         await expect(page.getByRole('button', { name: 'Manage or cancel' })).toHaveCount(0)
       })
 
-      test('Back shows a member the plan as it is now, with neither button', async ({ page, context, baseURL, request }) => {
+      test('Back shows a member the plan as it is now, with neither button', async ({ page, context, baseURL }) => {
         const owner = await createUser('Olivia Owner')
         const ws = await personalWorkspace(owner, 'Acme books')
         const member = await createUser('Mia Member')
@@ -453,7 +453,7 @@ test.describe('no call reaches Stripe', () => {
         await expectPlan(page, 'Free', '0', '20 of 20')
 
         await goToMembers(page)
-        expect((await postSubscriptionUpdated(request, { ws })).status()).toBe(200)
+        await setPlan(ws, proPlan(ws))
         await page.goBack()
 
         await expectPlan(page, 'Pro', '0', '500 of 500')
@@ -483,7 +483,7 @@ test.describe('no call reaches Stripe', () => {
         await expect(page.getByRole('button', { name: 'Upgrade' })).toBeEnabled()
       })
 
-      test('while the read on mount is on its way, Upgrade stays enabled and the page says nothing of it', async ({ page, context, baseURL, request }) => {
+      test('while the read on mount is on its way, Upgrade stays enabled and the page says nothing of it', async ({ page, context, baseURL }) => {
         const owner = await createUser('Olivia Owner')
         const ws = await personalWorkspace(owner, 'Acme books')
         let release = () => {}
@@ -504,7 +504,7 @@ test.describe('no call reaches Stripe', () => {
         await expect(page.getByText(CHECKING)).toHaveCount(0)
         await expect(page.getByText(STILL_FREE)).toHaveCount(0)
 
-        expect((await postSubscriptionUpdated(request, { ws })).status()).toBe(200)
+        await setPlan(ws, proPlan(ws))
         release()
 
         await expect(figure(page, 'Current plan')).toHaveText('Pro')
@@ -523,7 +523,7 @@ test.describe('no call reaches Stripe', () => {
           fail: (route: Route) => route.abort(),
         },
       ]) {
-        test(`a failed read leaves the page as it is, with no error message, when ${failure.name}`, async ({ page, context, baseURL, request }) => {
+        test(`a failed read leaves the page as it is, with no error message, when ${failure.name}`, async ({ page, context, baseURL }) => {
           const owner = await createUser('Olivia Owner')
           const ws = await personalWorkspace(owner, 'Acme books')
           await setPagesUsed(ws, 25)
@@ -536,7 +536,7 @@ test.describe('no call reaches Stripe', () => {
           await expectPlan(page, 'Free', '25', '0 of 20')
 
           await goToMembers(page)
-          expect((await postSubscriptionUpdated(request, { ws })).status()).toBe(200)
+          await setPlan(ws, proPlan(ws))
           await page.route(failure.url, failure.fail)
           await page.goBack()
 
@@ -639,7 +639,7 @@ test.describe('no call reaches Stripe', () => {
       const ws = await personalWorkspace(owner, 'Acme books')
 
       expect((await postEvent(request, 'invoice.paid', subscriptionFixture({ ws }))).status()).toBe(200)
-      expect((await postSubscriptionUpdated(request, { ws: '00000000-0000-0000-0000-000000000000' })).status()).toBe(200)
+      expect((await postSubscriptionDeleted(request, { ws: '00000000-0000-0000-0000-000000000000' })).status()).toBe(200)
 
       await signIn(context, baseURL!, owner)
       await page.goto('/billing')

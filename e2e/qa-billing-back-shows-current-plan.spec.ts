@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { createUser, signIn } from './support/auth'
-import { postSubscriptionUpdated } from './support/stripe'
+import { proPlan, setPlan } from './support/stripe'
 import { personalWorkspace, switcher } from './support/workspace'
 
 // The billing page shows the current plan (issue #50 criterion 9, PRD US-11.1 AC-1), and after
@@ -42,7 +42,7 @@ for (const { name, viewport } of [
       await page.goto(`/billing?checkout=success&workspace=${ws}`)
       await expect(page).toHaveURL(/\/billing$/)
       await expect(figure(page, 'Current plan')).toHaveText('Free')
-      expect((await postSubscriptionUpdated(request, { ws })).status()).toBe(200)
+      await setPlan(ws, proPlan(ws))
       await expect(figure(page, 'Current plan')).toHaveText('Pro')
       await expect(page.getByRole('button', { name: 'Manage or cancel' })).toBeVisible()
 
