@@ -1,5 +1,22 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { inviteUrl } from './site'
+import { billingUrl, inviteUrl } from './site'
+
+describe('billingUrl', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('builds the billing page and the return from a completed Checkout from SITE_URL', () => {
+    vi.stubEnv('SITE_URL', 'https://doc-extract.vercel.app/')
+    expect(billingUrl()).toBe('https://doc-extract.vercel.app/billing')
+    expect(billingUrl('success')).toBe('https://doc-extract.vercel.app/billing?checkout=success')
+  })
+
+  it('throws when SITE_URL is unset', () => {
+    vi.stubEnv('SITE_URL', '')
+    expect(() => billingUrl()).toThrow(/SITE_URL/)
+  })
+})
 
 describe('inviteUrl', () => {
   afterEach(() => {
