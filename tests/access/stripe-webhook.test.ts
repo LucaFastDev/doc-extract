@@ -88,6 +88,11 @@ function fakeStripe(retrieve: (id: string) => Promise<unknown> = async (id) => s
   return { stripe, retrieve: spy }
 }
 
+/** A fake Stripe whose retrieve returns the given subscription, whatever id is asked for. */
+function retrieving(sub: unknown) {
+  return fakeStripe(async () => sub)
+}
+
 function signed(body: unknown, secret = SECRET) {
   const payload = JSON.stringify(body)
   return { payload, signature: Stripe.webhooks.generateTestHeaderString({ payload, secret }) }
@@ -201,7 +206,7 @@ describe('customer.subscription.updated', () => {
     await setWorkspace(ws, { plan: 'pro', stripe_customer_id: `cus_${randomUUID()}`, plan_period_end: '2030-01-01T00:00:00Z' })
     const sub = subscription({ cancel_at_period_end: true, metadata: { workspace_id: ws } })
 
-    expect((await deliver(event('customer.subscription.updated', sub))).status).toBe(200)
+    expect((await deliver(event('customer.subscription.updated', sub), retrieving(sub).stripe)).status).toBe(200)
 
     expect(await workspace(ws)).toEqual({
       plan: 'pro',
@@ -215,7 +220,8 @@ describe('customer.subscription.updated', () => {
   it('clears the set-to-end flag when the subscription is renewed again', async () => {
     const ws = await newWorkspace()
     await setWorkspace(ws, { plan: 'pro', plan_cancel_at_period_end: true })
-    await deliver(event('customer.subscription.updated', subscription({ metadata: { workspace_id: ws } })))
+    const sub = subscription({ metadata: { workspace_id: ws } })
+    await deliver(event('customer.subscription.updated', sub), retrieving(sub).stripe)
     expect((await workspace(ws)).plan_cancel_at_period_end).toBe(false)
   })
 
@@ -230,8 +236,10 @@ describe('customer.subscription.updated', () => {
     ['paused', 'free'],
   ])('with status %s means %s (ruling 4)', async (status, plan) => {
     const ws = await newWorkspace()
-    await setWorkspace(ws, { plan: plan === 'pro' ? 'free' : 'pro' })
-    await deliver(event('customer.subscription.updated', subscription({ status, metadata: { workspace_id: ws } })))
+    const sub = subscription({ status, metadata: { workspace_id: ws } })
+    // The workspace holds this subscription, so a status other than active or past_due ends it.
+    await setWorkspace(ws, { plan: plan === 'pro' ? 'free' : 'pro', stripe_subscription_id: sub.id })
+    await deliver(event('customer.subscription.updated', sub), retrieving(sub).stripe)
     expect((await workspace(ws)).plan).toBe(plan)
   })
 
@@ -239,7 +247,8 @@ describe('customer.subscription.updated', () => {
     const ws = await newWorkspace()
     const customer = `cus_${randomUUID()}`
     await setWorkspace(ws, { stripe_customer_id: customer })
-    await deliver(event('customer.subscription.updated', subscription({ customer })))
+    const sub = subscription({ customer })
+    await deliver(event('customer.subscription.updated', sub), retrieving(sub).stripe)
     expect((await workspace(ws)).plan).toBe('pro')
   })
 
@@ -247,7 +256,8 @@ describe('customer.subscription.updated', () => {
     const ws = await newWorkspace()
     const customer = `cus_${randomUUID()}`
     await setWorkspace(ws, { stripe_customer_id: customer })
-    await deliver(event('customer.subscription.updated', subscription({ customer, metadata: { workspace_id: randomUUID() } })))
+    const sub = subscription({ customer, metadata: { workspace_id: randomUUID() } })
+    await deliver(event('customer.subscription.updated', sub), retrieving(sub).stripe)
     expect((await workspace(ws)).plan).toBe('pro')
   })
 
@@ -268,15 +278,16 @@ describe('customer.subscription.deleted', () => {
   it('makes it Free, clears the subscription and period end, and keeps the customer (ruling 4)', async () => {
     const ws = await newWorkspace()
     const customer = `cus_${randomUUID()}`
+    const sub = subscription({ customer, status: 'canceled', metadata: { workspace_id: ws } })
     await setWorkspace(ws, {
       plan: 'pro',
       stripe_customer_id: customer,
-      stripe_subscription_id: 'sub_old',
+      stripe_subscription_id: sub.id,
       plan_period_end: PERIOD_END_ISO,
       plan_cancel_at_period_end: true,
     })
 
-    const result = await deliver(event('customer.subscription.deleted', subscription({ customer, status: 'canceled', metadata: { workspace_id: ws } })))
+    const result = await deliver(event('customer.subscription.deleted', sub))
 
     expect(result.status).toBe(200)
     expect(await workspace(ws)).toEqual({
@@ -351,5 +362,197 @@ describe('any other event type', () => {
     }
     expect(await workspace(ws)).toEqual(before)
     expect(retrieve).not.toHaveBeenCalled()
+  })
+})
+
+describe('events out of order (issue 73)', () => {
+  /** A Pro workspace holding the given subscription. */
+  async function proHolding(subscriptionId: string | null) {
+    const ws = await newWorkspace()
+    await setWorkspace(ws, {
+      plan: 'pro',
+      stripe_customer_id: `cus_${randomUUID()}`,
+      stripe_subscription_id: subscriptionId,
+      plan_period_end: '2031-01-01T00:00:00Z',
+      plan_cancel_at_period_end: true,
+    })
+    return ws
+  }
+
+  function expectIgnored(warn: ReturnType<typeof vi.spyOn>, body: { id: string; type: string }) {
+    expect(warn).toHaveBeenCalledTimes(1)
+    const line = String(warn.mock.calls[0].join(' '))
+    expect(line).toContain(body.id)
+    expect(line).toContain(body.type)
+  }
+
+  describe('customer.subscription.updated', () => {
+    it('uses the retrieved subscription, not the event’s copy: an event saying incomplete over an active subscription keeps Pro', async () => {
+      const ws = await newWorkspace()
+      const sub = subscription({ metadata: { workspace_id: ws } })
+      await setWorkspace(ws, { plan: 'pro', stripe_subscription_id: sub.id })
+      const { stripe, retrieve } = retrieving({ ...sub, status: 'active', cancel_at_period_end: true })
+      const body = event('customer.subscription.updated', { ...sub, status: 'incomplete', cancel_at_period_end: false })
+
+      expect((await deliver(body, stripe)).status).toBe(200)
+
+      expect(retrieve).toHaveBeenCalledWith(sub.id)
+      expect(await workspace(ws)).toEqual({
+        plan: 'pro',
+        stripe_customer_id: sub.customer,
+        stripe_subscription_id: sub.id,
+        plan_period_end: new Date(PERIOD_END_ISO),
+        plan_cancel_at_period_end: true,
+      })
+    })
+
+    it.each([
+      ['null', null],
+      ['a different id', 'sub_older'],
+    ])('with an active retrieved status writes Pro and the new subscription when the workspace holds %s', async (_name, held) => {
+      const ws = await newWorkspace()
+      await setWorkspace(ws, { stripe_subscription_id: held })
+      const sub = subscription({ metadata: { workspace_id: ws } })
+
+      expect((await deliver(event('customer.subscription.updated', sub), retrieving(sub).stripe)).status).toBe(200)
+
+      expect(await workspace(ws)).toEqual({
+        plan: 'pro',
+        stripe_customer_id: sub.customer,
+        stripe_subscription_id: sub.id,
+        plan_period_end: new Date(PERIOD_END_ISO),
+        plan_cancel_at_period_end: false,
+      })
+    })
+
+    it('arriving before checkout.session.completed for a new subscription makes the workspace Pro with the new id', async () => {
+      const ws = await newWorkspace()
+      const sub = subscription({ metadata: { workspace_id: ws } })
+      expect((await deliver(event('customer.subscription.updated', sub), retrieving(sub).stripe)).status).toBe(200)
+      expect(await workspace(ws)).toMatchObject({ plan: 'pro', stripe_subscription_id: sub.id })
+    })
+
+    it('with a retrieved status of unpaid and the id the workspace holds makes it Free, as today', async () => {
+      const ws = await newWorkspace()
+      const sub = subscription({ status: 'unpaid', metadata: { workspace_id: ws } })
+      await setWorkspace(ws, { plan: 'pro', stripe_subscription_id: sub.id })
+
+      expect((await deliver(event('customer.subscription.updated', sub), retrieving(sub).stripe)).status).toBe(200)
+
+      expect(await workspace(ws)).toEqual({
+        plan: 'free',
+        stripe_customer_id: sub.customer,
+        stripe_subscription_id: sub.id,
+        plan_period_end: new Date(PERIOD_END_ISO),
+        plan_cancel_at_period_end: false,
+      })
+    })
+
+    it.each([
+      ['a newer subscription held', 'sub_newer'],
+      ['no subscription held', null],
+    ])('ignores a cancelled older subscription with %s: no column changes, 200, processed, one warning', async (_name, held) => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const ws = await proHolding(held)
+      const before = await workspace(ws)
+      const sub = subscription({ status: 'canceled', metadata: { workspace_id: ws } })
+      const body = event('customer.subscription.updated', sub)
+
+      expect((await deliver(body, retrieving(sub).stripe)).status).toBe(200)
+
+      expect(await workspace(ws)).toEqual(before)
+      expect((await eventRow(body.id)).processed_at).not.toBeNull()
+      expectIgnored(warn, body)
+    })
+
+    it('answers 500, changes nothing and leaves processed_at null when the retrieve fails, then processes the same event when it is sent again', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      const ws = await newWorkspace()
+      const sub = subscription({ metadata: { workspace_id: ws } })
+      const before = await workspace(ws)
+      const body = event('customer.subscription.updated', sub)
+      const failing = fakeStripe(async () => {
+        throw new Error('No such subscription')
+      })
+
+      expect((await deliver(body, failing.stripe)).status).toBe(500)
+      expect(await workspace(ws)).toEqual(before)
+      expect(await eventRow(body.id)).toMatchObject({ processed_at: null })
+
+      expect((await deliver(body, retrieving(sub).stripe)).status).toBe(200)
+      expect(await workspace(ws)).toMatchObject({ plan: 'pro', stripe_subscription_id: sub.id })
+      expect((await eventRow(body.id)).processed_at).not.toBeNull()
+    })
+  })
+
+  describe('customer.subscription.deleted', () => {
+    it('for the subscription the workspace holds makes it Free without calling Stripe', async () => {
+      const ws = await proHolding('sub_held')
+      const customer = (await workspace(ws)).stripe_customer_id
+      const { stripe, retrieve } = fakeStripe()
+
+      const body = event('customer.subscription.deleted', subscription({ id: 'sub_held', customer, status: 'canceled', metadata: { workspace_id: ws } }))
+      expect((await deliver(body, stripe)).status).toBe(200)
+
+      expect(await workspace(ws)).toEqual({
+        plan: 'free',
+        stripe_customer_id: customer,
+        stripe_subscription_id: null,
+        plan_period_end: null,
+        plan_cancel_at_period_end: false,
+      })
+      expect(retrieve).not.toHaveBeenCalled()
+    })
+
+    it('for a workspace holding no subscription makes it Free without calling Stripe', async () => {
+      const ws = await proHolding(null)
+      const { stripe, retrieve } = fakeStripe()
+      const body = event('customer.subscription.deleted', subscription({ status: 'canceled', metadata: { workspace_id: ws } }))
+
+      expect((await deliver(body, stripe)).status).toBe(200)
+
+      expect((await workspace(ws)).plan).toBe('free')
+      expect(retrieve).not.toHaveBeenCalled()
+    })
+
+    it('for a different subscription than the one the workspace holds changes no column: 200, processed, one warning', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const ws = await proHolding('sub_newer')
+      const before = await workspace(ws)
+      const body = event('customer.subscription.deleted', subscription({ id: 'sub_older', status: 'canceled', metadata: { workspace_id: ws } }))
+
+      expect((await deliver(body)).status).toBe(200)
+
+      expect(await workspace(ws)).toEqual(before)
+      expect((await eventRow(body.id)).processed_at).not.toBeNull()
+      expectIgnored(warn, body)
+    })
+  })
+
+  describe('checkout.session.completed', () => {
+    it('writes nothing when the subscription it retrieves is canceled: 200, processed, one warning', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const ws = await newWorkspace()
+      const before = await workspace(ws)
+      const session = checkoutSession(ws)
+      const body = event('checkout.session.completed', session)
+      const { stripe } = fakeStripe(async (id) => subscription({ id, status: 'canceled' }))
+
+      expect((await deliver(body, stripe)).status).toBe(200)
+
+      expect(await workspace(ws)).toEqual(before)
+      expect((await eventRow(body.id)).processed_at).not.toBeNull()
+      expectIgnored(warn, body)
+    })
+
+    it.each(['active', 'past_due'])('still makes the workspace Pro when the retrieved status is %s', async (status) => {
+      const ws = await newWorkspace()
+      const session = checkoutSession(ws)
+      const { stripe } = fakeStripe(async (id) => subscription({ id, status }))
+
+      expect((await deliver(event('checkout.session.completed', session), stripe)).status).toBe(200)
+
+      expect(await workspace(ws)).toMatchObject({ plan: 'pro', stripe_subscription_id: session.subscription })
+    })
   })
 })

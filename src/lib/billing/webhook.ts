@@ -10,7 +10,7 @@ export type WebhookStripe = Pick<Stripe, 'subscriptions'>
 export interface WebhookDeps {
   /** The service-role client: the plan and Stripe columns accept no other writer. */
   admin: () => SupabaseClient
-  /** Only checkout.session.completed needs it, to read the subscription's period end. */
+  /** checkout.session.completed and customer.subscription.updated retrieve the current subscription. */
   stripe: () => WebhookStripe
   secret: () => string
 }
@@ -62,8 +62,29 @@ async function setWorkspace(admin: Admin, id: string, values: Record<string, unk
   if (error) throw error
 }
 
+/** The subscription the workspace holds now, or null when it holds none. */
+async function heldSubscription(admin: Admin, id: string): Promise<string | null> {
+  const { data, error } = await admin
+    .from('workspaces')
+    .select('stripe_subscription_id')
+    .eq('id', id)
+    .single<{ stripe_subscription_id: string | null }>()
+  if (error) throw error
+  return data.stripe_subscription_id
+}
+
+/** Whether the subscription keeps the workspace on Pro (ruling 4 on #50): only these two statuses do. */
+function keepsPro(subscription: Stripe.Subscription): boolean {
+  return subscription.status === 'active' || subscription.status === 'past_due'
+}
+
 function logUnknownWorkspace(event: Stripe.Event) {
   console.error('Stripe event', event.id, 'of type', event.type, 'names no known workspace; nothing was changed.')
+}
+
+/** An event about a subscription the workspace has moved on from: acknowledged, nothing written. */
+function logIgnored(event: Stripe.Event, reason: string) {
+  console.warn('Stripe event', event.id, 'of type', event.type, 'was ignored:', reason)
 }
 
 async function onCheckoutCompleted(event: Stripe.Event, session: Stripe.Checkout.Session, deps: WebhookDeps, admin: Admin) {
@@ -74,8 +95,11 @@ async function onCheckoutCompleted(event: Stripe.Event, session: Stripe.Checkout
     console.error('Stripe event', event.id, 'is a completed Checkout with no subscription; nothing was changed.')
     return
   }
-  // A Checkout session does not carry the period end, so this is the one call the webhook makes.
+  // A Checkout session carries neither the period end nor the subscription's status now.
   const subscription = await deps.stripe().subscriptions.retrieve(subscriptionId)
+  if (!keepsPro(subscription)) {
+    return logIgnored(event, `its subscription ${subscriptionId} is ${subscription.status}, not active or past_due.`)
+  }
   await setWorkspace(admin, workspace, {
     plan: 'pro',
     stripe_customer_id: idOf(session.customer),
@@ -85,12 +109,25 @@ async function onCheckoutCompleted(event: Stripe.Event, session: Stripe.Checkout
   })
 }
 
-async function onSubscriptionUpdated(event: Stripe.Event, subscription: Stripe.Subscription, admin: Admin) {
+/**
+ * Stripe does not keep events in order and retries them late, so the event's copy of the
+ * subscription may be stale: the current one is retrieved and used for everything (issue 73). A
+ * failed retrieve throws, so the event answers 500 and Stripe sends it again.
+ */
+async function onSubscriptionUpdated(event: Stripe.Event, eventCopy: Stripe.Subscription, deps: WebhookDeps, admin: Admin) {
+  const subscription = await deps.stripe().subscriptions.retrieve(eventCopy.id)
   const workspace = await workspaceOfSubscription(admin, subscription)
   if (!workspace) return logUnknownWorkspace(event)
+  const keeps = keepsPro(subscription)
+  if (!keeps) {
+    // A subscription that is not paying only ends the plan if it is the one the workspace holds.
+    const held = await heldSubscription(admin, workspace)
+    if (held !== subscription.id) {
+      return logIgnored(event, `its subscription ${subscription.id} is ${subscription.status} and the workspace holds ${held ?? 'none'}.`)
+    }
+  }
   await setWorkspace(admin, workspace, {
-    // Ruling 4: only these two statuses keep Pro.
-    plan: subscription.status === 'active' || subscription.status === 'past_due' ? 'pro' : 'free',
+    plan: keeps ? 'pro' : 'free',
     stripe_customer_id: idOf(subscription.customer),
     stripe_subscription_id: subscription.id,
     plan_period_end: periodEnd(subscription),
@@ -101,6 +138,11 @@ async function onSubscriptionUpdated(event: Stripe.Event, subscription: Stripe.S
 async function onSubscriptionDeleted(event: Stripe.Event, subscription: Stripe.Subscription, admin: Admin) {
   const workspace = await workspaceOfSubscription(admin, subscription)
   if (!workspace) return logUnknownWorkspace(event)
+  // A deletion of an older subscription must not clear the one the workspace holds now.
+  const held = await heldSubscription(admin, workspace)
+  if (held !== null && held !== subscription.id) {
+    return logIgnored(event, `its subscription ${subscription.id} is not the ${held} the workspace holds.`)
+  }
   // Ruling 4: the customer stays, so a later upgrade reuses it.
   await setWorkspace(admin, workspace, {
     plan: 'free',
@@ -115,7 +157,7 @@ async function processEvent(event: Stripe.Event, deps: WebhookDeps, admin: Admin
     case 'checkout.session.completed':
       return onCheckoutCompleted(event, event.data.object, deps, admin)
     case 'customer.subscription.updated':
-      return onSubscriptionUpdated(event, event.data.object, admin)
+      return onSubscriptionUpdated(event, event.data.object, deps, admin)
     case 'customer.subscription.deleted':
       return onSubscriptionDeleted(event, event.data.object, admin)
     default:
