@@ -354,7 +354,7 @@ export function DocumentsView({
 
       <span hidden data-testid="live-status" data-state={live} />
       {documents.length === 0 ? (
-        <p className="text-muted-foreground">
+        <p className="text-muted-foreground [overflow-wrap:anywhere]">
           No documents in <span className="font-medium text-foreground">{workspace.name}</span> yet.
         </p>
       ) : (

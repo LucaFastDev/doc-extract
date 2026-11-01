@@ -140,7 +140,7 @@ export function BillingView({
     <main className="flex flex-col gap-8">
       <div className="min-w-0">
         <h1 className="text-2xl font-semibold tracking-tight">Billing</h1>
-        <p className="text-muted-foreground">
+        <p className="text-muted-foreground [overflow-wrap:anywhere]">
           The plan and pages of <span className="font-medium text-foreground">{workspace.name}</span>.
         </p>
       </div>

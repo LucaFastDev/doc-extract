@@ -34,6 +34,21 @@ describe('src/proxy.ts', () => {
     expect(location.searchParams.get('next')).toBe('/documents?status=failed')
   })
 
+  it.each(['/documents/export', '/members', '/billing', '/invite/abc', '/api/documents/1'])(
+    'sends a signed-out visitor of %s to sign-in',
+    async (path) => {
+      const response = await visit(path)
+      expect(response.status).toBe(307)
+      expect(new URL(response.headers.get('location') ?? '').pathname).toBe('/sign-in')
+    },
+  )
+
+  it('passes a signed-out visit to an address that is no route on, to the 404 page, with the session cookie', async () => {
+    const response = await visit('/this-does-not-exist')
+    expect(response.headers.get('location')).toBeNull()
+    expect(response.cookies.get('sb-test-auth-token')?.value).toBe('refreshed')
+  })
+
   it('passes a signed-out server action POST on to the action, which sends the visitor to sign-in itself', async () => {
     const response = await visit('/documents', { method: 'POST', headers: { 'next-action': 'abc' } })
     expect(response.headers.get('location')).toBeNull()
