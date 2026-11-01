@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState, type DragEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import Link from 'next/link'
 import { FunctionsHttpError, type RealtimeChannel } from '@supabase/supabase-js'
 import { Trash2Icon, UploadIcon } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { budgetSummary, type BudgetStatus } from '@/lib/documents/budget'
 import {
   allowanceSummary,
   canRetry,
@@ -58,7 +59,9 @@ async function reason(fileName: string, error: unknown): Promise<string> {
 // change to the workspace's documents through Realtime, which sends only rows the user may read.
 // A Failed, Not supported or Waiting for budget row says why, and a failed one whose file is still
 // there can be retried (US-2.1 AC-6 and AC-7, issue #24). A document that needs review, is
-// approved or is not supported opens its review screen; any row can be deleted (F5, F19).
+// approved or is not supported opens its review screen; any row can be deleted (F5, F19). Beside
+// the pages left, the AI budget line (US-12.1 AC-3, Lead ruling 1 on #48) is fetched on load and
+// again whenever Realtime reports a document's status changed; a failed fetch hides it.
 export function DocumentsView({
   workspace,
   initialDocuments,
@@ -78,6 +81,27 @@ export function DocumentsView({
   const [live, setLive] = useState('connecting')
   const [retrying, setRetrying] = useState<string | null>(null)
   const [retryError, setRetryError] = useState<string | null>(null)
+  const [budget, setBudget] = useState<BudgetStatus | null>(null)
+  const budgetRequests = useRef(0)
+  // The last status Realtime or the first load gave each document, so only a change refetches.
+  const [knownStatuses] = useState(() => new Map<string, string>(initialDocuments.map((d) => [d.id, d.status])))
+
+  // Only the latest request's answer is shown, so a slow earlier one cannot overwrite it.
+  const refreshBudget = useCallback(() => {
+    const request = ++budgetRequests.current
+    void supabase
+      .rpc('get_budget_status')
+      .single<BudgetStatus>()
+      .then(({ data, error }) => {
+        if (request !== budgetRequests.current) return
+        if (error) console.error('The AI budget could not be loaded.', error)
+        setBudget(error ? null : data)
+      })
+  }, [supabase])
+
+  useEffect(() => {
+    refreshBudget()
+  }, [refreshBudget])
 
   function upsert(doc: DocumentItem) {
     setDocuments((docs) =>
@@ -122,6 +146,10 @@ export function DocumentsView({
             }
             const row = payload.new as DocumentItem & { workspace_id: string }
             if (row.workspace_id !== workspace.id) return
+            if (knownStatuses.get(row.id) !== row.status) {
+              knownStatuses.set(row.id, row.status)
+              refreshBudget()
+            }
             if (isListed(row.status)) {
               upsert({
                 id: row.id,
@@ -149,7 +177,7 @@ export function DocumentsView({
       cancelled = true
       if (channel) supabase.removeChannel(channel)
     }
-  }, [supabase, workspace.id])
+  }, [supabase, workspace.id, refreshBudget, knownStatuses])
 
   async function upload(files: File[]) {
     setRefusal(null)
@@ -231,6 +259,7 @@ export function DocumentsView({
   }
 
   const left = allowanceSummary(allowance)
+  const spend = budget && budgetSummary(budget)
 
   return (
     <div className="flex flex-col gap-6">
@@ -283,6 +312,12 @@ export function DocumentsView({
           <p className="text-xs text-destructive">
             Couldn&apos;t update pages left. Reload the page to see the current count.
           </p>
+        )}
+        {spend && (
+          <div aria-label="AI budget" className="grid gap-1">
+            <p className="text-xs text-muted-foreground">{spend.usage}</p>
+            {spend.notice && <p className="text-xs font-medium">{spend.notice}</p>}
+          </div>
         )}
         {progress && (
           <p role="status" className="text-sm">
