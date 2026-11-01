@@ -709,10 +709,12 @@ keeps the period end on the subscription's item.
 user. Owners and members see the plan, the pages from `get_page_allowance`, each plan's limits and
 price from `get_plan_limits` and the test-mode notice; only an owner gets Upgrade or "Manage or
 cancel", and a Pro plan set to end shows the date. A completed Checkout returns to
-`/billing?checkout=success`: the page takes the marker out of the address, then re-reads the plan
-through RLS every 2 seconds for at most 20 seconds, and stops once it is Pro; still Free after that,
-it says "Your payment went through. Your plan will update shortly." A cancelled Checkout returns to
-`/billing`, which runs no timer and shows no message (Lead ruling 6 on #50).
+`/billing?checkout=success`: the page takes the marker out with `router.replace('/billing')`, so the
+router and the history entry drop it too and a reload, a workspace switch or a rename runs no timer,
+then re-reads the plan through RLS every 2 seconds for at most 20 seconds, and stops once it is Pro;
+still Free after that, it says "Your payment went through. Your plan will update shortly." A
+cancelled Checkout returns to `/billing`, which runs no timer and shows no message (Lead ruling 6 on
+#50).
 
 `src/lib/supabase/server.ts` throws when `NEXT_PUBLIC_SUPABASE_URL` or
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` is unset, and its service-role client (`createServiceRoleClient`,
