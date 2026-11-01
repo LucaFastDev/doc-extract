@@ -301,21 +301,42 @@ out links to the wrong place, and an unset one makes creating an invitation fail
 
 This app takes **no real payments**. Every item here checks that only test mode is in use.
 
-- [ ] `STRIPE_SECRET_KEY` in Vercel is a **test** key (`sk_test_…`); no live key (`sk_live_…`) is
-      set anywhere. Pass: Stripe dashboard → Developers → API keys, with "Test mode" on, shows the
-      key whose last four characters match; the server refuses a live key at startup (section
-      6.2), so a wrong key shows as every billing call failing.
+- [ ] `STRIPE_SECRET_KEY` in Vercel is a **test** key (`sk_test_…`); no live key (`sk_live_…` or
+      `rk_live_…`) is set anywhere. Pass: Stripe dashboard → Developers → API keys, with "Test
+      mode" on, shows the key whose last four characters match. A key that does not start with
+      `sk_test_` stops the server (`src/instrumentation.ts`, section 6.2): every page and route,
+      the landing page and the demo included, answers 500, and Vercel's function log says
+      "STRIPE_SECRET_KEY does not start with sk_test_". An unset key does not stop the server: the
+      demo and the landing page work, and only the billing calls fail.
 - [ ] Stripe dashboard (test mode) → Products: the Pro product has a recurring price of **$19 a
-      month in USD** with no trial (OQ-24); its price id is the one in `STRIPE_PRICE_PRO`.
+      month in USD** with no trial (OQ-24); its price id is the one in `STRIPE_PRICE_PRO`. Pass:
+      SQL editor, `select monthly_price_usd from plan_limits where plan = 'pro'` is the same 19.00,
+      which is what the billing and landing pages show.
 - [ ] Stripe dashboard (test mode) → Developers → Webhooks: an endpoint for
-      `<site>/api/stripe/webhook` is registered for `checkout.session.completed`,
+      `<site>/api/stripe/webhook` is registered for exactly `checkout.session.completed`,
       `customer.subscription.updated` and `customer.subscription.deleted`, and its signing secret
-      is the one in `STRIPE_WEBHOOK_SECRET`.
+      is the one in `STRIPE_WEBHOOK_SECRET`. Pass: any other type the endpoint receives is only
+      acknowledged, so the list holds those three; a delivery answered 400 means the secret differs.
+- [ ] Stripe dashboard (test mode) → Developers → Webhooks → the endpoint → API version: it is
+      `2026-10-28.endive`, the version `src/lib/stripe.ts` pins. An endpoint's events use the
+      version it was created with, and the webhook reads the period end from the subscription's
+      item (`items.data[0].current_period_end`), where this version places it. Pass: the version
+      shown matches, and after an upgrade `select plan_period_end from workspaces where id = '<the
+      workspace>'` is not null.
 - [ ] Stripe dashboard (test mode) → Settings → Billing → Customer portal is activated with
-      cancellation at the end of the billing period allowed (OQ-37).
-- [ ] One upgrade with the test card `4242 4242 4242 4242` turns a Free workspace into Pro within
-      10 seconds (OQ-36), the webhook endpoint shows the delivery as succeeded, and cancelling it
-      through the portal returns the workspace to Free at the period end (OQ-24, OQ-37).
+      cancellation at the end of the billing period allowed (OQ-37). Pass: "Manage or cancel" on
+      `<site>/billing` opens the portal, and it offers cancelling at the end of the period, not at
+      once.
+- [ ] Pass: signed in on `<site>/billing` as an owner on Free, Upgrade opens Checkout at $19 a month.
+      One upgrade with the test card `4242 4242 4242 4242` returns to the billing page and turns the
+      workspace into Pro within 10 seconds of the webhook (OQ-36), without a reload; the webhook
+      endpoint shows the delivery as succeeded; and SQL editor, `select type, processed_at from
+      stripe_events order by received_at desc limit 5` shows it with `processed_at` set. Cancelling
+      through the portal shows "Your Pro plan ends on <date>" on the billing page, and the workspace
+      returns to Free at the period end (OQ-24, OQ-37).
+- [ ] Pass: SQL editor, `select count(*) from stripe_events where processed_at is null and
+      received_at < now() - interval '1 day'` is 0. A row left unprocessed is an event whose
+      processing failed on every retry (Vercel's function log says "could not be processed").
 
 ## Scheduled jobs
 
