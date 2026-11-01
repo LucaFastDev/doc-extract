@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { PLAN_COLUMNS, PLAN_LABELS, pagesLeft, planEndDate, type WorkspacePlan } from '@/lib/billing/plan'
@@ -18,9 +18,22 @@ const MAX_RE_READS = 10
 
 const NO_CONNECTION = 'That did not work. Check your connection and try again.'
 
+// The plan and the pages, read in the browser as the user, through RLS.
+async function readPlan(workspaceId: string) {
+  const supabase = createClient()
+  const [workspaceRow, allowanceRow] = await Promise.all([
+    supabase.from('workspaces').select(PLAN_COLUMNS).eq('id', workspaceId).single<WorkspacePlan>(),
+    supabase.rpc('get_page_allowance', { ws: workspaceId }).single<PageAllowance>(),
+  ])
+  if (workspaceRow.error) throw workspaceRow.error
+  if (allowanceRow.error) throw allowanceRow.error
+  return { plan: workspaceRow.data, allowance: allowanceRow.data }
+}
+
 // The billing page (PRD US-11.1). A button asks its route for a Stripe URL and goes there; a failed
 // call shows its message and leaves the plan as it was. On return from a completed Checkout, whose
 // webhook may not have arrived yet, the page re-reads the plan until it turns Pro or the time is up.
+// Otherwise it reads the plan once when it mounts, so in-app Back shows the plan as it is now.
 export function BillingView({
   workspace,
   isOwner,
@@ -43,21 +56,30 @@ export function BillingView({
   const [redirecting, setRedirecting] = useState(false)
   const [error, setError] = useState<string>()
 
+  // Lead ruling 9 on #50: the router rebuilds this view on in-app Back from its cached page, whose
+  // plan can be from before a webhook. So a view that mounts and is not re-reading reads once and
+  // shows what it gets, with no timer and no message. The ref makes it one read under Strict Mode,
+  // which runs this effect twice on mount; the key on the view means the workspace cannot change
+  // under it, so a late answer is always this workspace's.
+  const readOnMount = useRef(!reReading)
+  useEffect(() => {
+    if (!readOnMount.current) return
+    readOnMount.current = false
+    readPlan(workspace.id)
+      .then((read) => {
+        setPlan(read.plan)
+        setAllowance(read.allowance)
+      })
+      .catch((readError) => {
+        // The page keeps what it shows.
+        console.error('The plan could not be read.', readError)
+      })
+  }, [workspace.id])
+
   useEffect(() => {
     if (!reReading) return
-    const supabase = createClient()
     let stopped = false
     let reads = 0
-
-    async function readPlan() {
-      const [workspaceRow, allowanceRow] = await Promise.all([
-        supabase.from('workspaces').select(PLAN_COLUMNS).eq('id', workspace.id).single<WorkspacePlan>(),
-        supabase.rpc('get_page_allowance', { ws: workspace.id }).single<PageAllowance>(),
-      ])
-      if (workspaceRow.error) throw workspaceRow.error
-      if (allowanceRow.error) throw allowanceRow.error
-      return { plan: workspaceRow.data, allowance: allowanceRow.data }
-    }
 
     const timer = setInterval(async () => {
       reads += 1
@@ -65,7 +87,7 @@ export function BillingView({
       if (last) clearInterval(timer)
       let upgraded = false
       try {
-        const read = await readPlan()
+        const read = await readPlan(workspace.id)
         if (stopped) return
         upgraded = read.plan.plan === 'pro'
         if (upgraded) {
