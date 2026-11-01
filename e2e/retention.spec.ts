@@ -131,7 +131,7 @@ test.describe('the AI budget line', () => {
 
     // The ceiling is reached and process-queue moves the document to waiting.
     await setDailyCap(0)
-    await sql("update public.documents set status = 'waiting_budget', status_reason = 'Today''s AI limit is reached.' where id = $1", [id])
+    await sql("update public.documents set status = 'waiting_budget', status_reason = 'Waiting for the daily ceiling.' where id = $1", [id])
     await expect(page.getByText(`Today's AI limit is reached. Waiting documents resume at ${await nextMidnightForViewer()}.`)).toBeVisible()
     expect(loads).toBe(0)
   })
