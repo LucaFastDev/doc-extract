@@ -1,11 +1,12 @@
 'use client'
 
-import { useActionState, useEffect, useRef, useState, useTransition } from 'react'
+import { useActionState, useEffect, useRef, useState, useTransition, type FormEvent } from 'react'
 import Link from 'next/link'
-import { ChevronsUpDownIcon, CreditCardIcon, PencilIcon, PlusIcon, UsersIcon } from 'lucide-react'
+import { ChevronsUpDownIcon, CreditCardIcon, PencilIcon, PlusIcon, Trash2Icon, UsersIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -25,6 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DELETE_FAILED } from '@/lib/account/memberships'
 import { createWorkspace, renameWorkspace, switchWorkspace, type FormState } from './actions'
 
 interface Workspace {
@@ -38,10 +40,10 @@ interface Workspace {
 let focusOnMount = false
 
 // The workspace switcher (PRD US-8.1 AC-3, AC-4): lists the user's workspaces, switches between
-// them, creates one, lets an owner rename the current one, and opens its members (US-8.2) and its
-// billing (US-11.1).
+// them, creates one, lets an owner rename or delete the current one (US-18.1), and opens its
+// members (US-8.2) and its billing (US-11.1).
 export function WorkspaceSwitcher({ workspaces, current }: { workspaces: Workspace[]; current: Workspace }) {
-  const [dialog, setDialog] = useState<'create' | 'rename' | null>(null)
+  const [dialog, setDialog] = useState<'create' | 'rename' | 'delete' | null>(null)
   const [pending, startTransition] = useTransition()
   const trigger = useRef<HTMLButtonElement>(null)
 
@@ -93,10 +95,16 @@ export function WorkspaceSwitcher({ workspaces, current }: { workspaces: Workspa
             Create workspace
           </DropdownMenuItem>
           {current.role === 'owner' && (
-            <DropdownMenuItem onSelect={() => setDialog('rename')}>
-              <PencilIcon />
-              Rename workspace
-            </DropdownMenuItem>
+            <>
+              <DropdownMenuItem onSelect={() => setDialog('rename')}>
+                <PencilIcon />
+                Rename workspace
+              </DropdownMenuItem>
+              <DropdownMenuItem variant="destructive" onSelect={() => setDialog('delete')}>
+                <Trash2Icon />
+                Delete workspace
+              </DropdownMenuItem>
+            </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
@@ -112,6 +120,7 @@ export function WorkspaceSwitcher({ workspaces, current }: { workspaces: Workspa
         >
           {dialog === 'create' && <CreateForm onDone={() => setDialog(null)} />}
           {dialog === 'rename' && <RenameForm workspace={current} onDone={() => setDialog(null)} />}
+          {dialog === 'delete' && <DeleteForm workspace={current} />}
         </DialogContent>
       </Dialog>
     </>
@@ -187,6 +196,66 @@ function RenameForm({ workspace, onDone }: { workspace: Workspace; onDone: () =>
       <DialogFooter>
         <Button type="submit" disabled={pending}>
           Save
+        </Button>
+      </DialogFooter>
+    </form>
+  )
+}
+
+// The typed name is a gate in the browser only; DELETE /api/workspaces/[id] checks is_owner itself
+// (issue #61, rulings 1 and 8). On success a full navigation, not a client transition, so no cached
+// page shows the deleted workspace; the cookie still names it, and falls back (ruling 9).
+function DeleteForm({ workspace }: { workspace: Workspace }) {
+  const [typed, setTyped] = useState('')
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const matches = typed === workspace.name
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    if (!matches || pending) return
+    setPending(true)
+    setError(null)
+    try {
+      const response = await fetch(`/api/workspaces/${workspace.id}`, { method: 'DELETE' })
+      if (response.status === 204) {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+        window.location.assign('/documents')
+        return
+      }
+      setError(DELETE_FAILED)
+    } catch {
+      setError(DELETE_FAILED)
+    }
+    setPending(false)
+  }
+
+  return (
+    <form onSubmit={(event) => void submit(event)} className="grid gap-4 [overflow-wrap:anywhere]">
+      <DialogHeader>
+        <DialogTitle>Delete workspace</DialogTitle>
+        <DialogDescription>
+          This deletes {workspace.name} for everyone: its documents, files, results, history, invitations and members.
+          An active Pro subscription is cancelled at once. This cannot be undone.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="grid gap-2">
+        <Label htmlFor="delete-workspace-name">Type {workspace.name} to confirm</Label>
+        <Input id="delete-workspace-name" value={typed} onChange={(event) => setTyped(event.target.value)} autoComplete="off" />
+      </div>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      <DialogFooter>
+        <DialogClose asChild>
+          <Button type="button" variant="outline" disabled={pending}>
+            Cancel
+          </Button>
+        </DialogClose>
+        <Button type="submit" variant="destructive" disabled={!matches || pending}>
+          Delete workspace
         </Button>
       </DialogFooter>
     </form>
