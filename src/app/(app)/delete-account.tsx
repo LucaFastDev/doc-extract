@@ -19,23 +19,36 @@ import { createClient } from '@/lib/supabase/client'
 // to Sign out for every signed-in user, also one in no workspace.
 export function DeleteAccount({ userId }: { userId: string }) {
   const [open, setOpen] = useState(false)
+  // True while the delete request runs. The dialog ignores every close then (Escape, a press outside,
+  // the close button), so the form stays mounted and the answer has somewhere to show (ruling 11).
+  const [pending, setPending] = useState(false)
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(next) => (next || !pending) && setOpen(next)}>
       <DialogTrigger asChild>
         <Button type="button" variant="ghost" size="sm">
           Delete account
         </Button>
       </DialogTrigger>
-      {/* Mounted per opening, so each one reads the workspaces again. */}
-      <DialogContent>{open && <DeleteAccountForm userId={userId} />}</DialogContent>
+      {/* Mounted per opening, so each one reads the workspaces again. As tall as the window at most,
+          and scrolling inside it, so every button is within reach (ruling 11). */}
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
+        {open && <DeleteAccountForm userId={userId} pending={pending} setPending={setPending} />}
+      </DialogContent>
     </Dialog>
   )
 }
 
-function DeleteAccountForm({ userId }: { userId: string }) {
+function DeleteAccountForm({
+  userId,
+  pending,
+  setPending,
+}: {
+  userId: string
+  pending: boolean
+  setPending: (pending: boolean) => void
+}) {
   // null while reading; 'failed' when the read failed; otherwise the workspaces that go with the account.
   const [names, setNames] = useState<string[] | 'failed' | null>(null)
-  const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {

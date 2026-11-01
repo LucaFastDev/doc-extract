@@ -44,6 +44,7 @@ let focusOnMount = false
 // members (US-8.2) and its billing (US-11.1).
 export function WorkspaceSwitcher({ workspaces, current }: { workspaces: Workspace[]; current: Workspace }) {
   const [dialog, setDialog] = useState<'create' | 'rename' | 'delete' | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [pending, startTransition] = useTransition()
   const trigger = useRef<HTMLButtonElement>(null)
 
@@ -109,10 +110,14 @@ export function WorkspaceSwitcher({ workspaces, current }: { workspaces: Workspa
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={dialog !== null} onOpenChange={(open) => !open && setDialog(null)}>
+      {/* While the delete request runs every close is ignored (Escape, a press outside, the close
+          button), so the form stays mounted and the answer has somewhere to show (ruling 11). */}
+      <Dialog open={dialog !== null} onOpenChange={(open) => !open && !deleting && setDialog(null)}>
         {/* The dialogs open from menu items, not from a trigger of their own, so on close focus
-            is sent back to the switcher's button rather than left on <body>. */}
+            is sent back to the switcher's button rather than left on <body>. The delete dialog is
+            as tall as the window at most and scrolls inside it, so every button is within reach. */}
         <DialogContent
+          className={dialog === 'delete' ? 'max-h-[90dvh] overflow-y-auto' : undefined}
           onCloseAutoFocus={(event) => {
             event.preventDefault()
             trigger.current?.focus()
@@ -120,7 +125,7 @@ export function WorkspaceSwitcher({ workspaces, current }: { workspaces: Workspa
         >
           {dialog === 'create' && <CreateForm onDone={() => setDialog(null)} />}
           {dialog === 'rename' && <RenameForm workspace={current} onDone={() => setDialog(null)} />}
-          {dialog === 'delete' && <DeleteForm workspace={current} />}
+          {dialog === 'delete' && <DeleteForm workspace={current} pending={deleting} setPending={setDeleting} />}
         </DialogContent>
       </Dialog>
     </>
@@ -205,9 +210,16 @@ function RenameForm({ workspace, onDone }: { workspace: Workspace; onDone: () =>
 // The typed name is a gate in the browser only; DELETE /api/workspaces/[id] checks is_owner itself
 // (issue #61, rulings 1 and 8). On success a full navigation, not a client transition, so no cached
 // page shows the deleted workspace; the cookie still names it, and falls back (ruling 9).
-function DeleteForm({ workspace }: { workspace: Workspace }) {
+function DeleteForm({
+  workspace,
+  pending,
+  setPending,
+}: {
+  workspace: Workspace
+  pending: boolean
+  setPending: (pending: boolean) => void
+}) {
   const [typed, setTyped] = useState('')
-  const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const matches = typed === workspace.name
 
