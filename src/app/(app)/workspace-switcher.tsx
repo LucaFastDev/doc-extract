@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { ChevronsUpDownIcon, PencilIcon, PlusIcon, UsersIcon } from 'lucide-react'
+import { ChevronsUpDownIcon, CreditCardIcon, PencilIcon, PlusIcon, UsersIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -38,7 +38,8 @@ interface Workspace {
 let focusOnMount = false
 
 // The workspace switcher (PRD US-8.1 AC-3, AC-4): lists the user's workspaces, switches between
-// them, creates one, lets an owner rename the current one, and opens its members (US-8.2).
+// them, creates one, lets an owner rename the current one, and opens its members (US-8.2) and its
+// billing (US-11.1).
 export function WorkspaceSwitcher({ workspaces, current }: { workspaces: Workspace[]; current: Workspace }) {
   const [dialog, setDialog] = useState<'create' | 'rename' | null>(null)
   const [pending, startTransition] = useTransition()
@@ -79,6 +80,12 @@ export function WorkspaceSwitcher({ workspaces, current }: { workspaces: Workspa
             <Link href="/members">
               <UsersIcon />
               Members
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/billing">
+              <CreditCardIcon />
+              Billing
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setDialog('create')}>
