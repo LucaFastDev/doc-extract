@@ -572,7 +572,7 @@ in `STRIPE_PRICE_PRO` must match `monthly_price_usd` (go-live).
 `spend_cap_usd` (10.00), `daily_cap_usd` (2.00, OQ-33), `account_page_cap` (10, OQ-2; null turns
 the cap off), `model` (`claude-sonnet-5-5`), `input_usd_per_mtok` (2) and `output_usd_per_mtok`
 (10), Sonnet 5.5's prices on Anthropic's pricing page as read on 2026-10-31,
-`base_input_tokens` (4000), `max_input_tokens_per_page` (5000), `max_output_tokens` (8192),
+`base_input_tokens` (20000), `max_input_tokens_per_page` (5000), `max_output_tokens` (8192),
 `confidence_threshold` (0.80, OQ-8), `amount_tolerance` (0.01, OQ-7), and
 `extract_concurrency int not null default 1` (Lead ruling 3 on #24): how many `process-queue`
 requests the cron job sends each run, read on every run; 0 sends none; production sets 2
@@ -879,7 +879,8 @@ both. Because the reserved amount is an upper bound, both limits hold even with 
 limit, not a guess. The input part rests on `base_input_tokens` (system prompt and tool
 definitions) and `max_input_tokens_per_page`, set above the largest values the eval measures;
 `settle_spend` logs a warning for any call whose actual cost passed its estimate, so a wrong
-setting is visible.
+setting is visible. Until a real eval run is committed, the value of `base_input_tokens` comes from
+the eval dry run's estimate of about 18,000 tokens.
 
 The prices in `app_config` are copied from Anthropic's pricing page for the configured model when
 the queue milestone is built, and checked in docs/go-live.md. As a second guard, the Anthropic

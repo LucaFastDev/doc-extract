@@ -71,9 +71,9 @@ domain (OQ-27). `<site>` below means that address.
       page for that model (https://platform.claude.com/docs/en/about-claude/pricing; Sonnet 5.5 was
       2 and 10 USD per million input and output tokens on 2026-10-31). `extract_concurrency` is
       **2** in production (Lead ruling 3 on #24): the migration inserts 1, so set it once with
-      `update app_config set extract_concurrency = 2`. `max_output_tokens` and the two input
-      settings bound the spend estimate (section 7): keep them at or above the eval's largest
-      measured values.
+      `update app_config set extract_concurrency = 2`. `base_input_tokens` is 20000, or a higher
+      value set from a committed eval run. `max_output_tokens` and the two input settings bound the
+      spend estimate (section 7): keep them at or above the eval's largest measured values.
 - [ ] **plan_limits**: SQL editor, `select * from plan_limits`. Pass: `free` 20 pages and 0, `pro`
       500 pages and 19.00 (OQ-2, OQ-24).
 

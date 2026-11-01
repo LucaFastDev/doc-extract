@@ -12,6 +12,7 @@ import {
   PROMPT_VERSION,
   type ClaudeClient,
   type ExtractFile,
+  type ExtractRequest,
   type MessagesApi,
   type Usage,
 } from '../supabase/functions/_shared/claude.ts'
@@ -242,6 +243,16 @@ const TOOL_USE_TOKENS = 350
 /** A PDF page, as text and as an image, at the high end of Anthropic's guidance. */
 const PDF_PAGE_TOKENS = 3000
 
+/**
+ * The part of a request's input every document pays, the file left out: the system prompt, the tool
+ * definitions and the first message's text. app_config.base_input_tokens must stay at or above it
+ * (ARCHITECTURE.md section 7); fixed-input.test.ts checks that.
+ */
+export function fixedInputTokens(request: ExtractRequest): number {
+  const text = request.system + JSON.stringify(request.tools) + JSON.stringify(request.messages[0].content.filter((b) => b.type === 'text'))
+  return Math.ceil(text.length / CHARS_PER_TOKEN) + TOOL_USE_TOKENS
+}
+
 /** An image's tokens: width × height / 750, after the API scales it to at most 1568 px a side and 1.15 megapixels. */
 function imageTokens(bytes: Uint8Array): number {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
@@ -261,9 +272,8 @@ function dryRun(docs: EvalDocumentFile[], model: string, log: (line: string) => 
   log(`${'Document'.padEnd(24)} Pages  Input tokens  Output tokens`)
   for (const doc of docs) {
     const request = buildRequest(doc.file, null, { model, maxTokens: SETTINGS.max_tokens })
-    const text = request.system + JSON.stringify(request.tools) + JSON.stringify(request.messages[0].content.filter((b) => b.type === 'text'))
     const fileTokens = doc.file.mimeType === 'application/pdf' ? doc.pages * PDF_PAGE_TOKENS : imageTokens(doc.file.bytes)
-    const docInput = Math.ceil(text.length / CHARS_PER_TOKEN) + TOOL_USE_TOKENS + fileTokens
+    const docInput = fixedInputTokens(request) + fileTokens
     const docOutput = Math.ceil(JSON.stringify(toolInput(doc.expected, 0.95)).length / CHARS_PER_TOKEN) + 50
     input += docInput
     output += docOutput
