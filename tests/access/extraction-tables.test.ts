@@ -129,10 +129,18 @@ describe('app_config', () => {
       confidence_threshold: '0.800',
       amount_tolerance: '0.01',
       extract_concurrency: 1,
+      base_input_tokens: 20000,
     })
     for (const column of ['base_input_tokens', 'max_input_tokens_per_page', 'max_output_tokens']) {
       expect(rows[0][column]).toBeGreaterThan(0)
     }
+  })
+
+  it('defaults base_input_tokens to 20000, the size of the fixed part of a request (issue #71)', async () => {
+    const { rows } = await withDb((db) =>
+      db.query("select column_default from information_schema.columns where table_schema = 'public' and table_name = 'app_config' and column_name = 'base_input_tokens'"),
+    )
+    expect(rows).toEqual([{ column_default: '20000' }])
   })
 
   it('cannot hold a second row', async () => {

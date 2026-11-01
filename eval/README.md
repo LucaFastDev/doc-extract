@@ -69,7 +69,9 @@ Node warning that "Transform Types is an experimental feature" is expected: the 
 app's own Claude client, which needs it.
 
 ARCHITECTURE.md section 9: if Haiku meets the targets, it becomes the default model. That choice,
-and any change to `app_config`, is made separately, from the committed results.
+and any change to `app_config`, is made separately, from the committed results. Until then,
+`app_config.base_input_tokens` (20000) comes from the dry run's estimate of the fixed part of a
+request, about 18,000 tokens.
 
 ### What a run costs
 

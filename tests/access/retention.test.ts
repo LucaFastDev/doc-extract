@@ -53,7 +53,7 @@ describe('get_budget_status', () => {
   }
 
   // With app_config's values, one page costs at most
-  // (4000 + 5000) × 2 / 1e6 + 8192 × 10 / 1e6 = 0.09992 USD.
+  // (20000 + 5000) × 2 / 1e6 + 8192 × 10 / 1e6 = 0.13192 USD.
 
   it('reports this month’s spend and cap, and no limit reached, when both have room', async () => {
     await rolledBack(async (db) => {
@@ -86,9 +86,9 @@ describe('get_budget_status', () => {
   it('counts a limit reached only when what is left is below a one-page estimate, reservations included', async () => {
     await rolledBack(async (db) => {
       // Exactly one page's estimate left today: reserve_spend would still accept it.
-      await setSpend(db, { spent: 0 }, { spent: 1.90008 })
+      await setSpend(db, { spent: 0 }, { spent: 1.86808 })
       expect((await status(db)).daily_reached).toBe(false)
-      await setSpend(db, { spent: 0 }, { spent: 1.900081 })
+      await setSpend(db, { spent: 0 }, { spent: 1.868081 })
       expect((await status(db)).daily_reached).toBe(true)
       // What is reserved is not yet spent, but it is not left either.
       await setSpend(db, { spent: 0, reserved: 9.95 }, { spent: 0 })
