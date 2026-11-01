@@ -15,6 +15,13 @@ export interface FormState {
   ok?: boolean
 }
 
+const NAME_TOO_LONG = 'Use 100 characters or fewer for the workspace name.'
+
+// Counts code points, as char_length does in the database's check on workspaces.name.
+function nameTooLong(name: string) {
+  return Array.from(name).length > 100
+}
+
 export async function switchWorkspace(id: string): Promise<void> {
   const supabase = await signedInClient()
   const { data: member, error } = await supabase.rpc('is_member', { ws: id })
@@ -29,6 +36,7 @@ export async function createWorkspace(_prev: FormState, formData: FormData): Pro
   const supabase = await signedInClient()
   const name = String(formData.get('name') ?? '').trim()
   if (!name) return { error: 'Enter a name for the workspace.' }
+  if (nameTooLong(name)) return { error: NAME_TOO_LONG }
 
   const { data: id, error } = await supabase.rpc('create_workspace', { name })
   if (error || typeof id !== 'string') return { error: 'The workspace could not be created. Try again.' }
@@ -43,6 +51,7 @@ export async function renameWorkspace(_prev: FormState, formData: FormData): Pro
   const id = String(formData.get('id') ?? '')
   const name = String(formData.get('name') ?? '').trim()
   if (!name) return { error: 'Enter a name for the workspace.' }
+  if (nameTooLong(name)) return { error: NAME_TOO_LONG }
 
   // RLS lets only an owner update the row, so a member's rename changes nothing and returns no row.
   const { data, error } = await supabase.from('workspaces').update({ name }).eq('id', id).select('id')
