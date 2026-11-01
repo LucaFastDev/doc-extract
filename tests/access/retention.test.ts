@@ -361,7 +361,8 @@ describe('a purge-files run', () => {
 
   it('answers 401 to a request without the secret, or with a wrong one, and changes nothing', async () => {
     const before = await usage()
-    for (const headers of [{}, { 'x-cron-secret': 'wrong' }, { Authorization: `Bearer ${cronSecret}` }]) {
+    const refused: Record<string, string>[] = [{}, { 'x-cron-secret': 'wrong' }, { Authorization: `Bearer ${cronSecret}` }]
+    for (const headers of refused) {
       expect((await purge(headers)).status).toBe(401)
     }
     expect(await objectExists('documents', old.path)).toBe(true)
