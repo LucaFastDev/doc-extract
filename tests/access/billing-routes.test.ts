@@ -9,7 +9,11 @@ import { addMember, anonClient, personalWorkspaceId, signUp, type TestUser } fro
 // a fake that records what it is asked for (ruling 7).
 
 const SITE = 'https://site.test'
-const settings = () => ({ priceId: 'price_test_pro', successUrl: `${SITE}/billing?checkout=success`, cancelUrl: `${SITE}/billing` })
+const settings = () => ({
+  priceId: 'price_test_pro',
+  successUrl: (workspaceId: string) => `${SITE}/billing?checkout=success&workspace=${workspaceId}`,
+  cancelUrl: `${SITE}/billing`,
+})
 
 async function setWorkspace(ws: string, plan: 'free' | 'pro', customer: string | null) {
   await withDb((db) => db.query('update public.workspaces set plan = $2, stripe_customer_id = $3 where id = $1', [ws, plan, customer]))
@@ -62,7 +66,7 @@ describe('createCheckout', () => {
       line_items: [{ price: 'price_test_pro', quantity: 1 }],
       metadata: { workspace_id: ws },
       subscription_data: { metadata: { workspace_id: ws } },
-      success_url: `${SITE}/billing?checkout=success`,
+      success_url: `${SITE}/billing?checkout=success&workspace=${ws}`,
       cancel_url: `${SITE}/billing`,
     })
   })

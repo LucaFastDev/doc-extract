@@ -9,8 +9,8 @@ import { addMember, personalWorkspace, switcher, useWorkspace } from './support/
 const CHECKING = 'Checking your plan…'
 const STILL_FREE = 'Your payment went through. Your plan will update shortly.'
 
-async function returnFromCheckout(page: Page) {
-  await page.goto('/billing?checkout=success')
+async function returnFromCheckout(page: Page, ws: string) {
+  await page.goto(`/billing?checkout=success&workspace=${ws}`)
   await expect(page).toHaveURL(/\/billing$/)
   await expect(page.getByText(CHECKING)).toBeVisible()
 }
@@ -23,9 +23,9 @@ async function secondWorkspace(user: TestUser, name: string) {
 
 test('browser Back to the billing page after a Checkout return shows the billing page', async ({ page, context, baseURL }) => {
   const owner = await createUser('Olivia Owner')
-  await personalWorkspace(owner, 'Acme books')
+  const ws = await personalWorkspace(owner, 'Acme books')
   await signIn(context, baseURL!, owner)
-  await returnFromCheckout(page)
+  await returnFromCheckout(page, ws)
 
   await switcher(page).click()
   await page.getByRole('menuitem', { name: 'Members' }).click()
@@ -44,7 +44,7 @@ test('switching to another workspace after a Checkout return says nothing about 
   await secondWorkspace(owner, 'Unpaid workspace')
   await signIn(context, baseURL!, owner)
   await useWorkspace(context, baseURL!, paid)
-  await returnFromCheckout(page)
+  await returnFromCheckout(page, paid)
 
   await switcher(page).click()
   await page.getByRole('menuitemradio', { name: 'Unpaid workspace' }).click()
@@ -60,9 +60,9 @@ test('switching to another workspace after a Checkout return says nothing about 
 
 test('renaming the workspace after a Checkout return does not bring the marker back', async ({ page, context, baseURL }) => {
   const owner = await createUser('Olivia Owner')
-  await personalWorkspace(owner, 'Acme books')
+  const ws = await personalWorkspace(owner, 'Acme books')
   await signIn(context, baseURL!, owner)
-  await returnFromCheckout(page)
+  await returnFromCheckout(page, ws)
 
   await switcher(page).click()
   await page.getByRole('menuitem', { name: 'Rename workspace' }).click()

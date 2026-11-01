@@ -116,7 +116,6 @@ export function BillingView({
 
   return (
     <main className="flex flex-col gap-8">
-      {returnedFromCheckout && <SpendCheckoutMarker />}
       <div className="min-w-0">
         <h1 className="text-2xl font-semibold tracking-tight">Billing</h1>
         <p className="text-muted-foreground">
@@ -179,12 +178,13 @@ export function BillingView({
   )
 }
 
-// The marker is spent once used, so a reload, a workspace switch or a rename shows the plan as it is,
-// with no timer. Through the router, not window.history.replaceState: on the first render this effect
-// runs before the router patches history, so that call would blank the entry's router state, which
-// breaks Back to it, and leave the marker in the URL the router keeps using. The view's state, and so
-// its re-reads, carries over: only the search params change.
-function SpendCheckoutMarker() {
+// The marker and the workspace it names are spent on every return, acted on or not, so a reload, a
+// workspace switch or a rename shows the plan as it is, with no timer. Through the router, not
+// window.history.replaceState: on the first render this effect runs before the router patches
+// history, so that call would blank the entry's router state, which breaks Back to it, and leave the
+// marker in the URL the router keeps using. The view's state, and so its re-reads, carries over: only
+// the search params change.
+export function SpendCheckoutMarker() {
   const router = useRouter()
   useEffect(() => {
     router.replace('/billing', { scroll: false })

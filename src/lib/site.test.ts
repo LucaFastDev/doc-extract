@@ -1,20 +1,37 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { billingUrl, inviteUrl } from './site'
+import { billingUrl, checkoutSuccessUrl, inviteUrl } from './site'
 
 describe('billingUrl', () => {
   afterEach(() => {
     vi.unstubAllEnvs()
   })
 
-  it('builds the billing page and the return from a completed Checkout from SITE_URL', () => {
+  it('builds the billing page, with no marker, from SITE_URL', () => {
     vi.stubEnv('SITE_URL', 'https://doc-extract.vercel.app/')
     expect(billingUrl()).toBe('https://doc-extract.vercel.app/billing')
-    expect(billingUrl('success')).toBe('https://doc-extract.vercel.app/billing?checkout=success')
   })
 
   it('throws when SITE_URL is unset', () => {
     vi.stubEnv('SITE_URL', '')
     expect(() => billingUrl()).toThrow(/SITE_URL/)
+  })
+})
+
+describe('checkoutSuccessUrl', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('builds the return from a completed Checkout from SITE_URL, naming the workspace', () => {
+    vi.stubEnv('SITE_URL', 'https://doc-extract.vercel.app/')
+    expect(checkoutSuccessUrl('11111111-2222-3333-4444-555555555555')).toBe(
+      'https://doc-extract.vercel.app/billing?checkout=success&workspace=11111111-2222-3333-4444-555555555555',
+    )
+  })
+
+  it('throws when SITE_URL is unset', () => {
+    vi.stubEnv('SITE_URL', '')
+    expect(() => checkoutSuccessUrl('ws')).toThrow(/SITE_URL/)
   })
 })
 
