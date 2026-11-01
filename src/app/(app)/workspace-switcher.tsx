@@ -235,12 +235,14 @@ function DeleteForm({ workspace }: { workspace: Workspace }) {
       <DialogHeader>
         <DialogTitle>Delete workspace</DialogTitle>
         <DialogDescription>
-          This deletes {workspace.name} for everyone: its documents, files, results, history, invitations and members.
+          This deletes <span className="whitespace-pre-wrap">{workspace.name}</span> for everyone: its documents, files, results, history, invitations and members.
           An active Pro subscription is cancelled at once. This cannot be undone.
         </DialogDescription>
       </DialogHeader>
       <div className="grid gap-2">
-        <Label htmlFor="delete-workspace-name">Type {workspace.name} to confirm</Label>
+        <Label htmlFor="delete-workspace-name" className="block leading-normal whitespace-pre-wrap">
+          Type {workspace.name} to confirm
+        </Label>
         <Input id="delete-workspace-name" value={typed} onChange={(event) => setTyped(event.target.value)} autoComplete="off" />
       </div>
       {error && (
