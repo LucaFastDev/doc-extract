@@ -80,3 +80,48 @@ describe('workspace actions after the session has ended', () => {
     expect(rpc).toHaveBeenCalledWith('is_member', { ws: 'ws-1' })
   })
 })
+
+// Issue #69 criterion 5: the count is of code points after the trim, as char_length counts, so 100
+// emoji are within the limit though their length in JavaScript is 200.
+describe('the 100-character limit on a workspace name', () => {
+  const TOO_LONG = { error: 'Use 100 characters or fewer for the workspace name.' }
+  const OVER = ['x'.repeat(101), `  ${'x'.repeat(101)}  `, '😀'.repeat(101)]
+  const AT_LIMIT = [
+    ['x'.repeat(100), 'x'.repeat(100)],
+    [`  ${'x'.repeat(100)}  `, 'x'.repeat(100)],
+    ['😀'.repeat(100), '😀'.repeat(100)],
+  ]
+
+  beforeEach(() => {
+    user = { id: 'u1' }
+    requestPath = '/documents'
+    rpc.mockReset()
+    update.mockReset()
+    rpc.mockResolvedValue({ data: 'ws-new', error: null })
+    update.mockReturnValue({ eq: () => ({ select: async () => ({ data: [{ id: 'ws-1' }], error: null }) }) })
+  })
+
+  it('create refuses over 100 before calling the database, and sends 100 on', async () => {
+    for (const name of OVER) {
+      expect(await createWorkspace({}, form({ name }))).toEqual(TOO_LONG)
+    }
+    expect(rpc).not.toHaveBeenCalled()
+
+    for (const [name, trimmed] of AT_LIMIT) {
+      expect(await createWorkspace({}, form({ name }))).toEqual({ ok: true })
+      expect(rpc).toHaveBeenLastCalledWith('create_workspace', { name: trimmed })
+    }
+  })
+
+  it('rename refuses over 100 before calling the database, without blaming the role, and sends 100 on', async () => {
+    for (const name of OVER) {
+      expect(await renameWorkspace({}, form({ id: 'ws-1', name }))).toEqual(TOO_LONG)
+    }
+    expect(update).not.toHaveBeenCalled()
+
+    for (const [name, trimmed] of AT_LIMIT) {
+      expect(await renameWorkspace({}, form({ id: 'ws-1', name }))).toEqual({ ok: true })
+      expect(update).toHaveBeenLastCalledWith({ name: trimmed })
+    }
+  })
+})

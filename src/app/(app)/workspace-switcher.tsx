@@ -285,6 +285,7 @@ function NameField({ defaultValue, error }: { defaultValue: string; error?: stri
         name="name"
         defaultValue={defaultValue}
         required
+        maxLength={100}
         autoComplete="off"
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? 'workspace-name-error' : undefined}

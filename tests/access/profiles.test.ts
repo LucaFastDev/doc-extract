@@ -1,6 +1,7 @@
+import { randomUUID } from 'node:crypto'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { withDb } from './local-db'
-import { anonClient, personalWorkspaceId, signUp, type TestUser } from './users'
+import { adminClient, anonClient, personalWorkspaceId, signUp, type TestUser } from './users'
 
 // profiles (ARCHITECTURE.md section 4.2): one row per auth user, made by handle_new_user(); a user
 // reads their own row and those of people they share a workspace with, and updates only their own
@@ -54,6 +55,20 @@ describe('profiles', () => {
     expect(data).toEqual([{ display_name: 'Alice Renamed' }])
   })
 
+  it('refuses a display_name of 101 characters through the API, and takes 100 and null', async () => {
+    const user = await signUp('Short Name')
+    const over = await user.client.from('profiles').update({ display_name: 'd'.repeat(101) }).eq('id', user.id).select('id')
+    expect(over.error?.code).toBe('23514')
+    const row = await withDb((db) => db.query('select display_name from public.profiles where id = $1', [user.id]))
+    expect(row.rows[0].display_name).toBe('Short Name')
+
+    for (const name of ['d'.repeat(100), '😀'.repeat(100), null]) {
+      const { data, error } = await user.client.from('profiles').update({ display_name: name }).eq('id', user.id).select('display_name')
+      expect(error).toBeNull()
+      expect(data).toEqual([{ display_name: name }])
+    }
+  })
+
   it('refuses a change to another user’s display_name', async () => {
     const { data } = await teammate.client
       .from('profiles')
@@ -82,5 +97,41 @@ describe('profiles', () => {
   it('shows anon nothing', async () => {
     const { data } = await anonClient().from('profiles').select('id')
     expect(data ?? []).toEqual([])
+  })
+})
+
+// Issue #69 criterion 3: the trigger cuts a long name rather than refusing it, so a sign-up never
+// fails because of one.
+describe('handle_new_user with a name over 100 characters', () => {
+  async function displayNameAfterSignUp(metadata: Record<string, string>) {
+    const { data, error } = await adminClient().auth.admin.createUser({
+      email: `access-${randomUUID()}@example.test`,
+      email_confirm: true,
+      user_metadata: metadata,
+    })
+    expect(error).toBeNull()
+    const row = await withDb((db) => db.query('select display_name from public.profiles where id = $1', [data.user!.id]))
+    return row.rows[0].display_name as string
+  }
+
+  it('signs the user up, with a profile and personal workspace, and cuts full_name to 100', async () => {
+    const user = await signUp('f'.repeat(150))
+    const { data, error } = await user.client.from('profiles').select('display_name').eq('id', user.id)
+    expect(error).toBeNull()
+    expect(data).toEqual([{ display_name: 'f'.repeat(100) }])
+    expect(await personalWorkspaceId(user)).toEqual(expect.any(String))
+  })
+
+  it('cuts the name metadata to 100', async () => {
+    expect(await displayNameAfterSignUp({ name: 'g'.repeat(150) })).toBe('g'.repeat(100))
+  })
+
+  it('trims first, then cuts, so the spaces do not use up the 100', async () => {
+    expect(await displayNameAfterSignUp({ full_name: `   ${'h'.repeat(150)}   ` })).toBe('h'.repeat(100))
+    expect(await displayNameAfterSignUp({ full_name: `   ${'i'.repeat(100)}   ` })).toBe('i'.repeat(100))
+  })
+
+  it('counts characters, not bytes', async () => {
+    expect(await displayNameAfterSignUp({ full_name: '😀'.repeat(150) })).toBe('😀'.repeat(100))
   })
 })
