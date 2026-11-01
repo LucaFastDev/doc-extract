@@ -4,7 +4,8 @@
 /** Where a signed-in user lands when no return-to path is given: the document list. */
 export const DEFAULT_PATH = '/documents'
 
-// Pages a signed-out visitor may open. Everything else sends them to sign-in.
+// Pages a signed-out visitor may open. A protected page not listed here sends them to sign-in; an
+// address under neither list is no route and answers 404 (see PROTECTED_PREFIXES below).
 const PUBLIC_PATHS = ['/', '/sign-in', '/privacy', '/terms', '/auth/callback', '/api/stripe/webhook']
 const PUBLIC_PREFIXES = ['/demo']
 
