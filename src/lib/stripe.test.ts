@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getStripe, STRIPE_API_VERSION, stripePricePro, stripeWebhookSecret } from './stripe'
 
@@ -28,6 +31,21 @@ describe('getStripe', () => {
     const stripe = getStripe()
     expect(stripe.subscriptions).toBeDefined()
     expect(stripe.getApiField('version')).toBe(STRIPE_API_VERSION)
+  })
+})
+
+describe('src/lib/stripe.ts', () => {
+  const SRC = fileURLToPath(new URL('..', import.meta.url))
+
+  it('is the only module under src/ that creates a Stripe client', () => {
+    const creators = readdirSync(SRC, { recursive: true, encoding: 'utf8' })
+      .filter((file) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file))
+      .filter((file) => /new Stripe\(/.test(readFileSync(join(SRC, file), 'utf8')))
+    expect(creators).toEqual([join('lib', 'stripe.ts')])
+  })
+
+  it('is server-only', () => {
+    expect(readFileSync(join(SRC, 'lib', 'stripe.ts'), 'utf8').split('\n')[0]).toBe("import 'server-only'")
   })
 })
 
