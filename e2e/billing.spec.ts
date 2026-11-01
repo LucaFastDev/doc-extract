@@ -1,5 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
-import { createUser, signIn } from './support/auth'
+import { createUser, signIn, sql } from './support/auth'
 import { postEvent, postSubscriptionDeleted, postSubscriptionUpdated, setPagesUsed, setPlan, subscriptionFixture } from './support/stripe'
 import { addMember, expectNoSideScroll, personalWorkspace, switcher, useWorkspace } from './support/workspace'
 
@@ -9,6 +9,7 @@ import { addMember, expectNoSideScroll, personalWorkspace, switcher, useWorkspac
 
 const NOTICE =
   'Billing here is a test-mode demonstration. Only Stripe test cards are accepted and no real money is ever charged. To try it, use the card 4242 4242 4242 4242 with any future date and any CVC.'
+const CHECKING = 'Checking your plan…'
 const STILL_FREE = 'Your payment went through. Your plan will update shortly.'
 const CHECKOUT_URL = 'https://checkout.stripe.test/session'
 const PORTAL_URL = 'https://billing.stripe.test/session'
@@ -234,7 +235,7 @@ test.describe('no call reaches Stripe', () => {
         const ws = await personalWorkspace(owner, 'Acme books')
         const reads = countPlanReads(page)
         await signIn(context, baseURL!, owner)
-        await page.goto('/billing?checkout=success')
+        await page.goto(`/billing?checkout=success&workspace=${ws}`)
         await expect(figure(page, 'Current plan')).toHaveText('Free')
 
         expect((await postSubscriptionUpdated(request, { ws })).status()).toBe(200)
@@ -255,11 +256,11 @@ test.describe('no call reaches Stripe', () => {
         baseURL,
       }) => {
         const owner = await createUser('Olivia Owner')
-        await personalWorkspace(owner, 'Acme books')
+        const ws = await personalWorkspace(owner, 'Acme books')
         const reads = countPlanReads(page)
         await signIn(context, baseURL!, owner)
         await page.clock.install()
-        await page.goto('/billing?checkout=success')
+        await page.goto(`/billing?checkout=success&workspace=${ws}`)
         await expect(figure(page, 'Current plan')).toHaveText('Free')
         await expect(page.getByRole('button', { name: 'Upgrade' })).toBeDisabled()
 
@@ -283,11 +284,11 @@ test.describe('no call reaches Stripe', () => {
 
       test('a re-read that fails does not stop the others, and the page still says the plan will update', async ({ page, context, baseURL }) => {
         const owner = await createUser('Olivia Owner')
-        await personalWorkspace(owner, 'Acme books')
+        const ws = await personalWorkspace(owner, 'Acme books')
         await page.route('**/rest/v1/workspaces*', (route) => route.abort())
         await signIn(context, baseURL!, owner)
         await page.clock.install()
-        await page.goto('/billing?checkout=success')
+        await page.goto(`/billing?checkout=success&workspace=${ws}`)
         await expect(figure(page, 'Current plan')).toHaveText('Free')
 
         // Longer than 20 seconds: the Supabase client backs off and retries a read that fails.
@@ -320,7 +321,7 @@ test.describe('no call reaches Stripe', () => {
         const reads = countPlanReads(page)
         await signIn(context, baseURL!, owner)
         await page.clock.install()
-        await page.goto('/billing?checkout=success')
+        await page.goto(`/billing?checkout=success&workspace=${ws}`)
         await expect(figure(page, 'Current plan')).toHaveText('Pro')
 
         await page.clock.runFor(30_000)
@@ -331,12 +332,72 @@ test.describe('no call reaches Stripe', () => {
 
       test('a reload after returning from Checkout does not start the re-reads again', async ({ page, context, baseURL }) => {
         const owner = await createUser('Olivia Owner')
-        await personalWorkspace(owner, 'Acme books')
+        const ws = await personalWorkspace(owner, 'Acme books')
         await signIn(context, baseURL!, owner)
-        await page.goto('/billing?checkout=success')
+        await page.goto(`/billing?checkout=success&workspace=${ws}`)
         await expect(page).toHaveURL(/\/billing$/)
         await page.reload()
         await expect(page.getByRole('button', { name: 'Upgrade' })).toBeEnabled()
+      })
+
+      /** The plain page after a return the page must not act on (Lead ruling 8 on #50), with the marker gone. */
+      async function expectPlainReturn(page: Page, reads: { count: number }, path: string) {
+        await page.clock.install()
+        await page.goto(path)
+        await expect(figure(page, 'Current plan')).toHaveText('Free')
+        await expect(page).toHaveURL(/\/billing$/)
+        await expect(page.getByText(CHECKING)).toHaveCount(0)
+
+        await page.clock.runFor(30_000)
+
+        await expect(page.getByText(CHECKING)).toHaveCount(0)
+        await expect(page.getByText(STILL_FREE)).toHaveCount(0)
+        expect(reads.count).toBe(0)
+      }
+
+      test('a return naming another workspace is the plain page, and says nothing about the one that paid', async ({ page, context, baseURL, request }) => {
+        const owner = await createUser('Olivia Owner')
+        const unpaid = await personalWorkspace(owner, 'Unpaid workspace')
+        const [{ id: paid }] = await sql<{ id: string }>('insert into public.workspaces (name, created_by) values ($1, $2) returning id', [
+          'Paid workspace',
+          owner.id,
+        ])
+        await addMember(paid, owner, 'owner')
+        expect((await postSubscriptionUpdated(request, { ws: paid })).status()).toBe(200)
+        const reads = countPlanReads(page)
+        await signIn(context, baseURL!, owner)
+        await useWorkspace(context, baseURL!, unpaid)
+
+        await expectPlainReturn(page, reads, `/billing?checkout=success&workspace=${paid}`)
+
+        await expect(page.getByRole('main')).toContainText('Unpaid workspace')
+        await expect(page.getByRole('main')).not.toContainText('Paid workspace')
+        await expect(page.getByRole('button', { name: 'Upgrade' })).toBeEnabled()
+      })
+
+      test('a return with no workspace is the plain page', async ({ page, context, baseURL }) => {
+        const owner = await createUser('Olivia Owner')
+        await personalWorkspace(owner, 'Acme books')
+        const reads = countPlanReads(page)
+        await signIn(context, baseURL!, owner)
+
+        await expectPlainReturn(page, reads, '/billing?checkout=success')
+
+        await expect(page.getByRole('button', { name: 'Upgrade' })).toBeEnabled()
+      })
+
+      test('a return naming the workspace reaches a member as the plain page', async ({ page, context, baseURL }) => {
+        const owner = await createUser('Olivia Owner')
+        const ws = await personalWorkspace(owner, 'Acme books')
+        const member = await createUser('Mia Member')
+        await addMember(ws, member, 'member')
+        const reads = countPlanReads(page)
+        await signIn(context, baseURL!, member)
+        await useWorkspace(context, baseURL!, ws)
+
+        await expectPlainReturn(page, reads, `/billing?checkout=success&workspace=${ws}`)
+
+        await expect(page.getByRole('button', { name: 'Upgrade' })).toHaveCount(0)
       })
 
       test('the signed-in navigation opens the page for an owner and a member', async ({ page, context, baseURL }) => {

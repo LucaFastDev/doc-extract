@@ -1,5 +1,30 @@
 import { describe, expect, it } from 'vitest'
-import { pagesLeft, planEndDate } from './plan'
+import { checkoutReturn, pagesLeft, planEndDate } from './plan'
+
+describe('checkoutReturn', () => {
+  const owner = { id: 'ws-1', role: 'owner' }
+
+  it('acts on a return naming the current workspace, for an owner of it', () => {
+    expect(checkoutReturn({ checkout: 'success', workspace: 'ws-1' }, owner)).toEqual({ spendMarker: true, actOnReturn: true })
+  })
+
+  it.each([
+    ['names another workspace', { checkout: 'success', workspace: 'ws-2' }, owner],
+    ['names no workspace', { checkout: 'success', workspace: undefined }, owner],
+    ['names the workspace twice', { checkout: 'success', workspace: ['ws-1', 'ws-1'] }, owner],
+    ['reaches a member', { checkout: 'success', workspace: 'ws-1' }, { id: 'ws-1', role: 'member' }],
+  ])('spends the marker and does not act when the return %s', (_name, marker, current) => {
+    expect(checkoutReturn(marker, current)).toEqual({ spendMarker: true, actOnReturn: false })
+  })
+
+  it.each([
+    ['no marker', { checkout: undefined, workspace: undefined }],
+    ['a workspace with no marker', { checkout: undefined, workspace: 'ws-1' }],
+    ['another marker', { checkout: 'cancelled', workspace: 'ws-1' }],
+  ])('leaves %s alone', (_name, marker) => {
+    expect(checkoutReturn(marker, owner)).toEqual({ spendMarker: false, actOnReturn: false })
+  })
+})
 
 describe('planEndDate', () => {
   const end = '2030-03-14T23:30:00Z'
