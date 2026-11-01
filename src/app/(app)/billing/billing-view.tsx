@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { PLAN_COLUMNS, PLAN_LABELS, pagesLeft, planEndDate, type WorkspacePlan } from '@/lib/billing/plan'
 import type { PageAllowance } from '@/lib/documents/upload'
@@ -41,11 +42,6 @@ export function BillingView({
   const [stillFree, setStillFree] = useState(false)
   const [redirecting, setRedirecting] = useState(false)
   const [error, setError] = useState<string>()
-
-  useEffect(() => {
-    // The marker is spent once used, so a reload shows the plan as it is, with no timer.
-    if (returnedFromCheckout) window.history.replaceState(null, '', '/billing')
-  }, [returnedFromCheckout])
 
   useEffect(() => {
     if (!reReading) return
@@ -120,6 +116,7 @@ export function BillingView({
 
   return (
     <main className="flex flex-col gap-8">
+      {returnedFromCheckout && <SpendCheckoutMarker />}
       <div className="min-w-0">
         <h1 className="text-2xl font-semibold tracking-tight">Billing</h1>
         <p className="text-muted-foreground">
@@ -180,6 +177,19 @@ export function BillingView({
       </section>
     </main>
   )
+}
+
+// The marker is spent once used, so a reload, a workspace switch or a rename shows the plan as it is,
+// with no timer. Through the router, not window.history.replaceState: on the first render this effect
+// runs before the router patches history, so that call would blank the entry's router state, which
+// breaks Back to it, and leave the marker in the URL the router keeps using. The view's state, and so
+// its re-reads, carries over: only the search params change.
+function SpendCheckoutMarker() {
+  const router = useRouter()
+  useEffect(() => {
+    router.replace('/billing', { scroll: false })
+  }, [router])
+  return null
 }
 
 function Figure({ label, value }: { label: string; value: string }) {
