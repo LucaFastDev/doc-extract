@@ -14,7 +14,8 @@ function env(name: string): string {
   return value
 }
 
-function apiUrl(): string {
+/** The local stack's API URL; it throws for any other. */
+export function apiUrl(): string {
   const url = env('NEXT_PUBLIC_SUPABASE_URL')
   if (!LOCAL_API_URL.test(url)) {
     throw new Error('NEXT_PUBLIC_SUPABASE_URL is not the local stack; access tests never run against a hosted project.')
