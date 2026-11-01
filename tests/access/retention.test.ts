@@ -433,4 +433,23 @@ describe('a purge-files run', () => {
     const listed = await adminClient().storage.from('demo').list('', { limit: 1000 })
     expect(listed.data?.map((o) => o.name)).toContain(demoFile)
   })
+
+  // Criterion 2 and choice 3: an object that is already gone is no Storage error, so the document
+  // counts as removed and gets its file_deleted_at, and the next run does not retry it.
+  it('counts a document past 7 days whose object is not in Storage as removed, not failed', async () => {
+    const { id, storage_path } = await createDocument(user, ws)
+    await withDb((db) => db.query("update public.documents set status = 'needs_review', created_at = now() - interval '8 days' where id = $1", [id]))
+    expect(await objectExists('documents', storage_path)).toBe(false)
+    expect(await documentRow(id)).toMatchObject({ file_deleted: false })
+
+    const { status, body } = await purge({ 'x-cron-secret': cronSecret })
+    expect(status).toBe(200)
+    expect(body.files_failed).toBe(0)
+    expect(body.files_removed).toBeGreaterThanOrEqual(1)
+    expect(await documentRow(id)).toMatchObject({ file_deleted: true })
+
+    // Marked, so it is not selected again.
+    const again = await purge({ 'x-cron-secret': cronSecret })
+    expect(again.body).toMatchObject({ files_removed: 0, files_failed: 0 })
+  })
 })
