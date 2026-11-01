@@ -172,7 +172,7 @@ src/
     layout.tsx                 root layout; imports ./globals.css
     globals.css                design tokens (CSS variables on :root), shadcn layout
   proxy.ts                     Next.js 16's proxy (the renamed middleware.ts): refreshes the session
-                               cookie; sends signed-out visitors to /sign-in
+                               cookie; sends signed-out visitors of protected pages to /sign-in
   lib/supabase/client.ts       the browser client (createBrowserClient); throws if NEXT_PUBLIC_SUPABASE_URL is unset
   lib/supabase/server.ts       the server client (createServerClient + cookies) and the service-role
                                client; `import 'server-only'`; throws if unset
@@ -684,8 +684,11 @@ All run on the Node.js runtime and are short; none calls Claude.
 
 `src/proxy.ts` (Next.js 16 renamed the `middleware.ts` convention to `proxy.ts`, exporting
 `proxy`) refreshes the session cookie on each request (the `@supabase/ssr` pattern), and sends a
-signed-out visitor who opens a page outside the public list (`/`, `/demo…`, `/sign-in`,
-`/privacy`, `/terms`, `/auth/callback`, `/api/stripe/webhook`) to `/sign-in?next=<path>`. It
+signed-out visitor who opens a page under a protected prefix (`/documents`, `/members`,
+`/billing`, `/invite`, `/api`) that is not public (`/`, `/demo…`, `/sign-in`, `/privacy`,
+`/terms`, `/auth/callback`, `/api/stripe/webhook`) to `/sign-in?next=<path>`. Any other address is
+no route of ours: the proxy passes it on and it answers 404 with the site-wide `not-found.tsx`
+page. A unit test reads `src/app` and fails for a route that is neither public nor protected. It
 redirects only `GET` and `HEAD`: a 307 would make the browser repeat a server action's `POST`
 against `/sign-in`, which cannot answer it. It passes the requested path and query on to the page
 in an `x-request-path` request header, always overwriting any the browser sent, and each server
