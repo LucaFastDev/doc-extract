@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { defineConfig, devices } from '@playwright/test'
 import { mockClaudePort } from './e2e/mock-claude/port'
+import { E2E_STRIPE_WEBHOOK_SECRET } from './e2e/support/stripe-secret'
 
 // The specs sign test users in against the local stack (e2e/support/auth.ts), whose URL and keys
 // are in .env.local, or in the environment in CI, which wins over the file.
@@ -54,7 +55,9 @@ export default defineConfig({
       reuseExistingServer: true,
       timeout: 120_000,
       // Invitation links are built from SITE_URL (src/lib/site.ts): here, the test server itself.
-      env: { SITE_URL: BASE_URL },
+      // The billing specs sign their fixture events with this test-only secret; the server has no
+      // Stripe key, so nothing can reach Stripe (Lead ruling 7 on #50).
+      env: { SITE_URL: BASE_URL, STRIPE_WEBHOOK_SECRET: E2E_STRIPE_WEBHOOK_SECRET },
     },
     {
       command: 'node e2e/mock-claude/server.ts',
