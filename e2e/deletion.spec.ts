@@ -412,6 +412,38 @@ for (const [width, viewport] of [
   })
 }
 
+// Issue #61 ruling 11: the refusal names every workspace, so with many of them the account dialog is
+// taller than a phone window. It scrolls inside the window, so Cancel can still be reached and pressed.
+test.describe('at 360x740', () => {
+  test.use({ viewport: { width: 360, height: 740 } })
+
+  test('Cancel can be reached and pressed in the account dialog when the refusal names 25 workspaces', async ({ page, context, baseURL }) => {
+    const user = await createUser()
+    const teammate = await createUser()
+    const suffix = 'with a rather long descriptive name for the books'
+    const first = await personalWorkspace(user, `Shared workspace number 01 ${suffix}`)
+    await addMember(first, teammate, 'member')
+    for (let n = 2; n <= 25; n++) {
+      const id = await ownedWorkspace(user, `Shared workspace number ${String(n).padStart(2, '0')} ${suffix}`)
+      await addMember(id, teammate, 'member')
+    }
+    await signIn(context, baseURL!, user)
+    await page.goto('/documents')
+
+    const dialog = await openAccountDialog(page)
+    await dialog.getByRole('button', { name: 'Delete my account' }).click()
+    await expect(dialog.getByRole('alert')).toContainText('Shared workspace number 25')
+    // Taller than the window, so only a scrolling dialog keeps Cancel within reach.
+    expect(await dialog.evaluate((el) => el.scrollHeight)).toBeGreaterThan(740)
+    const box = await dialog.boundingBox()
+    expect(box!.height).toBeLessThanOrEqual(740)
+
+    await dialog.getByRole('button', { name: 'Cancel' }).click({ timeout: 5_000 })
+    await expect(dialog).toBeHidden()
+    expect(await userGone(user)).toBe(false)
+  })
+})
+
 test('the routes answer 401 with no session, past the proxy', async ({ playwright, baseURL }) => {
   const request = await playwright.request.newContext({ baseURL })
   try {
