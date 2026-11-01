@@ -265,6 +265,14 @@ describe('deleteWorkspace, the order and the files', () => {
     expect(clients.steps.filter((s) => s !== 'list')).toEqual(['cancel', 'remove', 'release a', 'delete row'])
   })
 
+  it('treats an id in capitals as the same workspace, removing the objects under its lower-case folder', async () => {
+    const clients = fakeClients({ objects: [`${WS}/a/original`] })
+    const { factory } = fakeStripe()
+    expect((await deleteWorkspace(WS.toUpperCase(), { ...clients, stripe: factory })).status).toBe(204)
+    expect([...clients.objects]).toEqual([])
+    expect(clients.removedBatches).toEqual([[`${WS}/a/original`]])
+  })
+
   it('removes what is really under the folder, nested too, in batches of at most 100 until the listing is empty', async () => {
     const objects = [
       ...Array.from({ length: 150 }, (_, i) => `${WS}/doc-${String(i).padStart(3, '0')}/original`),

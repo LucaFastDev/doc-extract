@@ -130,7 +130,9 @@ export async function removeWorkspace(id: string, { admin, stripe }: Pick<Delete
 }
 
 /** Only an owner may delete a workspace; nothing changes for anyone else. */
-export async function deleteWorkspace(id: string, { asCaller, admin, stripe }: DeleteWorkspaceDeps): Promise<DeleteWorkspaceResult> {
+export async function deleteWorkspace(requestedId: string, { asCaller, admin, stripe }: DeleteWorkspaceDeps): Promise<DeleteWorkspaceResult> {
+  // Until the UUID check passes, the id is only what the request sent.
+  let id = requestedId
   try {
     const {
       data: { user },
@@ -139,6 +141,8 @@ export async function deleteWorkspace(id: string, { asCaller, admin, stripe }: D
 
     const notFound: DeleteWorkspaceResult = { status: 404, error: 'This workspace does not exist.' }
     if (!UUID.test(id)) return notFound
+    // An id in capitals is the same workspace, but Storage folders are named in lower case.
+    id = id.toLowerCase()
     const member = await asCaller.rpc('is_member', { ws: id })
     if (member.error) throw member.error
     if (member.data !== true) return notFound
