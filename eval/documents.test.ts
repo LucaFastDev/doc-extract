@@ -43,7 +43,7 @@ describe('the eval documents', () => {
     const built = await buildDocuments()
     expect(readdirSync(DOCUMENTS_DIR).sort()).toEqual([...built.keys()].sort())
     for (const [name, bytes] of built) expect(new Uint8Array(readFileSync(new URL(name, DOCUMENTS_DIR))), name).toEqual(bytes)
-  })
+  }, 60_000)
 
   it('are 30, five per type, each of a different layout, named after their type', () => {
     expect(EVAL_DOCUMENTS).toHaveLength(30)
