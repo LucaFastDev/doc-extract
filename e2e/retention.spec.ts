@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import { adminClient, createUser, signIn, sql, type TestUser } from './support/auth'
+import { adminClient, apiUrl, createUser, signIn, sql, type TestUser } from './support/auth'
 import { pngFile } from './support/files'
 import { check, expectNoSideScroll, seedDocument } from './support/review'
 
@@ -23,7 +23,7 @@ const VIEWER = { locale: 'en-GB', timezoneId: 'Pacific/Auckland' }
 /** Calls purge-files as the daily pg_cron job does, with the local CRON_SECRET from Vault. */
 async function runPurge() {
   const [{ secret }] = await sql<{ secret: string }>("select decrypted_secret as secret from vault.decrypted_secrets where name = 'cron_secret'")
-  const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/purge-files`, {
+  const response = await fetch(`${apiUrl()}/functions/v1/purge-files`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-cron-secret': secret },
     body: '{}',
