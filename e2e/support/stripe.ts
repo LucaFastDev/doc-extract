@@ -7,18 +7,39 @@ import { sql } from './auth'
 // Stripe fixtures for the billing specs (Lead ruling 7 on #50): nothing here reaches Stripe. Events
 // are signed locally and posted to the webhook of the running app; the two /api/billing/* calls a
 // browser makes are intercepted by each spec. The dev server has no STRIPE_SECRET_KEY at all.
+//
+// So an updated or checkout event cannot be posted to the running app, because both retrieve the
+// subscription from Stripe (ruling 5 on #73): a spec that needs the plan moved calls setPlan, and
+// tests/access/stripe-webhook.test.ts covers those two events against the real database. A signed
+// deleted event makes no call to Stripe, so it can be posted.
 
 export interface SubscriptionFixture {
   ws: string
+  /** The subscription id; a deleted event names the one the workspace holds. */
+  id?: string
   status?: string
   cancelAtPeriodEnd?: boolean
   /** Unix seconds. */
   periodEnd?: number
 }
 
-function subscriptionObject({ ws, status = 'active', cancelAtPeriodEnd = false, periodEnd = 1_900_000_000 }: SubscriptionFixture) {
+/** 2030-03-17T17:46:40Z, the period end every fixture carries (1_900_000_000 in Unix seconds). */
+export const PERIOD_END_ISO = '2030-03-17T17:46:40Z'
+
+/** The plan columns a Pro subscription for the workspace writes, for setPlan. */
+export function proPlan(ws: string, { cancelAtPeriodEnd = false } = {}) {
   return {
-    id: `sub_${randomUUID()}`,
+    plan: 'pro' as const,
+    customer: `cus_${ws}`,
+    subscription: `sub_${ws}`,
+    periodEnd: PERIOD_END_ISO,
+    cancelAtPeriodEnd,
+  }
+}
+
+function subscriptionObject({ ws, id = `sub_${randomUUID()}`, status = 'active', cancelAtPeriodEnd = false, periodEnd = 1_900_000_000 }: SubscriptionFixture) {
+  return {
+    id,
     object: 'subscription',
     customer: `cus_${randomUUID()}`,
     status,
@@ -38,10 +59,6 @@ export async function postEvent(request: APIRequestContext, type: string, object
       'stripe-signature': Stripe.webhooks.generateTestHeaderString({ payload, secret }),
     },
   })
-}
-
-export function postSubscriptionUpdated(request: APIRequestContext, fixture: SubscriptionFixture) {
-  return postEvent(request, 'customer.subscription.updated', subscriptionObject(fixture))
 }
 
 export function postSubscriptionDeleted(request: APIRequestContext, fixture: SubscriptionFixture) {
