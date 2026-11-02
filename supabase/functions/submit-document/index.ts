@@ -34,6 +34,7 @@ function deps(authorization: string): SubmitDeps {
   }
 
   return {
+    now: () => new Date(),
     async userId() {
       if (!jwt) return null
       const { data, error } = await asCaller.auth.getUser(jwt)
@@ -42,7 +43,7 @@ function deps(authorization: string): SubmitDeps {
     async loadDocument(id) {
       const { data, error } = await asCaller
         .from('documents')
-        .select('id, workspace_id, status, file_name, mime_type, storage_path')
+        .select('id, workspace_id, status, file_name, mime_type, storage_path, created_at')
         .eq('id', id)
         .maybeSingle<SubmittedDocument>()
       if (error) throw error

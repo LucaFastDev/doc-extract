@@ -3,14 +3,14 @@
 // tested without either. It reads only documents rows and removes only from the documents bucket:
 // the demo bucket and demo_documents are never read (ruling 5).
 
+import { STALE_UPLOAD_MS } from '../_shared/uploads.ts'
+
 /** Documents per select and objects per Storage call. */
 export const BATCH_SIZE = 100
 
 const DAY_MS = 24 * 60 * 60 * 1000
 /** A file is removed once its document is this old, measured from upload (US-14.1 AC-1). */
 const FILE_AGE_MS = 7 * DAY_MS
-/** An upload that has not reached submit-document in this long never will (section 8 step 4). */
-const STALE_UPLOAD_MS = 60 * 60 * 1000
 
 export interface ExpiredDocument {
   id: string
