@@ -25,8 +25,17 @@ describe('checkoutSuccessUrl', () => {
   it('builds the return from a completed Checkout from SITE_URL, naming the workspace', () => {
     vi.stubEnv('SITE_URL', 'https://site.test/')
     expect(checkoutSuccessUrl('11111111-2222-3333-4444-555555555555')).toBe(
-      'https://site.test/billing?checkout=success&workspace=11111111-2222-3333-4444-555555555555',
+      'https://site.test/billing?checkout=success&workspace=11111111-2222-3333-4444-555555555555&session_id={CHECKOUT_SESSION_ID}',
     )
+  })
+
+  it('carries Stripe’s session id placeholder with its braces unencoded, which is the only form Stripe fills in', () => {
+    vi.stubEnv('SITE_URL', 'https://site.test/')
+    const url = checkoutSuccessUrl('ws-1')
+    expect(url).toContain('session_id={CHECKOUT_SESSION_ID}')
+    expect(url).not.toContain('%7B')
+    expect(url).toContain('checkout=success')
+    expect(url).toContain('workspace=ws-1')
   })
 
   it('throws when SITE_URL is unset', () => {
