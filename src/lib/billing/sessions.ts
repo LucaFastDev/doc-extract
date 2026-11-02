@@ -27,7 +27,7 @@ export interface BillingResult {
 const SESSION_ID_PREFIX = 'cs_'
 const SESSION_ID_MAX_LENGTH = 255
 
-const UUID =/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 interface OwnedWorkspace {
   id: string
