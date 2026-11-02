@@ -382,6 +382,44 @@ for (const [width, viewport] of [
       expect(await userGone(user)).toBe(false)
     })
 
+    // Issue #80 ruling 3 and criterion 5: the pressed button was disabled while the request ran, so
+    // focus is put back on it, after a second failure in a row too.
+    test('after a failed delete the Delete workspace button is focused, again after a second failure', async ({ page, context, baseURL }) => {
+      const user = await createUser()
+      const name = 'Focus here'
+      await personalWorkspace(user, name)
+      await signIn(context, baseURL!, user)
+      await page.goto('/documents')
+      await page.route('**/api/workspaces/*', (route) => route.fulfill({ status: 500, json: { error: 'no' } }))
+
+      const dialog = await openWorkspaceDialog(page)
+      await dialog.getByLabel(`Type ${name} to confirm`).fill(name)
+      const button = dialog.getByRole('button', { name: 'Delete workspace' })
+      for (let attempt = 0; attempt < 2; attempt++) {
+        await button.click()
+        await expect(dialog.getByRole('alert')).toHaveText(FAILURE)
+        await expect(button).toBeFocused()
+        // Moves focus away, so the second round shows it comes back rather than stayed.
+        await dialog.getByLabel(`Type ${name} to confirm`).focus()
+      }
+    })
+
+    test('after a failed delete the Delete my account button is focused, again after a second failure', async ({ page, context, baseURL }) => {
+      const user = await createUser()
+      await signIn(context, baseURL!, user)
+      await page.goto('/documents')
+      await page.route('**/api/account', (route) => route.fulfill({ status: 500, json: { error: 'no' } }))
+
+      const dialog = await openAccountDialog(page)
+      const button = dialog.getByRole('button', { name: 'Delete my account' })
+      for (let attempt = 0; attempt < 2; attempt++) {
+        await button.click()
+        await expect(dialog.getByRole('alert')).toHaveText(FAILURE)
+        await expect(button).toBeFocused()
+        await dialog.getByRole('button', { name: 'Cancel' }).focus()
+      }
+    })
+
     test('after an account is deleted, its documents stay in a shared workspace, shown as uploaded by a deleted user', async ({ page, context, baseURL, browser }) => {
       const owner = await createUser()
       const leaver = await createUser()

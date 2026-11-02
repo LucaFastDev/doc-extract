@@ -55,7 +55,8 @@ export async function renameWorkspace(_prev: FormState, formData: FormData): Pro
 
   // RLS lets only an owner update the row, so a member's rename changes nothing and returns no row.
   const { data, error } = await supabase.from('workspaces').update({ name }).eq('id', id).select('id')
-  if (error || !data?.length) return { error: 'Only an owner can rename this workspace.' }
+  if (error) return { error: 'The workspace could not be renamed. Try again.' }
+  if (!data?.length) return { error: 'Only an owner can rename this workspace.' }
 
   revalidatePath('/', 'layout')
   return { ok: true }
