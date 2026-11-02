@@ -29,6 +29,7 @@ function DropdownMenuContent({
   sideOffset = 4,
   onKeyDownCapture,
   onClickCapture,
+  onAuxClickCapture,
   onInteractOutside,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
@@ -46,9 +47,9 @@ function DropdownMenuContent({
   }
 
   // The same for the pointer (issue #102). An item runs only from a click, including the click its own
-  // pointer up sends, so stopping the click is enough; the menu goes on closing as if never pressed.
+  // pointer up sends, and the browser opens a link item in a new tab only from the auxclick a middle
+  // press sends, so stopping those two is enough; the menu goes on closing as if never pressed.
   function ignorePressWhileClosing(event: React.MouseEvent<HTMLDivElement>) {
-    onClickCapture?.(event)
     if (event.currentTarget.dataset.state === 'closed') {
       event.preventDefault()
       event.stopPropagation()
@@ -66,7 +67,14 @@ function DropdownMenuContent({
         )}
         {...props}
         onKeyDownCapture={ignoreSelectionKeysWhileClosing}
-        onClickCapture={ignorePressWhileClosing}
+        onClickCapture={(event) => {
+          onClickCapture?.(event)
+          ignorePressWhileClosing(event)
+        }}
+        onAuxClickCapture={(event) => {
+          onAuxClickCapture?.(event)
+          ignorePressWhileClosing(event)
+        }}
         // A press the button toggles the menu on, a plain left press, is not outside the menu, and
         // neither is focus landing on the button. Without this, such a press while a closing menu is
         // still animating out closes the menu it has just reopened, and so does the closed menu's late

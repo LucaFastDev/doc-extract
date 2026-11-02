@@ -44,6 +44,21 @@ test('a press on a link in the menu right after Escape does not follow it', asyn
   await expect(page).toHaveURL(/\/documents$/)
 })
 
+test('a middle press on a link in the open menu opens it in a new tab', async ({ page, context, baseURL }) => {
+  await signIn(context, baseURL!, await createUser())
+  await page.goto('/documents')
+  const members = page.getByRole('menuitem', { name: 'Members' })
+  await openByPointer(switcher(page), members)
+  const at = await centreOf(members)
+
+  const opened = context.waitForEvent('page')
+  await page.mouse.click(at.x, at.y, { button: 'middle' })
+  const tab = await opened
+
+  await expect(tab).toHaveURL(/\/members$/)
+  await expect(page).toHaveURL(/\/documents$/)
+})
+
 test('a right click on the member menu button closes the open menu', async ({ page, context, baseURL }) => {
   const { button, item } = await openMemberMenu(page, context, baseURL!)
 
