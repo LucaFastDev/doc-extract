@@ -888,8 +888,10 @@ both. Because the reserved amount is an upper bound, both limits hold even with 
 `max_output_tokens` is also sent as the call's `max_tokens`, so the output part of the bound is a
 limit, not a guess. The input part rests on `base_input_tokens` (system prompt and tool
 definitions) and `max_input_tokens_per_page`, set so that, for every document in the eval's results
-file, one attempt's input (`usage.input_tokens ÷ usage.attempts`) is at or below
-`base_input_tokens + pages × max_input_tokens_per_page`; `settle_spend` logs a warning for any call
+file, `usage.input_tokens` as it stands (it sums the attempts that returned usage, so it is never
+below any one attempt's input) is at or below `base_input_tokens + pages × max_input_tokens_per_page`;
+a document over that bound with `usage.attempts` 1 fails the check, and one over it with
+`usage.attempts` above 1 is judged on an eval run where it took one attempt; `settle_spend` logs a warning for any call
 whose actual cost passed its estimate, so a wrong
 setting is visible. Until a real eval run is committed, the value of `base_input_tokens` comes from
 the eval dry run's estimate of about 18,000 tokens.
