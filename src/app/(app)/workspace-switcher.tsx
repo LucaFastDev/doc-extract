@@ -67,13 +67,14 @@ export function WorkspaceSwitcher({ workspaces, current }: { workspaces: Workspa
             <ChevronsUpDownIcon className="text-muted-foreground" />
           </Button>
         </DropdownMenuTrigger>
-        {/* A press on the button is the button's to answer: it toggles the menu. Without this, the
-            menu's layer also takes that press for one outside the menu; while a closing menu is
-            still animating out, that closes the menu the same press has just reopened (issue #97). */}
+        {/* The button is not outside its own menu: a press on it toggles the menu. Without this, a
+            press while a closing menu is still animating out closes the menu it has just reopened,
+            and so does the closed menu's late hand-off of focus to the button, if the press came
+            just after that menu left the page (issue #97). */}
         <DropdownMenuContent
           align="start"
           className="w-64 max-w-[calc(100vw-2rem)]"
-          onPointerDownOutside={(event) => {
+          onInteractOutside={(event) => {
             if (trigger.current?.contains(event.detail.originalEvent.target as Node)) event.preventDefault()
           }}
         >
