@@ -27,6 +27,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { DELETE_FAILED } from '@/lib/account/memberships'
+import { NAME_TOO_LONG, nameTooLongForBrowser } from '@/lib/workspace/name'
 import { createWorkspace, renameWorkspace, switchWorkspace, type FormState } from './actions'
 
 interface Workspace {
@@ -172,13 +173,14 @@ function CreateForm({
   onDone: () => void
 }) {
   const { state, formAction, pending } = useClosingAction(action, onDone)
+  const name = useNameField('', state.error)
   return (
-    <form action={formAction} className="grid gap-4">
+    <form action={formAction} onSubmit={name.onSubmit} className="grid gap-4">
       <DialogHeader>
         <DialogTitle>Create workspace</DialogTitle>
         <DialogDescription>You will be its owner, and it opens once created.</DialogDescription>
       </DialogHeader>
-      <NameField defaultValue="" error={state.error} />
+      <NameField {...name} />
       <DialogFooter>
         <Button type="submit" disabled={pending}>
           Create
@@ -190,14 +192,15 @@ function CreateForm({
 
 function RenameForm({ workspace, onDone }: { workspace: Workspace; onDone: () => void }) {
   const { state, formAction, pending } = useClosingAction(renameWorkspace, onDone)
+  const name = useNameField(workspace.name, state.error)
   return (
-    <form action={formAction} className="grid gap-4">
+    <form action={formAction} onSubmit={name.onSubmit} className="grid gap-4">
       <DialogHeader>
         <DialogTitle>Rename workspace</DialogTitle>
         <DialogDescription>Every member sees the new name.</DialogDescription>
       </DialogHeader>
       <input type="hidden" name="id" value={workspace.id} />
-      <NameField defaultValue={workspace.name} error={state.error} />
+      <NameField {...name} />
       <DialogFooter>
         <Button type="submit" disabled={pending}>
           Save
@@ -285,11 +288,26 @@ function DeleteForm({
   )
 }
 
+// The name field's value, and the browser's own refusal of a name that is too long (issue #80,
+// ruling 5): the submit is stopped before any request, so a paste past a server action's body limit
+// never reaches the server. A submit that is not refused clears the refusal and goes to the action.
+function useNameField(defaultValue: string, actionError?: string) {
+  const [value, setValue] = useState(defaultValue)
+  const [refused, setRefused] = useState(false)
+  function onSubmit(event: FormEvent) {
+    const tooLong = nameTooLongForBrowser(value)
+    setRefused(tooLong)
+    if (tooLong) event.preventDefault()
+  }
+  return { value, setValue, onSubmit, error: refused ? NAME_TOO_LONG : actionError }
+}
+
+type NameFieldState = ReturnType<typeof useNameField>
+
 // Controlled, so what was typed stays in the field after a refusal (a form action resets an
 // uncontrolled one). No maxLength: it counts UTF-16 units, and the limit of 100 characters is the
 // action's and the database's.
-function NameField({ defaultValue, error }: { defaultValue: string; error?: string }) {
-  const [value, setValue] = useState(defaultValue)
+function NameField({ value, setValue, error }: Pick<NameFieldState, 'value' | 'setValue' | 'error'>) {
   return (
     <div className="grid gap-2">
       <Label htmlFor="workspace-name">Name</Label>

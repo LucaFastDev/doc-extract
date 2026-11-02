@@ -140,6 +140,77 @@ for (const [label, viewport] of VIEWPORTS) {
       await expect(field).toHaveValue(TOO_LONG_NAME)
     })
 
+    // Issue #80 ruling 5, criterion 9: a paste past the server action's body limit is refused in the
+    // browser, so no request fails and no error page replaces the app.
+    for (const [what, pasted] of [
+      ['1,100,000 spaces', ' '.repeat(1_100_000)],
+      ['100 characters then 1,100,000 spaces', `${NAME}${' '.repeat(1_100_000)}`],
+    ] as const) {
+      test(`a paste of ${what} in the create form shows the limit message and stays in the field`, async ({ page, context, baseURL }) => {
+        const problems: string[] = []
+        page.on('pageerror', (error) => problems.push(`pageerror: ${error.message}`))
+        page.on('response', (response) => {
+          if (response.status() >= 500) problems.push(`${response.status()} ${response.url()}`)
+        })
+        await signIn(context, baseURL!, await createUser())
+        await page.goto('/documents')
+
+        await switcher(page).click()
+        await page.getByRole('menuitem', { name: 'Create workspace' }).click()
+        const dialog = page.getByRole('dialog', { name: 'Create workspace' })
+        const field = dialog.getByLabel('Name')
+        await field.fill(pasted)
+        await dialog.getByRole('button', { name: 'Create' }).click()
+
+        await expect(dialog.getByRole('alert')).toHaveText(LIMIT_MESSAGE)
+        expect(await field.inputValue()).toHaveLength(pasted.length)
+        expect(problems).toEqual([])
+      })
+    }
+
+    // Issue #80 ruling 5, criterion 10: the browser refuses 101 characters before any request.
+    test('101 characters in the create form send no POST', async ({ page, context, baseURL }) => {
+      const posts: string[] = []
+      page.on('request', (request) => {
+        // A server action is a POST to the page's own origin; the page's Supabase calls are not.
+        if (request.method() === 'POST' && request.url().startsWith(baseURL!)) posts.push(request.url())
+      })
+      await signIn(context, baseURL!, await createUser())
+      await page.goto('/documents')
+
+      await switcher(page).click()
+      await page.getByRole('menuitem', { name: 'Create workspace' }).click()
+      const dialog = page.getByRole('dialog', { name: 'Create workspace' })
+      await dialog.getByLabel('Name').fill(TOO_LONG_NAME)
+      await dialog.getByRole('button', { name: 'Create' }).click()
+
+      await expect(dialog.getByRole('alert')).toHaveText(LIMIT_MESSAGE)
+      expect(posts).toEqual([])
+    })
+
+    // Issue #80 ruling 5, criterion 11 (kept behaviour): trailing spaces within the 10,000 units are
+    // trimmed and the name accepted.
+    test('a name of 100 characters with 3 trailing spaces is accepted and stored trimmed', async ({ page, context, baseURL }) => {
+      const user = await createUser()
+      await signIn(context, baseURL!, user)
+      await page.goto('/documents')
+
+      await switcher(page).click()
+      await page.getByRole('menuitem', { name: 'Create workspace' }).click()
+      const dialog = page.getByRole('dialog', { name: 'Create workspace' })
+      await dialog.getByLabel('Name').fill(`${NAME}   `)
+      await dialog.getByRole('button', { name: 'Create' }).click()
+
+      await expect(dialog).toBeHidden()
+      await expect(switcher(page)).toHaveAccessibleName(`Workspace: ${NAME}`)
+      const rows = await sql(
+        `select w.name from public.workspace_members m join public.workspaces w on w.id = m.workspace_id
+         where m.user_id = $1 and w.name like 'WWW%'`,
+        [user.id],
+      )
+      expect(rows).toEqual([{ name: NAME }])
+    })
+
     // Issue #80 criterion 4.
     test('the rename form’s name field has no maxlength, and neither has the delete dialog’s typed name', async ({ page, context, baseURL }) => {
       await signIn(context, baseURL!, await setUp(false))
