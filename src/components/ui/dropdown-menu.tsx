@@ -6,26 +6,51 @@ import { CircleIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
+// The menu's own button, so its content can tell a press on that button from a press anywhere else.
+const TriggerContext = React.createContext<React.RefObject<HTMLButtonElement | null> | null>(null)
+
 function DropdownMenu({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
-  return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />
+  const trigger = React.useRef<HTMLButtonElement>(null)
+  return (
+    <TriggerContext.Provider value={trigger}>
+      <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />
+    </TriggerContext.Provider>
+  )
 }
 
-function DropdownMenuTrigger({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Trigger>) {
-  return <DropdownMenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />
+// With asChild, a ref on the child is kept alongside this one.
+function DropdownMenuTrigger({ ...props }: Omit<React.ComponentProps<typeof DropdownMenuPrimitive.Trigger>, 'ref'>) {
+  const trigger = React.useContext(TriggerContext)
+  return <DropdownMenuPrimitive.Trigger ref={trigger} data-slot="dropdown-menu-trigger" {...props} />
 }
 
 function DropdownMenuContent({
   className,
   sideOffset = 4,
   onKeyDownCapture,
+  onClickCapture,
+  onAuxClickCapture,
+  onInteractOutside,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
+  const trigger = React.useContext(TriggerContext)
+
   // A closed menu stays on the page until its exit animation ends, and focus stays on its item until
   // then, so a key that selects would run an item the user has just cancelled (issue #100). Stopped
   // here, before the item's own handler, for every menu. Prevented too, so a link item is not followed.
   function ignoreSelectionKeysWhileClosing(event: React.KeyboardEvent<HTMLDivElement>) {
     onKeyDownCapture?.(event)
     if (event.currentTarget.dataset.state === 'closed' && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault()
+      event.stopPropagation()
+    }
+  }
+
+  // The same for the pointer (issue #102). An item runs only from a click, including the click its own
+  // pointer up sends, and the browser opens a link item in a new tab only from the auxclick a middle
+  // press sends, so stopping those two is enough; the menu goes on closing as if never pressed.
+  function ignorePressWhileClosing(event: React.MouseEvent<HTMLDivElement>) {
+    if (event.currentTarget.dataset.state === 'closed') {
       event.preventDefault()
       event.stopPropagation()
     }
@@ -42,6 +67,26 @@ function DropdownMenuContent({
         )}
         {...props}
         onKeyDownCapture={ignoreSelectionKeysWhileClosing}
+        onClickCapture={(event) => {
+          onClickCapture?.(event)
+          ignorePressWhileClosing(event)
+        }}
+        onAuxClickCapture={(event) => {
+          onAuxClickCapture?.(event)
+          ignorePressWhileClosing(event)
+        }}
+        // A press the button toggles the menu on, a plain left press, is not outside the menu, and
+        // neither is focus landing on the button. Without this, such a press while a closing menu is
+        // still animating out closes the menu it has just reopened, and so does the closed menu's late
+        // hand-off of focus to the button, if the press came just after that menu left the page
+        // (issues #97, #102). Any other press on the button, such as a right click or a Ctrl-click,
+        // does not toggle, so it stays outside and dismisses the menu.
+        onInteractOutside={(event) => {
+          onInteractOutside?.(event)
+          const { originalEvent } = event.detail
+          const inside = originalEvent instanceof FocusEvent || (originalEvent.button === 0 && !originalEvent.ctrlKey)
+          if (inside && trigger?.current?.contains(originalEvent.target as Node)) event.preventDefault()
+        }}
       />
     </DropdownMenuPrimitive.Portal>
   )
