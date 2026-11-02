@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -50,6 +50,14 @@ function DeleteAccountForm({
   // null while reading; 'failed' when the read failed; otherwise the workspaces that go with the account.
   const [names, setNames] = useState<string[] | 'failed' | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const button = useRef<HTMLButtonElement>(null)
+  // Counts failures, so a second one in a row moves focus again. The button was disabled while the
+  // request ran, which left focus on <body>; it is enabled again by the time this effect runs.
+  const [failures, setFailures] = useState(0)
+
+  useEffect(() => {
+    if (failures > 0) button.current?.focus()
+  }, [failures])
 
   useEffect(() => {
     let current = true
@@ -83,6 +91,7 @@ function DeleteAccountForm({
       setError(DELETE_FAILED)
     }
     setPending(false)
+    setFailures((count) => count + 1)
   }
 
   return (
@@ -112,7 +121,13 @@ function DeleteAccountForm({
           </Button>
         </DialogClose>
         {names !== 'failed' && (
-          <Button type="button" variant="destructive" disabled={names === null || pending} onClick={() => void confirm()}>
+          <Button
+            ref={button}
+            type="button"
+            variant="destructive"
+            disabled={names === null || pending}
+            onClick={() => void confirm()}
+          >
             Delete my account
           </Button>
         )}
