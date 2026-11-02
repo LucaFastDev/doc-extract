@@ -1,4 +1,5 @@
 import type { AcceptedMimeType } from '../../../shared/limits.ts'
+import { SUBMIT_WINDOW_MS } from '../_shared/uploads.ts'
 import {
   allowanceRefusal,
   countPages,
@@ -19,9 +20,13 @@ export interface SubmittedDocument {
   file_name: string
   mime_type: string
   storage_path: string
+  /** ISO timestamp the row was created at. */
+  created_at: string
 }
 
 export interface SubmitDeps {
+  /** The current time; the tests set it. */
+  now(): Date
   /** The caller, from their JWT; null when it is missing or invalid. */
   userId(): Promise<string | null>
   /** The document read as the caller, so RLS returns it only to a member of its workspace. */
@@ -75,6 +80,11 @@ export async function submitDocument(body: unknown, deps: SubmitDeps): Promise<S
     return { status: 403, body: { error: 'You are not a member of this workspace.' } }
   }
   if (doc.status !== 'uploading') return refused(`${doc.file_name} has already been submitted.`)
+  // Not rejected: the row stays uploading, so purge-files still removes it and gives back any pages
+  // it holds, which it would not do for a rejected row (ARCHITECTURE.md sections 6.1 and 8).
+  if (deps.now().getTime() - new Date(doc.created_at).getTime() >= SUBMIT_WINDOW_MS) {
+    return refused(`${doc.file_name} did not finish uploading. Upload it again.`)
+  }
 
   // A refusal changes only a document still uploading, so a second submit cannot undo the first.
   const reject = async (reason: string, file?: { page_count?: number | null; sha256?: string | null }) => {

@@ -1,5 +1,6 @@
 import { PDFDocument } from 'pdf-lib'
 import { beforeEach, describe, expect, it } from 'vitest'
+import { STALE_UPLOAD_MS, SUBMIT_WINDOW_MS } from '../_shared/uploads'
 import { submitDocument, type SubmitDeps, type SubmittedDocument } from './submit'
 
 // submit-document's steps (ARCHITECTURE.md sections 2 and 6.1, PRD US-1.1 AC-3, AC-5 and AC-6):
@@ -9,6 +10,7 @@ import { submitDocument, type SubmitDeps, type SubmittedDocument } from './submi
 
 const WS = '11111111-1111-4111-8111-111111111111'
 const DOC = '22222222-2222-4222-8222-222222222222'
+const NOW = new Date('2026-06-01T12:00:00.000Z')
 const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13])
 
 async function pdf(pages: number): Promise<Uint8Array> {
@@ -39,9 +41,11 @@ function fake(overrides: Partial<SubmitDeps> & { file?: Uint8Array | null; doc?:
           file_name: 'Invoice.pdf',
           mime_type: 'application/pdf',
           storage_path: `${WS}/${DOC}/original`,
+          created_at: new Date(NOW.getTime() - 60_000).toISOString(),
           ...overrides.doc,
         }
   const f: Fake = {
+    now: () => NOW,
     calls: [],
     reserved: 0,
     rejected: null,
@@ -131,6 +135,36 @@ describe('submitDocument', () => {
     const result = await submitDocument({ document_id: DOC }, deps)
     expect(result.status).toBe(409)
     expect(deps.calls).toEqual([])
+  })
+
+  // Issue #85: purge-files removes an upload an hour after it was created, so submit stops sooner.
+  it('refuses a document exactly SUBMIT_WINDOW_MS old, before the download, and leaves it uploading', async () => {
+    let downloaded = false
+    deps = fake({
+      doc: { created_at: new Date(NOW.getTime() - SUBMIT_WINDOW_MS).toISOString() },
+      download: async () => {
+        downloaded = true
+        return pdf(2)
+      },
+    })
+    const result = await submitDocument({ document_id: DOC }, deps)
+    expect(result).toEqual({ status: 409, body: { error: 'Invoice.pdf did not finish uploading. Upload it again.' } })
+    expect(downloaded).toBe(false)
+    expect(deps.calls).toEqual([])
+    expect(deps.enqueued).toBeNull()
+    expect(deps.status).toBe('uploading')
+  })
+
+  it('goes on with a document one minute younger than SUBMIT_WINDOW_MS and queues it', async () => {
+    deps = fake({ doc: { created_at: new Date(NOW.getTime() - SUBMIT_WINDOW_MS + 60_000).toISOString() } })
+    const result = await submitDocument({ document_id: DOC }, deps)
+    expect(result.status).toBe(202)
+    expect(deps.calls).toEqual(['recordFile', 'reservePages', 'queue'])
+    expect(deps.enqueued).toBe(DOC)
+  })
+
+  it('leaves at least 10 minutes between the end of the submit window and the purge', () => {
+    expect(STALE_UPLOAD_MS - SUBMIT_WINDOW_MS).toBeGreaterThanOrEqual(10 * 60 * 1000)
   })
 
   it('rejects a file whose upload is missing, counting no pages', async () => {
