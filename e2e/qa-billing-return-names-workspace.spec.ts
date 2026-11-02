@@ -22,7 +22,6 @@ test('a Checkout return while another tab has switched workspace says nothing ab
   page,
   context,
   baseURL,
-  request,
 }) => {
   test.setTimeout(60_000)
   const owner = await createUser('Olivia Owner')

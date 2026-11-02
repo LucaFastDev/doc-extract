@@ -33,7 +33,7 @@ for (const { name, viewport } of [
   test.describe(`at ${name}`, () => {
     test.use({ viewport })
 
-    test('Back to the billing page after the page picked up Pro still shows Pro', async ({ page, context, baseURL, request }) => {
+    test('Back to the billing page after the page picked up Pro still shows Pro', async ({ page, context, baseURL }) => {
       const owner = await createUser('Olivia Owner')
       const ws = await personalWorkspace(owner, 'Acme books')
       await signIn(context, baseURL!, owner)
