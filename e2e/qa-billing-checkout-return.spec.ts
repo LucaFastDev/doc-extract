@@ -4,13 +4,14 @@ import { addMember, personalWorkspace, switcher, useWorkspace } from './support/
 
 // What the billing page does after a return from Checkout, once the ?checkout=success marker has been
 // used (PRD US-11.1, Lead ruling 6 on #50: "No timer runs otherwise"). Each test asserts the correct
-// behaviour. No call reaches Stripe: the return is the page's own URL.
+// behaviour. No call reaches Stripe: the return is the page's own URL, and its check is answered here.
 
 const CHECKING = 'Checking your plan…'
 const STILL_FREE = 'Your payment went through. Your plan will update shortly.'
 
 async function returnFromCheckout(page: Page, ws: string) {
-  await page.goto(`/billing?checkout=success&workspace=${ws}`)
+  await page.route('**/api/billing/checkout-return', (route) => route.fulfill({ status: 200, json: { paid: true } }))
+  await page.goto(`/billing?checkout=success&workspace=${ws}&session_id=cs_test_return`)
   await expect(page).toHaveURL(/\/billing$/)
   await expect(page.getByText(CHECKING)).toBeVisible()
 }

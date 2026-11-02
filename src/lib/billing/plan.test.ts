@@ -4,25 +4,28 @@ import { checkoutReturn, pagesLeft, planEndDate } from './plan'
 describe('checkoutReturn', () => {
   const owner = { id: 'ws-1', role: 'owner' }
 
-  it('acts on a return naming the current workspace, for an owner of it', () => {
-    expect(checkoutReturn({ checkout: 'success', workspace: 'ws-1' }, owner)).toEqual({ spendMarker: true, actOnReturn: true })
+  it('acts on a return naming the current workspace and one session, for an owner of it, and returns the session', () => {
+    expect(checkoutReturn({ checkout: 'success', workspace: 'ws-1', session_id: 'cs_1' }, owner)).toEqual({ spendMarker: true, sessionId: 'cs_1' })
   })
 
   it.each([
-    ['names another workspace', { checkout: 'success', workspace: 'ws-2' }, owner],
-    ['names no workspace', { checkout: 'success', workspace: undefined }, owner],
-    ['names the workspace twice', { checkout: 'success', workspace: ['ws-1', 'ws-1'] }, owner],
-    ['reaches a member', { checkout: 'success', workspace: 'ws-1' }, { id: 'ws-1', role: 'member' }],
+    ['names another workspace', { checkout: 'success', workspace: 'ws-2', session_id: 'cs_1' }, owner],
+    ['names no workspace', { checkout: 'success', workspace: undefined, session_id: 'cs_1' }, owner],
+    ['names the workspace twice', { checkout: 'success', workspace: ['ws-1', 'ws-1'], session_id: 'cs_1' }, owner],
+    ['names no session', { checkout: 'success', workspace: 'ws-1', session_id: undefined }, owner],
+    ['names more than one session', { checkout: 'success', workspace: 'ws-1', session_id: ['cs_1', 'cs_2'] }, owner],
+    ['reaches a member', { checkout: 'success', workspace: 'ws-1', session_id: 'cs_1' }, { id: 'ws-1', role: 'member' }],
   ])('spends the marker and does not act when the return %s', (_name, marker, current) => {
-    expect(checkoutReturn(marker, current)).toEqual({ spendMarker: true, actOnReturn: false })
+    expect(checkoutReturn(marker, current)).toEqual({ spendMarker: true, sessionId: null })
   })
 
   it.each([
-    ['no marker', { checkout: undefined, workspace: undefined }],
-    ['a workspace with no marker', { checkout: undefined, workspace: 'ws-1' }],
-    ['another marker', { checkout: 'cancelled', workspace: 'ws-1' }],
+    ['no marker', { checkout: undefined, workspace: undefined, session_id: undefined }],
+    ['a workspace with no marker', { checkout: undefined, workspace: 'ws-1', session_id: undefined }],
+    ['a session with no marker', { checkout: undefined, workspace: 'ws-1', session_id: 'cs_1' }],
+    ['another marker', { checkout: 'cancelled', workspace: 'ws-1', session_id: 'cs_1' }],
   ])('leaves %s alone', (_name, marker) => {
-    expect(checkoutReturn(marker, owner)).toEqual({ spendMarker: false, actOnReturn: false })
+    expect(checkoutReturn(marker, owner)).toEqual({ spendMarker: false, sessionId: null })
   })
 })
 

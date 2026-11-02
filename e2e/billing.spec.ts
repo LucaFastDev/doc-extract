@@ -4,8 +4,8 @@ import { postEvent, postSubscriptionDeleted, proPlan, setPagesUsed, setPlan, sub
 import { addMember, expectNoSideScroll, personalWorkspace, switcher, useWorkspace } from './support/workspace'
 
 // The billing page and its routes (PRD US-11.1, OQ-20, OQ-24, OQ-36, OQ-37, OQ-45; issue #50). No
-// call reaches Stripe (Lead ruling 7): the specs intercept the two /api/billing/* calls and post
-// signed fixture events to the webhook, and the dev server has no STRIPE_SECRET_KEY.
+// call reaches Stripe (Lead ruling 7): the specs intercept the /api/billing/* calls and post signed
+// fixture events to the webhook, and the dev server has no STRIPE_SECRET_KEY.
 
 const NOTICE =
   'Billing here is a test-mode demonstration. Only Stripe test cards are accepted and no real money is ever charged. To try it, use the card 4242 4242 4242 4242 with any future date and any CVC.'
@@ -13,6 +13,14 @@ const CHECKING = 'Checking your plan…'
 const STILL_FREE = 'Your payment went through. Your plan will update shortly.'
 const CHECKOUT_URL = 'https://checkout.stripe.test/session'
 const PORTAL_URL = 'https://billing.stripe.test/session'
+const RETURN_PATH = '/api/billing/checkout-return'
+const SESSION_ID = 'cs_test_return'
+const NOT_CHECKED = 'The payment could not be checked.'
+
+/** The address Stripe sends a completed Checkout back to, with the session id it fills in. */
+function checkoutReturnPath(ws: string) {
+  return `/billing?checkout=success&workspace=${ws}&session_id=${SESSION_ID}`
+}
 
 function yourPlan(page: Page) {
   return page.getByRole('region', { name: 'Your plan' })
@@ -36,6 +44,11 @@ async function interceptBillingCall(page: Page, path: string, answer: { status: 
     await route.fulfill({ status: answer.status, json: answer.body })
   })
   return sent
+}
+
+/** The route confirms the return: Stripe has a completed Checkout of this workspace, still live. */
+function answerPaid(page: Page) {
+  return interceptBillingCall(page, RETURN_PATH, { status: 200, body: { paid: true } })
 }
 
 /** A stand-in for Stripe's hosted page, so going there stays off the network. */
@@ -247,8 +260,9 @@ test.describe('no call reaches Stripe', () => {
         const owner = await createUser('Olivia Owner')
         const ws = await personalWorkspace(owner, 'Acme books')
         const reads = countPlanReads(page)
+        await answerPaid(page)
         await signIn(context, baseURL!, owner)
-        await page.goto(`/billing?checkout=success&workspace=${ws}`)
+        await page.goto(checkoutReturnPath(ws))
         await expect(figure(page, 'Current plan')).toHaveText('Free')
 
         await setPlan(ws, proPlan(ws))
@@ -271,9 +285,10 @@ test.describe('no call reaches Stripe', () => {
         const owner = await createUser('Olivia Owner')
         const ws = await personalWorkspace(owner, 'Acme books')
         const reads = countPlanReads(page)
+        await answerPaid(page)
         await signIn(context, baseURL!, owner)
         await page.clock.install()
-        await page.goto(`/billing?checkout=success&workspace=${ws}`)
+        await page.goto(checkoutReturnPath(ws))
         await expect(figure(page, 'Current plan')).toHaveText('Free')
         await expect(page.getByRole('button', { name: 'Upgrade' })).toBeDisabled()
 
@@ -299,15 +314,18 @@ test.describe('no call reaches Stripe', () => {
         const owner = await createUser('Olivia Owner')
         const ws = await personalWorkspace(owner, 'Acme books')
         await page.route('**/rest/v1/workspaces*', (route) => route.abort())
+        await answerPaid(page)
         await signIn(context, baseURL!, owner)
         await page.clock.install()
-        await page.goto(`/billing?checkout=success&workspace=${ws}`)
+        await page.goto(checkoutReturnPath(ws))
         await expect(figure(page, 'Current plan')).toHaveText('Free')
 
-        // Longer than 20 seconds: the Supabase client backs off and retries a read that fails.
-        await page.clock.runFor(60_000)
-
-        await expect(page.getByText(STILL_FREE)).toBeVisible()
+        // Longer than 20 seconds: the Supabase client backs off and retries a read that fails. Again
+        // if it ran before the route's answer started the re-reads.
+        await expect(async () => {
+          await page.clock.runFor(60_000)
+          await expect(page.getByText(STILL_FREE)).toBeVisible({ timeout: 1_000 })
+        }).toPass()
         await expect(figure(page, 'Current plan')).toHaveText('Free')
       })
 
@@ -315,13 +333,17 @@ test.describe('no call reaches Stripe', () => {
         const owner = await createUser('Olivia Owner')
         const ws = await personalWorkspace(owner, 'Acme books')
         await interceptBillingCall(page, '/api/billing/checkout', { status: 500, body: { error: 'Checkout could not be opened. Try again.' } })
+        await answerPaid(page)
         await signIn(context, baseURL!, owner)
         await page.clock.install()
-        await page.goto(`/billing?checkout=success&workspace=${ws}`)
+        await page.goto(checkoutReturnPath(ws))
         await expect(figure(page, 'Current plan')).toHaveText('Free')
 
-        await page.clock.runFor(20_000)
-        await expect(page.getByText(STILL_FREE)).toBeVisible()
+        // Again if it ran before the route's answer started the re-reads.
+        await expect(async () => {
+          await page.clock.runFor(20_000)
+          await expect(page.getByText(STILL_FREE)).toBeVisible({ timeout: 1_000 })
+        }).toPass()
 
         await page.getByRole('button', { name: 'Upgrade' }).click()
 
@@ -425,7 +447,7 @@ test.describe('no call reaches Stripe', () => {
         const reads = countPlanReads(page)
         await signIn(context, baseURL!, owner)
         await page.clock.install()
-        await page.goto(`/billing?checkout=success&workspace=${ws}`)
+        await page.goto(checkoutReturnPath(ws))
         await expect(figure(page, 'Current plan')).toHaveText('Pro')
         await expect.poll(() => reads.count).toBe(1)
 
@@ -438,11 +460,119 @@ test.describe('no call reaches Stripe', () => {
       test('a reload after returning from Checkout does not start the re-reads again', async ({ page, context, baseURL }) => {
         const owner = await createUser('Olivia Owner')
         const ws = await personalWorkspace(owner, 'Acme books')
+        await answerPaid(page)
         await signIn(context, baseURL!, owner)
-        await page.goto(`/billing?checkout=success&workspace=${ws}`)
+        await page.goto(checkoutReturnPath(ws))
         await expect(page).toHaveURL(/\/billing$/)
         await page.reload()
         await expect(page.getByRole('button', { name: 'Upgrade' })).toBeEnabled()
+      })
+
+      for (const { name, answer, logged } of [
+        {
+          name: 'the route answers it is not paid',
+          answer: (route: Route) => route.fulfill({ status: 200, json: { paid: false } }),
+          logged: 0,
+        },
+        {
+          name: 'the route answers 500',
+          answer: (route: Route) => route.fulfill({ status: 500, json: { error: NOT_CHECKED } }),
+          logged: 1,
+        },
+        {
+          name: 'the request fails',
+          answer: (route: Route) => route.abort(),
+          logged: 1,
+        },
+      ]) {
+        test(`a return is not confirmed when ${name}: no message after the 20 seconds, one read, Upgrade enabled`, async ({ page, context, baseURL }) => {
+          const owner = await createUser('Olivia Owner')
+          const ws = await personalWorkspace(owner, 'Acme books')
+          const reads = countPlanReads(page)
+          const sent: unknown[] = []
+          await page.route(`**${RETURN_PATH}`, (route) => {
+            sent.push(route.request().postDataJSON())
+            return answer(route)
+          })
+          const errors: string[] = []
+          page.on('console', (message) => {
+            if (message.type() === 'error') errors.push(message.text())
+          })
+          await signIn(context, baseURL!, owner)
+          await page.clock.install()
+          await page.goto(checkoutReturnPath(ws))
+          await expect(page).toHaveURL(/\/billing$/)
+          await expect(figure(page, 'Current plan')).toHaveText('Free')
+
+          // Longer than the 20 seconds of re-reads.
+          await page.clock.runFor(30_000)
+
+          // In this order: the message would arrive together with "Checking your plan…" going.
+          await expect(page.getByText(CHECKING)).toHaveCount(0)
+          await expect(page.getByText(STILL_FREE)).toHaveCount(0)
+          await expect(page.getByRole('button', { name: 'Upgrade' })).toBeEnabled()
+          await expect(page.getByRole('main')).not.toContainText(NOT_CHECKED)
+          await expect.poll(() => reads.count).toBe(1)
+          expect(sent).toEqual([{ workspaceId: ws, sessionId: SESSION_ID }])
+          expect(errors.filter((text) => text.includes(NOT_CHECKED))).toHaveLength(logged)
+        })
+      }
+
+      test('while the route answers, the page says it is checking, Upgrade is disabled and no plan read goes out', async ({ page, context, baseURL }) => {
+        const owner = await createUser('Olivia Owner')
+        const ws = await personalWorkspace(owner, 'Acme books')
+        let release = () => {}
+        const held = new Promise<void>((resolve) => {
+          release = resolve
+        })
+        const asked: unknown[] = []
+        const reads = countPlanReads(page)
+        await page.route(`**${RETURN_PATH}`, async (route) => {
+          asked.push(route.request().postDataJSON())
+          await held
+          await route.fulfill({ status: 200, json: { paid: false } })
+        })
+        await signIn(context, baseURL!, owner)
+        await page.goto(checkoutReturnPath(ws))
+        await expect.poll(() => asked.length).toBe(1)
+
+        await expect(page.getByText(CHECKING)).toBeVisible()
+        await expect(page.getByRole('button', { name: 'Upgrade' })).toBeDisabled()
+        expect(reads.count).toBe(0)
+
+        release()
+
+        await expect(page.getByText(CHECKING)).toHaveCount(0)
+        await expect(page.getByRole('button', { name: 'Upgrade' })).toBeEnabled()
+        await expect.poll(() => reads.count).toBe(1)
+        expect(asked).toHaveLength(1)
+      })
+
+      test('a return with no session id never calls the route, and shows nothing about checking or a payment', async ({ page, context, baseURL }) => {
+        const owner = await createUser('Olivia Owner')
+        const ws = await personalWorkspace(owner, 'Acme books')
+        const sent = await answerPaid(page)
+        const reads = countPlanReads(page)
+        await signIn(context, baseURL!, owner)
+
+        await expectPlainReturn(page, reads, `/billing?checkout=success&workspace=${ws}`)
+
+        await expect(page.getByRole('button', { name: 'Upgrade' })).toBeEnabled()
+        expect(sent).toEqual([])
+      })
+
+      test('a return already on Pro never calls the route', async ({ page, context, baseURL }) => {
+        const owner = await createUser('Olivia Owner')
+        const ws = await personalWorkspace(owner, 'Acme books')
+        await setPlan(ws, { plan: 'pro', customer: `cus_${ws}` })
+        const sent = await answerPaid(page)
+        const reads = countPlanReads(page)
+        await signIn(context, baseURL!, owner)
+        await page.goto(checkoutReturnPath(ws))
+        await expect(page).toHaveURL(/\/billing$/)
+        await expect(figure(page, 'Current plan')).toHaveText('Pro')
+        await expect.poll(() => reads.count).toBe(1)
+        expect(sent).toEqual([])
       })
 
       /** The plain page after a return the page must not act on (Lead ruling 8 on #50), with the marker gone. */
@@ -474,7 +604,7 @@ test.describe('no call reaches Stripe', () => {
         await signIn(context, baseURL!, owner)
         await useWorkspace(context, baseURL!, unpaid)
 
-        await expectPlainReturn(page, reads, `/billing?checkout=success&workspace=${paid}`)
+        await expectPlainReturn(page, reads, checkoutReturnPath(paid))
 
         await expect(page.getByRole('main')).toContainText('Unpaid workspace')
         await expect(page.getByRole('main')).not.toContainText('Paid workspace')
@@ -487,7 +617,7 @@ test.describe('no call reaches Stripe', () => {
         const reads = countPlanReads(page)
         await signIn(context, baseURL!, owner)
 
-        await expectPlainReturn(page, reads, '/billing?checkout=success')
+        await expectPlainReturn(page, reads, `/billing?checkout=success&session_id=${SESSION_ID}`)
 
         await expect(page.getByRole('button', { name: 'Upgrade' })).toBeEnabled()
       })
@@ -501,7 +631,7 @@ test.describe('no call reaches Stripe', () => {
         await signIn(context, baseURL!, member)
         await useWorkspace(context, baseURL!, ws)
 
-        await expectPlainReturn(page, reads, `/billing?checkout=success&workspace=${ws}`)
+        await expectPlainReturn(page, reads, checkoutReturnPath(ws))
 
         await expect(page.getByRole('button', { name: 'Upgrade' })).toHaveCount(0)
       })
@@ -554,8 +684,9 @@ test.describe('no call reaches Stripe', () => {
         const owner = await createUser('Olivia Owner')
         const ws = await personalWorkspace(owner, 'Acme books')
         const reads = countPlanReads(page)
+        await answerPaid(page)
         await signIn(context, baseURL!, owner)
-        await page.goto(`/billing?checkout=success&workspace=${ws}`)
+        await page.goto(checkoutReturnPath(ws))
         await expect(page).toHaveURL(/\/billing$/)
         await expect(page.getByText(CHECKING)).toBeVisible()
 
@@ -700,6 +831,40 @@ test.describe('no call reaches Stripe', () => {
 
       await setPlan(ws, { plan: 'pro', customer: `cus_${ws}` })
       expect((await context.request.post('/api/billing/checkout', { data: { workspaceId: ws } })).status()).toBe(409)
+    })
+
+    test('the return check answers 401 with no session and 403 to a member, the same as checkout', async ({ context, baseURL, request }) => {
+      const owner = await createUser('Olivia Owner')
+      const ws = await personalWorkspace(owner, 'Acme books')
+      const member = await createUser('Mia Member')
+      await addMember(ws, member, 'member')
+      const data = { workspaceId: ws, sessionId: SESSION_ID }
+
+      const signedOut = await request.post(RETURN_PATH, { data })
+      expect(signedOut.status()).toBe(401)
+      expect(await signedOut.json()).toEqual({ error: 'Sign in to manage billing.' })
+
+      await signIn(context, baseURL!, member)
+      const asMember = await context.request.post(RETURN_PATH, { data })
+      expect(asMember.status()).toBe(403)
+      expect(await asMember.json()).toEqual({ error: 'Only an owner of this workspace can manage billing.' })
+    })
+
+    test('the return check answers an owner paid false for a malformed id, and 500 when Stripe cannot be asked', async ({ context, baseURL }) => {
+      const owner = await createUser('Olivia Owner')
+      const ws = await personalWorkspace(owner, 'Acme books')
+      await signIn(context, baseURL!, owner)
+
+      for (const sessionId of ['not_a_session', `cs_${'x'.repeat(253)}`, 42, undefined]) {
+        const malformed = await context.request.post(RETURN_PATH, { data: { workspaceId: ws, sessionId } })
+        expect(malformed.status()).toBe(200)
+        expect(await malformed.json()).toEqual({ paid: false })
+      }
+
+      // The dev server has no Stripe key, so a well-formed id cannot be checked.
+      const unchecked = await context.request.post(RETURN_PATH, { data: { workspaceId: ws, sessionId: SESSION_ID } })
+      expect(unchecked.status()).toBe(500)
+      expect(await unchecked.json()).toEqual({ error: NOT_CHECKED })
     })
 
     test('the webhook answers 400, changing nothing, to a missing or wrong signature', async ({ page, context, baseURL, request }) => {
