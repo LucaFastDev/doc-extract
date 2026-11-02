@@ -67,7 +67,16 @@ export function WorkspaceSwitcher({ workspaces, current }: { workspaces: Workspa
             <ChevronsUpDownIcon className="text-muted-foreground" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-2rem)]">
+        {/* A press on the button is the button's to answer: it toggles the menu. Without this, the
+            menu's layer also takes that press for one outside the menu; while a closing menu is
+            still animating out, that closes the menu the same press has just reopened (issue #97). */}
+        <DropdownMenuContent
+          align="start"
+          className="w-64 max-w-[calc(100vw-2rem)]"
+          onPointerDownOutside={(event) => {
+            if (trigger.current?.contains(event.detail.originalEvent.target as Node)) event.preventDefault()
+          }}
+        >
           <DropdownMenuLabel className="text-muted-foreground">Workspaces</DropdownMenuLabel>
           <DropdownMenuRadioGroup
             value={current.id}
