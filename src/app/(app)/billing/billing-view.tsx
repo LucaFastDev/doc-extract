@@ -16,6 +16,8 @@ const NOTICE =
 const RE_READ_MS = 2_000
 const MAX_RE_READS = 10
 
+const CHECKOUT_PATH = '/api/billing/checkout'
+
 const NO_CONNECTION = 'That did not work. Check your connection and try again.'
 
 // The plan and the pages, read in the browser as the user, through RLS.
@@ -114,8 +116,11 @@ export function BillingView({
   }, [reReading, workspace.id])
 
   async function goToStripe(path: string) {
+    // A click ends the payment message, whatever the call answers; nothing sets it again.
+    setStillFree(false)
     setError(undefined)
     setRedirecting(true)
+    let alreadyOnPro = false
     try {
       const response = await fetch(path, {
         method: 'POST',
@@ -128,8 +133,24 @@ export function BillingView({
         return
       }
       setError(typeof body?.error === 'string' ? body.error : NO_CONNECTION)
+      alreadyOnPro = response.status === 409 && path === CHECKOUT_PATH
     } catch {
       setError(NO_CONNECTION)
+    }
+    // The checkout route refused because the workspace is on Pro, so the page showing Free is out of
+    // date: read once more. Pro replaces the plan and the error; Free or a failed read leaves both.
+    // Upgrade stays disabled until the read has answered.
+    if (alreadyOnPro) {
+      try {
+        const read = await readPlan(workspace.id)
+        if (read.plan.plan === 'pro') {
+          setPlan(read.plan)
+          setAllowance(read.allowance)
+          setError(undefined)
+        }
+      } catch (readError) {
+        console.error('The plan could not be read.', readError)
+      }
     }
     setRedirecting(false)
   }
@@ -175,7 +196,7 @@ export function BillingView({
         {isOwner && (
           <div>
             {plan.plan === 'free' ? (
-              <Button disabled={redirecting || reReading} onClick={() => goToStripe('/api/billing/checkout')}>
+              <Button disabled={redirecting || reReading} onClick={() => goToStripe(CHECKOUT_PATH)}>
                 Upgrade
               </Button>
             ) : (

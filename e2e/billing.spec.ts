@@ -311,6 +311,95 @@ test.describe('no call reaches Stripe', () => {
         await expect(figure(page, 'Current plan')).toHaveText('Free')
       })
 
+      test('a click on Upgrade removes the payment message, and a refused Upgrade shows only its error', async ({ page, context, baseURL }) => {
+        const owner = await createUser('Olivia Owner')
+        const ws = await personalWorkspace(owner, 'Acme books')
+        await interceptBillingCall(page, '/api/billing/checkout', { status: 500, body: { error: 'Checkout could not be opened. Try again.' } })
+        await signIn(context, baseURL!, owner)
+        await page.clock.install()
+        await page.goto(`/billing?checkout=success&workspace=${ws}`)
+        await expect(figure(page, 'Current plan')).toHaveText('Free')
+
+        await page.clock.runFor(20_000)
+        await expect(page.getByText(STILL_FREE)).toBeVisible()
+
+        await page.getByRole('button', { name: 'Upgrade' }).click()
+
+        await expect(page.getByRole('main').getByRole('alert')).toHaveText('Checkout could not be opened. Try again.')
+        await expect(page.getByText(STILL_FREE)).toHaveCount(0)
+      })
+
+      /** The page showing Free, the read on mount landed: both of its calls answered. */
+      async function openBillingOnFree(page: Page, context: BrowserContext, baseURL: string, owner: Awaited<ReturnType<typeof createUser>>) {
+        const landed = Promise.all([
+          page.waitForResponse((response) => response.url().includes('/rest/v1/workspaces')),
+          page.waitForResponse((response) => response.url().includes('/rest/v1/rpc/get_page_allowance')),
+        ])
+        await signIn(context, baseURL, owner)
+        await page.goto('/billing')
+        await landed
+        await expect(figure(page, 'Current plan')).toHaveText('Free')
+        await expect(page.getByRole('button', { name: 'Upgrade' })).toBeEnabled()
+      }
+
+      test('an Upgrade refused as already on Pro reads the plan again and shows Pro with no error', async ({ page, context, baseURL }) => {
+        const owner = await createUser('Olivia Owner')
+        const ws = await personalWorkspace(owner, 'Acme books')
+        await setPagesUsed(ws, 4)
+        await openBillingOnFree(page, context, baseURL!, owner)
+
+        await setPlan(ws, proPlan(ws))
+        await page.getByRole('button', { name: 'Upgrade' }).click()
+
+        await expectPlan(page, 'Pro', '4', '496 of 500')
+        await expect(page.getByRole('button', { name: 'Manage or cancel' })).toBeVisible()
+        await expect(page.getByRole('button', { name: 'Upgrade' })).toHaveCount(0)
+        await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0)
+      })
+
+      test('an Upgrade refused as already on Pro, with the workspace really on Free, keeps the error and the plan', async ({ page, context, baseURL }) => {
+        const owner = await createUser('Olivia Owner')
+        await personalWorkspace(owner, 'Acme books')
+        await interceptBillingCall(page, '/api/billing/checkout', { status: 409, body: { error: 'This workspace is already on Pro.' } })
+        await openBillingOnFree(page, context, baseURL!, owner)
+
+        await page.getByRole('button', { name: 'Upgrade' }).click()
+
+        await expect(page.getByRole('main').getByRole('alert')).toHaveText('This workspace is already on Pro.')
+        await expect(figure(page, 'Current plan')).toHaveText('Free')
+        await expect(page.getByRole('button', { name: 'Upgrade' })).toBeEnabled()
+      })
+
+      test('an Upgrade refused as already on Pro, whose read then fails, keeps the error and the plan', async ({ page, context, baseURL }) => {
+        const owner = await createUser('Olivia Owner')
+        const ws = await personalWorkspace(owner, 'Acme books')
+        await openBillingOnFree(page, context, baseURL!, owner)
+
+        await setPlan(ws, proPlan(ws))
+        await page.route('**/rest/v1/workspaces*', (route) => route.abort())
+        await page.getByRole('button', { name: 'Upgrade' }).click()
+
+        // The Supabase client backs off and retries a read that fails, for 7 seconds.
+        await expect(page.getByRole('button', { name: 'Upgrade' })).toBeEnabled({ timeout: 20_000 })
+        await expect(page.getByRole('main').getByRole('alert')).toHaveText('This workspace is already on Pro.')
+        await expect(figure(page, 'Current plan')).toHaveText('Free')
+      })
+
+      test('an Upgrade refused with another error makes no read of the plan', async ({ page, context, baseURL }) => {
+        const owner = await createUser('Olivia Owner')
+        await personalWorkspace(owner, 'Acme books')
+        const reads = countPlanReads(page)
+        await interceptBillingCall(page, '/api/billing/checkout', { status: 500, body: { error: 'Checkout could not be opened. Try again.' } })
+        await openBillingOnFree(page, context, baseURL!, owner)
+        expect(reads.count).toBe(1)
+
+        await page.getByRole('button', { name: 'Upgrade' }).click()
+
+        await expect(page.getByRole('main').getByRole('alert')).toHaveText('Checkout could not be opened. Try again.')
+        await page.waitForTimeout(1_500)
+        expect(reads.count).toBe(1)
+      })
+
       test('returning from a cancelled Checkout shows the plan as it is, with no message and no timer', async ({ page, context, baseURL }) => {
         const owner = await createUser('Olivia Owner')
         await personalWorkspace(owner, 'Acme books')
