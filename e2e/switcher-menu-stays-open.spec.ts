@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { createUser, signIn, sql } from './support/auth'
 import { switcher } from './support/workspace'
 
@@ -93,4 +93,35 @@ test('the menu reopened right after Escape stays open', async ({ page, context, 
   await watchForMenuCloses(page)
   await switcher(page).click()
   await expectMenuToStayOpen(page)
+})
+
+/** A press the button does not toggle on still closes the open menu, once, and it stays closed. */
+async function expectPressToCloseMenu(page: Page, press: Parameters<Locator['click']>[0]) {
+  const members = page.getByRole('menuitem', { name: 'Members' })
+  await switcher(page).click()
+  await expect(members).toBeVisible()
+
+  await watchForMenuCloses(page)
+  await switcher(page).click(press)
+  await expect(switcher(page)).toHaveAttribute('aria-expanded', 'false')
+
+  await page.waitForTimeout(2000)
+
+  await expect(switcher(page)).toHaveAttribute('aria-expanded', 'false')
+  await expect(members).toBeHidden()
+  expect(await menuCloses(page), 'times the menu closed').toBe(1)
+}
+
+test('a right click on the button closes the open menu, and it stays closed', async ({ page, context, baseURL }) => {
+  await signIn(context, baseURL!, await createUser())
+  await page.goto('/documents')
+
+  await expectPressToCloseMenu(page, { button: 'right' })
+})
+
+test('a Ctrl-click on the button closes the open menu, and it stays closed', async ({ page, context, baseURL }) => {
+  await signIn(context, baseURL!, await createUser())
+  await page.goto('/documents')
+
+  await expectPressToCloseMenu(page, { modifiers: ['Control'] })
 })
