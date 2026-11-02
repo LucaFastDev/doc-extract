@@ -28,11 +28,14 @@ export function billingUrl(): string {
 
 /**
  * Where a completed Checkout returns to: the billing page, naming the workspace that went to Checkout
- * (Lead ruling 8 on #50). The page acts on it only for that workspace and only for an owner of it.
+ * (Lead ruling 8 on #50), and the session Stripe fills in. The page acts on it only for that workspace
+ * and only for an owner of it, and asks Stripe about the session first. The placeholder is added to
+ * the finished string because searchParams.set would encode its braces, and Stripe only fills in the
+ * raw form.
  */
 export function checkoutSuccessUrl(workspaceId: string): string {
   const url = new URL('/billing', siteUrl())
   url.searchParams.set('checkout', 'success')
   url.searchParams.set('workspace', workspaceId)
-  return url.toString()
+  return `${url.toString()}&session_id={CHECKOUT_SESSION_ID}`
 }
