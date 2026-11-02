@@ -62,6 +62,17 @@ async function setWorkspace(admin: Admin, id: string, values: Record<string, unk
   if (error) throw error
 }
 
+/**
+ * Writes only if the workspace still holds the subscription that was read (null for none). A write
+ * that matches no row throws, so the event answers 500 and Stripe's retry reads the row again.
+ */
+async function setWorkspaceIfHolding(admin: Admin, id: string, held: string | null, values: Record<string, unknown>) {
+  const update = admin.from('workspaces').update(values).eq('id', id)
+  const { data, error } = await (held === null ? update.is('stripe_subscription_id', null) : update.eq('stripe_subscription_id', held)).select('id')
+  if (error) throw error
+  if (!data || data.length === 0) throw new Error(`Workspace ${id} no longer holds ${held ?? 'no subscription'}; nothing was written.`)
+}
+
 /** The subscription the workspace holds now, or null when it holds none. */
 async function heldSubscription(admin: Admin, id: string): Promise<string | null> {
   const { data, error } = await admin
@@ -118,21 +129,21 @@ async function onSubscriptionUpdated(event: Stripe.Event, eventCopy: Stripe.Subs
   const subscription = await deps.stripe().subscriptions.retrieve(eventCopy.id)
   const workspace = await workspaceOfSubscription(admin, subscription)
   if (!workspace) return logUnknownWorkspace(event)
-  const keeps = keepsPro(subscription)
-  if (!keeps) {
-    // A subscription that is not paying only ends the plan if it is the one the workspace holds.
-    const held = await heldSubscription(admin, workspace)
-    if (held !== subscription.id) {
-      return logIgnored(event, `its subscription ${subscription.id} is ${subscription.status} and the workspace holds ${held ?? 'none'}.`)
-    }
-  }
-  await setWorkspace(admin, workspace, {
-    plan: keeps ? 'pro' : 'free',
+  const values = {
+    plan: keepsPro(subscription) ? 'pro' : 'free',
     stripe_customer_id: idOf(subscription.customer),
     stripe_subscription_id: subscription.id,
     plan_period_end: periodEnd(subscription),
     plan_cancel_at_period_end: subscription.cancel_at_period_end,
-  })
+  }
+  if (keepsPro(subscription)) return setWorkspace(admin, workspace, values)
+  // A subscription that is not paying only ends the plan if it is the one the workspace holds,
+  // and the write applies only while the workspace still holds it.
+  const held = await heldSubscription(admin, workspace)
+  if (held !== subscription.id) {
+    return logIgnored(event, `its subscription ${subscription.id} is ${subscription.status} and the workspace holds ${held ?? 'none'}.`)
+  }
+  await setWorkspaceIfHolding(admin, workspace, held, values)
 }
 
 async function onSubscriptionDeleted(event: Stripe.Event, subscription: Stripe.Subscription, admin: Admin) {
@@ -144,7 +155,7 @@ async function onSubscriptionDeleted(event: Stripe.Event, subscription: Stripe.S
     return logIgnored(event, `its subscription ${subscription.id} is not the ${held} the workspace holds.`)
   }
   // Ruling 4: the customer stays, so a later upgrade reuses it.
-  await setWorkspace(admin, workspace, {
+  await setWorkspaceIfHolding(admin, workspace, held, {
     plan: 'free',
     stripe_subscription_id: null,
     plan_period_end: null,
