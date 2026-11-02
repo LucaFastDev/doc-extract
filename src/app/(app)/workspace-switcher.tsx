@@ -222,6 +222,14 @@ function DeleteForm({
   const [typed, setTyped] = useState('')
   const [error, setError] = useState<string | null>(null)
   const matches = typed === workspace.name
+  const button = useRef<HTMLButtonElement>(null)
+  // Counts failures, so a second one in a row moves focus again. The button was disabled while the
+  // request ran, which left focus on <body>; it is enabled again by the time this effect runs.
+  const [failures, setFailures] = useState(0)
+
+  useEffect(() => {
+    if (failures > 0) button.current?.focus()
+  }, [failures])
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -240,6 +248,7 @@ function DeleteForm({
       setError(DELETE_FAILED)
     }
     setPending(false)
+    setFailures((count) => count + 1)
   }
 
   return (
@@ -268,7 +277,7 @@ function DeleteForm({
             Cancel
           </Button>
         </DialogClose>
-        <Button type="submit" variant="destructive" disabled={!matches || pending}>
+        <Button ref={button} type="submit" variant="destructive" disabled={!matches || pending}>
           Delete workspace
         </Button>
       </DialogFooter>
@@ -276,16 +285,20 @@ function DeleteForm({
   )
 }
 
+// Controlled, so what was typed stays in the field after a refusal (a form action resets an
+// uncontrolled one). No maxLength: it counts UTF-16 units, and the limit of 100 characters is the
+// action's and the database's.
 function NameField({ defaultValue, error }: { defaultValue: string; error?: string }) {
+  const [value, setValue] = useState(defaultValue)
   return (
     <div className="grid gap-2">
       <Label htmlFor="workspace-name">Name</Label>
       <Input
         id="workspace-name"
         name="name"
-        defaultValue={defaultValue}
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
         required
-        maxLength={100}
         autoComplete="off"
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? 'workspace-name-error' : undefined}

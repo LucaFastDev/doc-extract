@@ -81,6 +81,29 @@ describe('workspace actions after the session has ended', () => {
   })
 })
 
+// Issue #80 criterion 1: a database error is not blamed on the role.
+describe('the refusals of a rename', () => {
+  beforeEach(() => {
+    user = { id: 'u1' }
+    requestPath = '/documents'
+    update.mockReset()
+  })
+
+  it('says the workspace could not be renamed when the update returns an error', async () => {
+    update.mockReturnValue({ eq: () => ({ select: async () => ({ data: null, error: { message: 'boom' } }) }) })
+    expect(await renameWorkspace({}, form({ id: 'ws-1', name: 'New' }))).toEqual({
+      error: 'The workspace could not be renamed. Try again.',
+    })
+  })
+
+  it('says only an owner can rename when the update returns no error and no row', async () => {
+    update.mockReturnValue({ eq: () => ({ select: async () => ({ data: [], error: null }) }) })
+    expect(await renameWorkspace({}, form({ id: 'ws-1', name: 'New' }))).toEqual({
+      error: 'Only an owner can rename this workspace.',
+    })
+  })
+})
+
 // Issue #69 criterion 5: the count is of code points after the trim, as char_length counts, so 100
 // emoji are within the limit though their length in JavaScript is 200.
 describe('the 100-character limit on a workspace name', () => {

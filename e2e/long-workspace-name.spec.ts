@@ -7,6 +7,10 @@ import { personalWorkspace, switcher } from './support/workspace'
 // desktop's.
 
 const NAME = 'W'.repeat(100)
+// Each emoji is outside the Basic Multilingual Plane: one character, two UTF-16 units.
+const EMOJI_NAME = '😀'.repeat(100)
+const TOO_LONG_NAME = 'W'.repeat(101)
+const LIMIT_MESSAGE = 'Use 100 characters or fewer for the workspace name.'
 
 const VIEWPORTS = [
   ['phone', { width: 360, height: 740 }],
@@ -77,8 +81,8 @@ for (const [label, viewport] of VIEWPORTS) {
       await noSideScroll(page)
     })
 
-    // Issue #69 criterion 6.
-    test('the create form stops at 100 characters and the new workspace shows its full name', async ({ page, context, baseURL }) => {
+    // Issue #80 criterion 2: 100 emoji are 200 UTF-16 units, within the limit of 100 characters.
+    test('the create form accepts a name of 100 emoji and the new workspace shows its full name', async ({ page, context, baseURL }) => {
       const user = await createUser()
       await signIn(context, baseURL!, user)
       await page.goto('/documents')
@@ -88,30 +92,63 @@ for (const [label, viewport] of VIEWPORTS) {
       const dialog = page.getByRole('dialog', { name: 'Create workspace' })
       const field = dialog.getByLabel('Name')
       await field.click()
-      await page.keyboard.insertText(`${NAME}W`)
-      await expect(field).toHaveValue(NAME)
+      await page.keyboard.insertText(EMOJI_NAME)
+      await expect(field).toHaveValue(EMOJI_NAME)
       await dialog.getByRole('button', { name: 'Create' }).click()
 
       await expect(dialog).toBeHidden()
-      await expect(switcher(page)).toHaveAccessibleName(`Workspace: ${NAME}`)
-      await expect(page.getByText('No documents in')).toContainText(NAME)
+      await expect(switcher(page)).toHaveAccessibleName(`Workspace: ${EMOJI_NAME}`)
+      await expect(page.getByText('No documents in')).toContainText(EMOJI_NAME)
       await noSideScroll(page)
       const rows = await sql(
         `select 1 from public.workspace_members m join public.workspaces w on w.id = m.workspace_id
          where m.user_id = $1 and w.name = $2`,
-        [user.id, NAME],
+        [user.id, EMOJI_NAME],
       )
       expect(rows).toHaveLength(1)
     })
 
-    test('the rename form stops at 100 characters too, and the delete dialog’s typed name has no limit', async ({ page, context, baseURL }) => {
+    // Issue #80 criterion 3: the action refuses, and what was typed stays in the field.
+    test('101 characters in the create form show the limit message and stay in the field', async ({ page, context, baseURL }) => {
+      await signIn(context, baseURL!, await createUser())
+      await page.goto('/documents')
+
+      await switcher(page).click()
+      await page.getByRole('menuitem', { name: 'Create workspace' }).click()
+      const dialog = page.getByRole('dialog', { name: 'Create workspace' })
+      const field = dialog.getByLabel('Name')
+      await field.click()
+      await page.keyboard.insertText(TOO_LONG_NAME)
+      await dialog.getByRole('button', { name: 'Create' }).click()
+
+      await expect(dialog.getByRole('alert')).toHaveText(LIMIT_MESSAGE)
+      await expect(field).toHaveValue(TOO_LONG_NAME)
+    })
+
+    test('101 characters in the rename form show the limit message and stay in the field', async ({ page, context, baseURL }) => {
+      await signIn(context, baseURL!, await setUp(false))
+      await page.goto('/documents')
+
+      await switcher(page).click()
+      await page.getByRole('menuitem', { name: 'Rename workspace' }).click()
+      const dialog = page.getByRole('dialog', { name: 'Rename workspace' })
+      const field = dialog.getByLabel('Name')
+      await field.fill(TOO_LONG_NAME)
+      await dialog.getByRole('button', { name: 'Save' }).click()
+
+      await expect(dialog.getByRole('alert')).toHaveText(LIMIT_MESSAGE)
+      await expect(field).toHaveValue(TOO_LONG_NAME)
+    })
+
+    // Issue #80 criterion 4.
+    test('the rename form’s name field has no maxlength, and neither has the delete dialog’s typed name', async ({ page, context, baseURL }) => {
       await signIn(context, baseURL!, await setUp(false))
       await page.goto('/documents')
 
       await switcher(page).click()
       await page.getByRole('menuitem', { name: 'Rename workspace' }).click()
       const rename = page.getByRole('dialog', { name: 'Rename workspace' })
-      await expect(rename.getByLabel('Name')).toHaveAttribute('maxlength', '100')
+      await expect(rename.getByLabel('Name')).not.toHaveAttribute('maxlength')
       await page.keyboard.press('Escape')
       await expect(rename).toBeHidden()
 
