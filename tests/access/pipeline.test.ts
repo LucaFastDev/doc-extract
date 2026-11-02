@@ -454,4 +454,91 @@ describe('retry_document', () => {
     expect(error?.code).toBe('22023')
     expect(error?.message).toContain('Only a failed document can be retried')
   })
+
+  describe('the refusal when the pages do not fit (#83)', () => {
+    /**
+     * What retry_document raises for a failed document whose counts are set directly through the
+     * service role. A free workspace has 20 pages a month and an account a cap of 10. The transaction
+     * is rolled back, so nothing a test sets reaches another.
+     */
+    async function refusal(o: { pagesUsed: number; pageCount: number; uploadedBy: string | null; accountUsed?: number }) {
+      const { id } = await createDocument(owner, ws, { file_name: 'Scan.pdf', mime_type: 'application/pdf', byte_size: 1024 })
+      return rolledBack(async (db) => {
+        await asServiceRole(db)
+        await db.query(
+          `insert into public.page_usage (workspace_id, period_start, pages_used) values ($1, ${MONTH}, $2)
+           on conflict (workspace_id, period_start) do update set pages_used = excluded.pages_used`,
+          [ws, o.pagesUsed],
+        )
+        await db.query(
+          `insert into public.account_page_usage (user_id, pages_used) values ($1, $2)
+           on conflict (user_id) do update set pages_used = excluded.pages_used`,
+          [owner.id, o.accountUsed ?? 0],
+        )
+        await db.query("update public.documents set status = 'failed', page_count = $2, uploaded_by = $3 where id = $1", [id, o.pageCount, o.uploadedBy])
+        await db.query('reset role')
+        await asUser(db, member.id)
+        return db.query('select public.retry_document($1)', [id]).then(
+          () => null,
+          (e: { code: string; message: string }) => ({ code: e.code, message: e.message }),
+        )
+      })
+    }
+
+    const WITH_CAP = 'of the page allowance (the workspace’s pages this month and the uploader’s lifetime cap).'
+    const WORKSPACE_ONLY = 'of the workspace’s pages this month.'
+
+    describe('with no uploader', () => {
+      it('gives the workspace’s pages left when they are below the document and the cap', async () => {
+        expect(await refusal({ pagesUsed: 17, pageCount: 5, uploadedBy: null })).toEqual({
+          code: '22023',
+          message: `Scan.pdf has 5 pages, but only 3 pages remain ${WORKSPACE_ONLY}`,
+        })
+      })
+
+      it('gives the workspace’s pages left, not the cap, when they are above the cap', async () => {
+        expect(await refusal({ pagesUsed: 9, pageCount: 12, uploadedBy: null })).toEqual({
+          code: '22023',
+          message: `Scan.pdf has 12 pages, but only 11 pages remain ${WORKSPACE_ONLY}`,
+        })
+      })
+
+      it('gives 0 when more pages are used than the plan allows', async () => {
+        expect(await refusal({ pagesUsed: 25, pageCount: 2, uploadedBy: null })).toEqual({
+          code: '22023',
+          message: `Scan.pdf has 2 pages, but only 0 pages remain ${WORKSPACE_ONLY}`,
+        })
+      })
+
+      it('says “1 page” for a document of one page, and “0 pages remain”', async () => {
+        expect(await refusal({ pagesUsed: 20, pageCount: 1, uploadedBy: null })).toEqual({
+          code: '22023',
+          message: `Scan.pdf has 1 page, but only 0 pages remain ${WORKSPACE_ONLY}`,
+        })
+      })
+
+      it('says “1 page remains” when one page is left', async () => {
+        expect(await refusal({ pagesUsed: 19, pageCount: 2, uploadedBy: null })).toEqual({
+          code: '22023',
+          message: `Scan.pdf has 2 pages, but only 1 page remains ${WORKSPACE_ONLY}`,
+        })
+      })
+    })
+
+    describe('with an uploader', () => {
+      it('keeps its text and number when the workspace’s pages are the smaller', async () => {
+        expect(await refusal({ pagesUsed: 17, pageCount: 5, uploadedBy: owner.id, accountUsed: 1 })).toEqual({
+          code: '22023',
+          message: `Scan.pdf has 5 pages, but only 3 pages remain ${WITH_CAP}`,
+        })
+      })
+
+      it('keeps its text and number when the account cap is the smaller', async () => {
+        expect(await refusal({ pagesUsed: 5, pageCount: 3, uploadedBy: owner.id, accountUsed: 8 })).toEqual({
+          code: '22023',
+          message: `Scan.pdf has 3 pages, but only 2 pages remain ${WITH_CAP}`,
+        })
+      })
+    })
+  })
 })
