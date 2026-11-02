@@ -1,12 +1,19 @@
 import { randomUUID } from 'node:crypto'
-import { beforeAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
+import { POST as checkoutReturnRoute } from '../../src/app/api/billing/checkout-return/route'
 import { createCheckout, createPortal, type CheckoutStripe, type PortalStripe } from '../../src/lib/billing/sessions'
 import { withDb } from './local-db'
 import { addMember, anonClient, personalWorkspaceId, signUp, type TestUser } from './users'
 
-// POST /api/billing/checkout and /api/billing/portal (ARCHITECTURE.md section 6.2, PRD US-11.1,
-// OQ-20, OQ-24, OQ-37, Lead rulings 2 and 6 on #50), with real users and RLS. The Stripe client is
-// a fake that records what it is asked for (ruling 7).
+// POST /api/billing/checkout, /api/billing/portal and /api/billing/checkout-return (ARCHITECTURE.md
+// section 6.2, PRD US-11.1, OQ-20, OQ-24, OQ-37, Lead rulings 2 and 6 on #50, issue 87), with real
+// users and RLS. The Stripe client is a fake that records what it is asked for (ruling 7).
+
+// The route handler itself runs below. Outside a request it has no cookies to build its client from,
+// so it gets the signed-in client of the test user; the Stripe factory is a spy.
+const route = vi.hoisted(() => ({ asCaller: undefined as unknown, stripe: vi.fn() }))
+vi.mock('@/lib/supabase/server', () => ({ createClient: async () => route.asCaller }))
+vi.mock('@/lib/stripe', () => ({ getStripe: route.stripe }))
 
 const SITE = 'https://site.test'
 const settings = () => ({
@@ -143,6 +150,54 @@ describe('createCheckout', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     const { stripe } = fakeCheckout(null)
     expect((await createCheckout(ws, { asCaller: owner.client, stripe: () => stripe, settings })).status).toBe(500)
+  })
+})
+
+describe('POST /api/billing/checkout-return', () => {
+  let owner: TestUser
+  let member: TestUser
+  let stranger: TestUser
+  let ws: string
+
+  beforeAll(async () => {
+    owner = await signUp()
+    member = await signUp()
+    stranger = await signUp()
+    ws = await personalWorkspaceId(owner)
+    await addMember(ws, member, 'member')
+    await setWorkspace(ws, 'free', null)
+  })
+
+  beforeEach(() => {
+    route.stripe.mockReset()
+  })
+
+  function post(asCaller: unknown, body: unknown) {
+    route.asCaller = asCaller
+    return checkoutReturnRoute(new Request('https://site.test/api/billing/checkout-return', { method: 'POST', body: JSON.stringify(body) }))
+  }
+
+  it('answers 401 signed out, before touching Stripe', async () => {
+    const response = await post(anonClient(), { workspaceId: ws, sessionId: 'cs_test_1' })
+    expect(response.status).toBe(401)
+    expect(await response.json()).toEqual({ error: 'Sign in to manage billing.' })
+    expect(route.stripe).not.toHaveBeenCalled()
+  })
+
+  it.each(['member', 'stranger'])('answers 403 to a %s, before touching Stripe', async (who) => {
+    const response = await post(who === 'member' ? member.client : stranger.client, { workspaceId: ws, sessionId: 'cs_test_1' })
+    expect(response.status).toBe(403)
+    expect(await response.json()).toEqual({ error: 'Only an owner of this workspace can manage billing.' })
+    expect(route.stripe).not.toHaveBeenCalled()
+  })
+
+  it('answers an owner from Stripe’s session, read through the real workspace row', async () => {
+    const retrieve = vi.fn(async () => ({ status: 'complete', metadata: { workspace_id: ws }, subscription: { status: 'active' } }))
+    route.stripe.mockReturnValue({ checkout: { sessions: { retrieve } } })
+    const response = await post(owner.client, { workspaceId: ws, sessionId: 'cs_test_1' })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ paid: true })
+    expect(retrieve).toHaveBeenCalledWith('cs_test_1', { expand: ['subscription'] })
   })
 })
 
