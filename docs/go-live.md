@@ -73,7 +73,10 @@ domain (OQ-27). `<site>` below means that address.
       **2** in production (Lead ruling 3 on #24): the migration inserts 1, so set it once with
       `update app_config set extract_concurrency = 2`. `base_input_tokens` is 20000, or a higher
       value set from a committed eval run. `max_output_tokens` and the two input settings bound the
-      spend estimate (section 7): keep them at or above the eval's largest measured values.
+      spend estimate (section 7). Keep `max_output_tokens` at or above the largest measured output.
+      Set the two input settings so that, for every document in the results file, one attempt's
+      `usage.input_tokens` (divided by `usage.attempts`, which it sums) is at or below
+      `base_input_tokens + pages × max_input_tokens_per_page`.
 - [ ] **plan_limits**: SQL editor, `select * from plan_limits`. Pass: `free` 20 pages and 0, `pro`
       500 pages and 19.00 (OQ-2, OQ-24).
 
