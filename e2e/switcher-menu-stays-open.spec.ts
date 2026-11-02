@@ -2,8 +2,10 @@ import { expect, test, type Page } from '@playwright/test'
 import { createUser, signIn, sql } from './support/auth'
 import { switcher } from './support/workspace'
 
-// Issue #97: the workspace switcher's menu, opened right after a switch that followed a dialog,
-// closed by itself. A menu the user opened stays open until the user closes it or picks an item.
+// Issue #97: the workspace switcher's menu, opened while the previous menu was still finishing its
+// exit animation, closed by itself. A menu the user opened stays open until the user closes it or
+// picks an item. The first test is the flow as it was reported, which meets that animation only
+// some of the time; the second reaches it nearly every time, so it guards the fix in a single run.
 
 /**
  * Counts every time the switcher's button stops saying its menu is open, or leaves the page taking
@@ -39,6 +41,19 @@ function menuCloses(page: Page) {
   return page.evaluate(() => (window as unknown as { menuWatch: { closes: number } }).menuWatch.closes)
 }
 
+/** The menu just opened is still open 2 seconds on, having never closed, and an item in it works. */
+async function expectMenuToStayOpen(page: Page) {
+  const members = page.getByRole('menuitem', { name: 'Members' })
+  await expect(members).toBeVisible()
+
+  await page.waitForTimeout(2000)
+
+  expect(await menuCloses(page), 'times the menu closed by itself').toBe(0)
+  await expect(members).toBeVisible()
+  await members.click()
+  await expect(page).toHaveURL(/\/members$/)
+}
+
 test('the menu opened right after a switch that followed a dialog stays open', async ({ page, context, baseURL }) => {
   const user = await createUser()
   await sql(
@@ -63,13 +78,19 @@ test('the menu opened right after a switch that followed a dialog stays open', a
 
   await watchForMenuCloses(page)
   await switcher(page).click()
-  const members = page.getByRole('menuitem', { name: 'Members' })
-  await expect(members).toBeVisible()
+  await expectMenuToStayOpen(page)
+})
 
-  await page.waitForTimeout(2000)
+test('the menu reopened right after Escape stays open', async ({ page, context, baseURL }) => {
+  await signIn(context, baseURL!, await createUser())
+  await page.goto('/documents')
 
-  expect(await menuCloses(page), 'times the menu closed by itself').toBe(0)
-  await expect(members).toBeVisible()
-  await members.click()
-  await expect(page).toHaveURL(/\/members$/)
+  await switcher(page).click()
+  await expect(page.getByRole('menuitem', { name: 'Members' })).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  // From here on, so the close Escape asked for is not counted.
+  await watchForMenuCloses(page)
+  await switcher(page).click()
+  await expectMenuToStayOpen(page)
 })
