@@ -25,13 +25,25 @@ const NO_CONNECTION = 'That did not work. Check your connection and try again.'
 // failed call and the page comes back to a state where the owner can act.
 const CALL_TIMEOUT_MS = 20_000
 
+// Rejects when the signal aborts. The Supabase client gets its access token before it fetches, and
+// that wait is outside the query's own abort, so the limit has to cover the whole call.
+function rejectOnAbort(signal: AbortSignal): Promise<never> {
+  return new Promise((_, reject) => {
+    if (signal.aborted) reject(signal.reason)
+    else signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+  })
+}
+
 // The plan and the pages, read in the browser as the user, through RLS.
 async function readPlan(workspaceId: string) {
   const supabase = createClient()
   const signal = AbortSignal.timeout(CALL_TIMEOUT_MS)
-  const [workspaceRow, allowanceRow] = await Promise.all([
-    supabase.from('workspaces').select(PLAN_COLUMNS).eq('id', workspaceId).abortSignal(signal).single<WorkspacePlan>(),
-    supabase.rpc('get_page_allowance', { ws: workspaceId }).abortSignal(signal).single<PageAllowance>(),
+  const [workspaceRow, allowanceRow] = await Promise.race([
+    Promise.all([
+      supabase.from('workspaces').select(PLAN_COLUMNS).eq('id', workspaceId).abortSignal(signal).single<WorkspacePlan>(),
+      supabase.rpc('get_page_allowance', { ws: workspaceId }).abortSignal(signal).single<PageAllowance>(),
+    ]),
+    rejectOnAbort(signal),
   ])
   if (workspaceRow.error) throw workspaceRow.error
   if (allowanceRow.error) throw allowanceRow.error
