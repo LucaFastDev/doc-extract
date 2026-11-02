@@ -21,12 +21,29 @@ const CHECKOUT_RETURN_PATH = '/api/billing/checkout-return'
 
 const NO_CONNECTION = 'That did not work. Check your connection and try again.'
 
+// Issue #94: every call the page makes has its own time limit, so one that never answers ends as a
+// failed call and the page comes back to a state where the owner can act.
+const CALL_TIMEOUT_MS = 20_000
+
+// Rejects when the signal aborts. The Supabase client gets its access token before it fetches, and
+// that wait is outside the query's own abort, so the limit has to cover the whole call.
+function rejectOnAbort(signal: AbortSignal): Promise<never> {
+  return new Promise((_, reject) => {
+    if (signal.aborted) reject(signal.reason)
+    else signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+  })
+}
+
 // The plan and the pages, read in the browser as the user, through RLS.
 async function readPlan(workspaceId: string) {
   const supabase = createClient()
-  const [workspaceRow, allowanceRow] = await Promise.all([
-    supabase.from('workspaces').select(PLAN_COLUMNS).eq('id', workspaceId).single<WorkspacePlan>(),
-    supabase.rpc('get_page_allowance', { ws: workspaceId }).single<PageAllowance>(),
+  const signal = AbortSignal.timeout(CALL_TIMEOUT_MS)
+  const [workspaceRow, allowanceRow] = await Promise.race([
+    Promise.all([
+      supabase.from('workspaces').select(PLAN_COLUMNS).eq('id', workspaceId).abortSignal(signal).single<WorkspacePlan>(),
+      supabase.rpc('get_page_allowance', { ws: workspaceId }).abortSignal(signal).single<PageAllowance>(),
+    ]),
+    rejectOnAbort(signal),
   ])
   if (workspaceRow.error) throw workspaceRow.error
   if (allowanceRow.error) throw allowanceRow.error
@@ -41,6 +58,7 @@ async function returnIsPaid(workspaceId: string, sessionId: string) {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ workspaceId, sessionId }),
+      signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
     })
     if (response.status !== 200) {
       console.error('The payment could not be checked.', response.status)
@@ -165,6 +183,7 @@ export function BillingView({
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ workspaceId: workspace.id }),
+        signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
       })
       const body = await response.json().catch(() => null)
       if (response.ok && typeof body?.url === 'string') {
