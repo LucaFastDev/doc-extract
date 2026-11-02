@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import Stripe from 'stripe'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { handleStripeWebhook, type WebhookStripe } from '../../src/lib/billing/webhook'
 import { withDb } from './local-db'
 import { adminClient, personalWorkspaceId, signUp } from './users'
@@ -612,6 +612,132 @@ describe('events out of order (issue 73)', () => {
       expect(await workspace(ws)).toEqual(before)
       expect((await eventRow(body.id)).processed_at).not.toBeNull()
       expectIgnored(warn, body)
+    })
+  })
+
+  describe('a newer subscription commits between the read and the write (issue 76)', () => {
+    /**
+     * An admin client whose first update on workspaces first writes the newer subscription through
+     * an unwrapped client, then goes ahead: the Checkout that commits between the read and the write.
+     */
+    function committingFirst(commit: () => Promise<void>) {
+      let armed = true
+      const wrap = <T extends object>(builder: T): T =>
+        new Proxy(builder, {
+          get(target, prop) {
+            const value = Reflect.get(target, prop, target)
+            if (prop === 'then') {
+              return (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
+                (async () => {
+                  if (armed && (target as { __commit?: boolean }).__commit) {
+                    armed = false
+                    await commit()
+                  }
+                  return (value as PromiseLike<unknown>['then']).call(target, resolve, reject)
+                })()
+            }
+            if (typeof value !== 'function') return value
+            return (...args: unknown[]) => {
+              const result = value.apply(target, args)
+              return result && typeof result === 'object' ? wrap(result) : result
+            }
+          },
+        })
+      const real = adminClient()
+      return () =>
+        new Proxy(real, {
+          get(target, prop) {
+            const value = Reflect.get(target, prop, target)
+            if (prop !== 'from') return typeof value === 'function' ? value.bind(target) : value
+            return (table: string) => {
+              const from = target.from(table)
+              if (table !== 'workspaces' || !armed) return from
+              return new Proxy(from, {
+                get(f, p) {
+                  const v = Reflect.get(f, p, f)
+                  if (p !== 'update') return typeof v === 'function' ? v.bind(f) : v
+                  return (...args: unknown[]) => {
+                    const builder = v.apply(f, args)
+                    ;(builder as { __commit?: boolean }).__commit = true
+                    return wrap(builder)
+                  }
+                },
+              })
+            }
+          },
+        }) as unknown as ReturnType<typeof adminClient>
+    }
+
+    // The customer is unique across workspaces, so each test commits its own.
+    let newer = { customer: '', id: '' }
+    beforeEach(() => {
+      newer = { customer: `cus_${randomUUID()}`, id: `sub_${randomUUID()}` }
+    })
+
+    async function commitNewer(ws: string) {
+      await setWorkspace(ws, {
+        plan: 'pro',
+        stripe_customer_id: newer.customer,
+        stripe_subscription_id: newer.id,
+        plan_period_end: '2032-02-02T00:00:00Z',
+        plan_cancel_at_period_end: false,
+      })
+    }
+
+    async function deliverRacing(body: unknown, ws: string, stripe: WebhookStripe) {
+      const { payload, signature } = signed(body)
+      return handleStripeWebhook(payload, signature, {
+        admin: committingFirst(() => commitNewer(ws)),
+        stripe: () => stripe,
+        secret: () => SECRET,
+      })
+    }
+
+    async function expectNewerKept(ws: string, body: { id: string; type: string }, stripe: WebhookStripe, racing: Promise<{ status: number }>) {
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      expect((await racing).status).toBe(500)
+      const kept = await workspace(ws)
+      expect(kept).toEqual({
+        plan: 'pro',
+        stripe_customer_id: newer.customer,
+        stripe_subscription_id: newer.id,
+        plan_period_end: new Date('2032-02-02T00:00:00Z'),
+        plan_cancel_at_period_end: false,
+      })
+      expect((await eventRow(body.id)).processed_at).toBeNull()
+      expect(warn).not.toHaveBeenCalled()
+
+      expect((await deliver(body, stripe)).status).toBe(200)
+
+      expect(await workspace(ws)).toEqual(kept)
+      expect((await eventRow(body.id)).processed_at).not.toBeNull()
+      expectIgnored(warn, body)
+    }
+
+    it('customer.subscription.updated with a status other than active or past_due: 500 and the newer subscription kept, then 200 ignored on the retry', async () => {
+      const ws = await proHolding('sub_older')
+      const retrieved = subscription({ id: 'sub_older', status: 'canceled', metadata: { workspace_id: ws } })
+      const body = event('customer.subscription.updated', retrieved)
+      const { stripe } = retrieving(retrieved)
+
+      await expectNewerKept(ws, body, stripe, deliverRacing(body, ws, stripe))
+    })
+
+    it('customer.subscription.deleted with the id read held: 500 and the newer subscription kept, then 200 ignored on the retry', async () => {
+      const ws = await proHolding('sub_held')
+      const body = event('customer.subscription.deleted', subscription({ id: 'sub_held', status: 'canceled', metadata: { workspace_id: ws } }))
+      const { stripe } = fakeStripe()
+
+      await expectNewerKept(ws, body, stripe, deliverRacing(body, ws, stripe))
+    })
+
+    it('customer.subscription.deleted with null read: 500 and the newer subscription kept, then 200 ignored on the retry', async () => {
+      const ws = await proHolding(null)
+      const body = event('customer.subscription.deleted', subscription({ id: 'sub_older', status: 'canceled', metadata: { workspace_id: ws } }))
+      const { stripe } = fakeStripe()
+
+      await expectNewerKept(ws, body, stripe, deliverRacing(body, ws, stripe))
     })
   })
 
