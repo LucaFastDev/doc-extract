@@ -17,8 +17,20 @@ function DropdownMenuTrigger({ ...props }: React.ComponentProps<typeof DropdownM
 function DropdownMenuContent({
   className,
   sideOffset = 4,
+  onKeyDownCapture,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
+  // A closed menu stays on the page until its exit animation ends, and focus stays on its item until
+  // then, so a key that selects would run an item the user has just cancelled (issue #100). Stopped
+  // here, before the item's own handler, for every menu. Prevented too, so a link item is not followed.
+  function ignoreSelectionKeysWhileClosing(event: React.KeyboardEvent<HTMLDivElement>) {
+    onKeyDownCapture?.(event)
+    if (event.currentTarget.dataset.state === 'closed' && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault()
+      event.stopPropagation()
+    }
+  }
+
   return (
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content
@@ -29,6 +41,7 @@ function DropdownMenuContent({
           className,
         )}
         {...props}
+        onKeyDownCapture={ignoreSelectionKeysWhileClosing}
       />
     </DropdownMenuPrimitive.Portal>
   )
