@@ -21,7 +21,7 @@ function render(plan: 'free' | 'pro') {
     createElement(BillingView, {
       workspace: { id: 'ws', name: 'Acme books' },
       isOwner: true,
-      returnedFromCheckout: false,
+      sessionId: null,
       initialPlan: { plan, plan_period_end: null, plan_cancel_at_period_end: false },
       initialAllowance: { workspace_used: 7, workspace_limit: 77, account_used: 0, account_cap: 10 },
       plans: { free: { pages: 11, price: '$3' }, pro: { pages: 77, price: '$42' } },

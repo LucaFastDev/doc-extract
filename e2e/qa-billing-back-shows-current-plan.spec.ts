@@ -39,7 +39,8 @@ for (const { name, viewport } of [
       await signIn(context, baseURL!, owner)
 
       // Returned from Checkout, the page re-reads until the webhook has made the workspace Pro.
-      await page.goto(`/billing?checkout=success&workspace=${ws}`)
+      await page.route('**/api/billing/checkout-return', (route) => route.fulfill({ status: 200, json: { paid: true } }))
+      await page.goto(`/billing?checkout=success&workspace=${ws}&session_id=cs_test_return`)
       await expect(page).toHaveURL(/\/billing$/)
       await expect(figure(page, 'Current plan')).toHaveText('Free')
       await setPlan(ws, proPlan(ws))
