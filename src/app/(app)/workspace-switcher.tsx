@@ -67,21 +67,7 @@ export function WorkspaceSwitcher({ workspaces, current }: { workspaces: Workspa
             <ChevronsUpDownIcon className="text-muted-foreground" />
           </Button>
         </DropdownMenuTrigger>
-        {/* A press the button toggles the menu on, a plain left press, is not outside the menu, and
-            neither is focus landing on the button. Without this, such a press while a closing menu
-            is still animating out closes the menu it has just reopened, and so does the closed
-            menu's late hand-off of focus to the button, if the press came just after that menu left
-            the page (issue #97). Any other press on the button, such as a right click or a
-            Ctrl-click, does not toggle, so it stays outside and dismisses the menu. */}
-        <DropdownMenuContent
-          align="start"
-          className="w-64 max-w-[calc(100vw-2rem)]"
-          onInteractOutside={(event) => {
-            const { originalEvent } = event.detail
-            const inside = originalEvent instanceof FocusEvent || (originalEvent.button === 0 && !originalEvent.ctrlKey)
-            if (inside && trigger.current?.contains(originalEvent.target as Node)) event.preventDefault()
-          }}
-        >
+        <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-2rem)]">
           <DropdownMenuLabel className="text-muted-foreground">Workspaces</DropdownMenuLabel>
           <DropdownMenuRadioGroup
             value={current.id}
