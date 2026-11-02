@@ -47,7 +47,9 @@ hand-named file `supabase/migrations/<UTC yyyymmddhhmmss>_<name>.sql`.
 - `src/lib/utils.ts` shadcn/ui's `cn`; `components.json` shadcn/ui's settings
 - `supabase/` `config.toml` (local stack only), forward-only `migrations/`, `seed.sql`,
   `functions/` (each function's checks in pure modules with `*.test.ts` beside them, run by
-  `npm test`; `supabase start` serves the functions present when it starts)
+  `npm test`; `supabase start` serves the functions present when it starts, and an edit to a
+  function is not served until `npx supabase stop` and `npx supabase start`, so a test run before
+  that can pass against the old code)
 - `shared/` plain TypeScript with no imports, read by Next.js as `@shared/*` and by the functions
   by relative import (`limits.ts`: accepted types, 10 MB, 10 pages, 10 files)
 - `demo/` the public demo's sample files (`samples/`), their values, generator and local upload;

@@ -887,8 +887,12 @@ created and decides nothing (Lead ruling 8 on #24). Otherwise it adds the estima
 both. Because the reserved amount is an upper bound, both limits hold even with concurrent calls.
 `max_output_tokens` is also sent as the call's `max_tokens`, so the output part of the bound is a
 limit, not a guess. The input part rests on `base_input_tokens` (system prompt and tool
-definitions) and `max_input_tokens_per_page`, set above the largest values the eval measures;
-`settle_spend` logs a warning for any call whose actual cost passed its estimate, so a wrong
+definitions) and `max_input_tokens_per_page`, set so that, for every document in the eval's results
+file, `usage.input_tokens` as it stands (it sums the attempts that returned usage, so it is never
+below any one attempt's input) is at or below `base_input_tokens + pages × max_input_tokens_per_page`;
+a document over that bound with `usage.attempts` 1 fails the check, and one over it with
+`usage.attempts` above 1 is judged on an eval run where it took one attempt; `settle_spend` logs a warning for any call
+whose actual cost passed its estimate, so a wrong
 setting is visible. Until a real eval run is committed, the value of `base_input_tokens` comes from
 the eval dry run's estimate of about 18,000 tokens.
 
@@ -1275,7 +1279,8 @@ needed. It does not add secrets to CI.
    non-member is refused.
 8. **Export**: CSV writer with tests; zip of the two CSV files; XLSX with two sheets; export UI
    choosing a type, then approved documents of that type.
-9. **Billing**: `/api/billing/checkout`, `/api/billing/portal`, `/api/stripe/webhook`,
+9. **Billing**: `/api/billing/checkout`, `/api/billing/checkout-return`, `/api/billing/portal`,
+   `/api/stripe/webhook`,
    `src/lib/stripe.ts` and `src/instrumentation.ts` with the live-key refusal, `stripe_events`;
    billing page with the plan, its limits and price from `get_plan_limits`, pages left and the
    test-mode notice; webhook tested with signed fixture events

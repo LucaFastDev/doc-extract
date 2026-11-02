@@ -169,9 +169,15 @@ threshold 0.8 and tolerance 0.01), and compares the stored values with `expected
 targets are PRD section 10's; missing one does not block a release (OQ-32).
 
 `max_input_tokens_per_page` divides a whole request's input by its pages, so it includes the fixed
-part every request carries (system prompt and tool definitions). Setting
-`app_config.max_input_tokens_per_page` at or above it keeps the spend estimate an upper bound
-(ARCHITECTURE.md section 7), with room to spare on multi-page documents.
+part every request carries (system prompt and tool definitions); do not set
+`app_config.max_input_tokens_per_page` from it alone. The settings keep the spend estimate an upper
+bound (ARCHITECTURE.md section 7) when, for every document in the results file, `usage.input_tokens`
+as it stands is at or below `base_input_tokens + pages × max_input_tokens_per_page`. That figure
+sums the attempts that returned usage, so it is never below any one attempt's input: a document at
+or below the bound is within it, however many attempts it took. A document over the bound with
+`usage.attempts` 1 is over it, and the settings do not keep the estimate an upper bound. A document
+over the bound with `usage.attempts` above 1 is not settled by this file: run the eval again and
+judge it on a run where it took one attempt.
 
 ## Changing the eval set
 
