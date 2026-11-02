@@ -164,7 +164,7 @@ src/
     (app)/                     signed-in pages: documents, review, export, members, billing, settings
     invite/[token]/            accept an invitation (sign-in first)
     auth/callback/route.ts     exchanges Google's code for a session cookie
-    api/billing/checkout/route.ts, api/billing/portal/route.ts
+    api/billing/checkout/route.ts, api/billing/checkout-return/route.ts, api/billing/portal/route.ts
     api/stripe/webhook/route.ts
     api/documents/[id]/route.ts    DELETE: delete one document
     api/workspaces/[id]/route.ts   DELETE: delete a workspace
@@ -680,7 +680,8 @@ All run on the Node.js runtime and are short; none calls Claude.
 | Route | Caller | Auth | Does |
 |---|---|---|---|
 | `GET /auth/callback` | Google, through Supabase Auth | OAuth code (PKCE) | `exchangeCodeForSession`, which sets the session cookie; redirects to `next` if it is a path on this site, else to the document list (OQ-34). |
-| `POST /api/billing/checkout` | browser, with `{ workspaceId }` in the body | session cookie | `src/lib/billing/sessions.ts`. Server client; 401 with no session; checks `is_owner` (OQ-20), 403 otherwise, a body naming no workspace included; 409 to a workspace already on Pro. Creates a Stripe Checkout session in subscription mode for `STRIPE_PRICE_PRO`, with no trial (OQ-24), the workspace id in the metadata of both the session and the subscription, the workspace's `stripe_customer_id` when it has one, and success and cancel URLs from `SITE_URL` back to the billing page, the success URL naming the workspace (Lead rulings 2, 6 and 8 on #50); returns its URL. |
+| `POST /api/billing/checkout` | browser, with `{ workspaceId }` in the body | session cookie | `src/lib/billing/sessions.ts`. Server client; 401 with no session; checks `is_owner` (OQ-20), 403 otherwise, a body naming no workspace included; 409 to a workspace already on Pro. Creates a Stripe Checkout session in subscription mode for `STRIPE_PRICE_PRO`, with no trial (OQ-24), the workspace id in the metadata of both the session and the subscription, the workspace's `stripe_customer_id` when it has one, and success and cancel URLs from `SITE_URL` back to the billing page, the success URL naming the workspace (Lead rulings 2, 6 and 8 on #50) and ending with the literal `&session_id={CHECKOUT_SESSION_ID}`, added to the finished string because Stripe only fills in the raw form (issue 87); returns its URL. |
+| `POST /api/billing/checkout-return` | browser, with `{ workspaceId, sessionId }` in the body, on a return from Checkout | session cookie | Same file and the same 401 and 403. A `sessionId` that is not a string starting with `cs_`, or is over 255 characters, answers 200 `{ "paid": false }` without calling Stripe. Otherwise it calls `checkout.sessions.retrieve` with the subscription expanded and answers 200 `{ "paid": true }` only when the session's `status` is `complete`, its `metadata.workspace_id` is this workspace's id and the subscription's `status` is `active` or `trialing`; otherwise 200 `{ "paid": false }`. Any error from Stripe, an unknown session included, is logged and answers 500 with `{ "error": "The payment could not be checked." }`, a text the page never shows (issue 87). |
 | `POST /api/billing/portal` | browser, with `{ workspaceId }` in the body | session cookie | Same file and the same 401 and 403; 409 to a workspace with no Stripe customer. Creates a customer portal session returning to the billing page; returns its URL (OQ-37). |
 | `POST /api/stripe/webhook` | Stripe | Stripe signature, no session | `src/lib/billing/webhook.ts`. Reads the raw body (`request.text()`), verifies it with `Stripe.webhooks.constructEvent` and `STRIPE_WEBHOOK_SECRET`, answering 400 and changing nothing to a missing or wrong signature. With the service-role client: inserts the event into `stripe_events` on first sight; an event whose row has `processed_at` set is acknowledged and skipped; processes it; then sets `processed_at`. A processing failure answers 500 and leaves `processed_at` null, so Stripe's retry processes it (Lead ruling 3 on #50). Stripe does not keep events in order and retries them late, so the webhook acts on a subscription's current state and ignores events about one the workspace has moved on from (issue 73). `checkout.session.completed` reads the workspace from the session's metadata and retrieves the subscription from Stripe for its status and period end; with status `active` or `past_due` it sets `pro`, customer, subscription, period end and whether the subscription is set to end, and with any other status it writes nothing. `customer.subscription.updated` retrieves the subscription by the event's subscription id and uses the retrieved object, never the event's copy, for the status and every column; it reads the workspace from the retrieved subscription's metadata, or else by `stripe_customer_id`. Status `active` or `past_due` sets the same columns as Checkout (`pro`), whatever subscription id the workspace holds, null included. Any other status sets `free` with the same columns only when the id equals the workspace's `stripe_subscription_id`; otherwise it writes nothing. A failed retrieve, a not-found included, answers 500 and leaves `processed_at` null, so Stripe's retry processes the event. `customer.subscription.deleted`, which Stripe sends at the end of a cancelled period, finds the workspace the same way, makes no call to Stripe, and sets `free` when its subscription id equals the workspace's `stripe_subscription_id` or the workspace holds none, clearing the subscription and the period end and keeping the customer; for a different id it writes nothing (rulings 2 and 4; OQ-24, OQ-37). The `free` write of both paths applies only if the workspace still holds what was read: it is filtered on the workspace id and on `stripe_subscription_id` equal to the id read, or null when none was read. When a Checkout commits a newer subscription between the read and the write, the write matches no row and throws, so the event answers 500, leaves `processed_at` null and changes no column; Stripe's retry reads the row again, finds a different subscription held, and ignores the event as below (issue 76). The `active` and `past_due` write and `checkout.session.completed` stay filtered on the workspace id alone. Each event that writes nothing for these reasons is answered 200, gets `processed_at`, and logs one `console.warn` line naming the event id and type. An event naming no known workspace is logged as an error and answered 200, changing nothing; any other type is acknowledged with 200. |
 | `DELETE /api/documents/[id]` | browser, after the user confirms (PRD US-19.1) | session cookie | `src/lib/documents/delete.ts`. A caller with no session gets 401. Reads the document with the server client, as the caller, so RLS returns it only to a member of its workspace; otherwise 404, and nothing changes. Checks `is_member(workspace_id)`; any member, owner or member, may delete any document of the workspace (OQ-20). With the service-role client: unless `file_deleted_at` is set, removes the object at `storage_path` in `documents` through the Storage API (an object already gone counts as removed); then `rpc delete_document(id)`, which in one transaction locks the row `for update`, calls `release_pages` if the status is `queued`, `waiting_budget` or `processing` (pages held, not yet used, PRD US-19.1 AC-5), and deletes the row, which cascades to its fields, check results, ticks, history and extractions. Pages already counted stay in `page_usage` and `account_page_usage`, which are not keyed by document, so they are not refunded (PRD US-19.1 AC-4); spend already recorded in `ai_spend_periods` and `ai_spend_days` stays too, and `ai_spend_reservations.document_id` and a later document's `duplicate_of` become null. If removing the file fails, it stops before deleting the row and returns 500, so it is safe to run again. Returns 204. |
@@ -731,26 +732,35 @@ keeps the period end on the subscription's item.
 user. Owners and members see the plan, the pages from `get_page_allowance`, each plan's limits and
 price from `get_plan_limits` and the test-mode notice; only an owner gets Upgrade or "Manage or
 cancel", and a Pro plan set to end shows the date. A completed Checkout returns to
-`/billing?checkout=success&workspace=<workspace id>`. On every return the page takes the marker and
-the workspace out with `router.replace('/billing')`, so the router and the history entry drop them
-too and a reload, a workspace switch or a rename runs no timer. The server component acts on the
-return only when the marker is `checkout=success`, its `workspace` is the current workspace and the
-viewer is an owner of it (`checkoutReturn` in `src/lib/billing/plan.ts`). Then the page re-reads the
+`/billing?checkout=success&workspace=<workspace id>&session_id=<session id>`. On every return the
+page takes the marker, the workspace and the session id out with `router.replace('/billing')`, so the
+router and the history entry drop them too and a reload, a workspace switch or a rename runs no timer.
+The server component acts on the return only when the marker is `checkout=success`, its `workspace` is
+the current workspace, the viewer is an owner of it and it names one `session_id` (`checkoutReturn` in
+`src/lib/billing/plan.ts`).
+
+The link alone proves nothing, as it can be opened again from the browser's history after a
+cancellation, so on Free the page first asks `POST /api/billing/checkout-return`, once, showing
+"Checking your plan…" with Upgrade disabled while it answers. On `paid: true` the page re-reads the
 plan through RLS every 2 seconds for at most 20 seconds, and stops once it is Pro; still Free after
-that, it says "Your payment went through. Your plan will update shortly." Every other return, one
-that lands on another workspace, a member's, or a bare `?checkout=success`, is the plain page, with
-no timer and nothing about a payment or about the workspace that paid. A cancelled Checkout returns
-to `/billing`, which runs no timer and shows no message (Lead rulings 6 and 8 on #50).
+that, it says "Your payment went through. Your plan will update shortly." On `paid: false`, a non-200
+answer or a failed request, "Checking your plan…" goes, no message shows, Upgrade is enabled, and the
+view reads the plan once as it does on mount; a failed answer is also logged. A return on Pro makes no
+call. Every other return, one that lands on another workspace, a member's, a bare `?checkout=success`,
+or one naming no session or more than one, is the plain page, with no call, no timer and nothing about
+a payment or about the workspace that paid. A cancelled Checkout returns to `/billing`, which runs no
+timer and shows no message (Lead rulings 6 and 8 on #50, issue 87).
 
 The router rebuilds the view on in-app Back from its cached page, whose plan can be from before a
-webhook, and with no marker. So whenever the view mounts and is not re-reading, it reads the plan and
+webhook, and with no marker. So whenever the view mounts and is not checking a return, it reads the plan and
 the pages once in the browser, through RLS, with the same read the re-reads use, and shows what comes
 back, whichever way the plan moved. This covers owners and members, with or without a return before
 it. That read starts no timer, shows no "Checking your plan…" and no message, and leaves Upgrade
 enabled; if Upgrade is pressed before it lands, the route's 409 answers. A failed read is logged and
 the page keeps what it shows, with no error message. A return the page acts on that finds the workspace
-on Free makes no such read: its re-reads are the only ones. One that finds it already on Pro starts no
-re-reads, so it makes this one read (Lead ruling 9 and choice 23 on #50).
+on Free makes no such read while it asks; if the answer is `paid: true` its re-reads are the only ones,
+and otherwise it makes this one read. One that finds it already on Pro starts no re-reads, so it makes
+this one read (Lead ruling 9 and choice 23 on #50, issue 87).
 
 `src/lib/supabase/server.ts` throws when `NEXT_PUBLIC_SUPABASE_URL` or
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` is unset, and its service-role client (`createServiceRoleClient`,
