@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { signedInClient } from '@/lib/auth/server'
 import { createClient } from '@/lib/supabase/server'
 import { setCurrentWorkspace } from '@/lib/workspace/server'
+import { NAME_TOO_LONG, nameTooLong } from '@/lib/workspace/name'
 
 // Workspace switch, create and rename (PRD US-8.1 AC-3 and AC-4, OQ-17), and sign-out (US-9.1
 // AC-2). Each runs as the signed-in user: RLS and create_workspace() decide what is allowed, and
@@ -13,13 +14,6 @@ import { setCurrentWorkspace } from '@/lib/workspace/server'
 export interface FormState {
   error?: string
   ok?: boolean
-}
-
-const NAME_TOO_LONG = 'Use 100 characters or fewer for the workspace name.'
-
-// Counts code points, as char_length does in the database's check on workspaces.name.
-function nameTooLong(name: string) {
-  return Array.from(name).length > 100
 }
 
 export async function switchWorkspace(id: string): Promise<void> {
@@ -55,7 +49,8 @@ export async function renameWorkspace(_prev: FormState, formData: FormData): Pro
 
   // RLS lets only an owner update the row, so a member's rename changes nothing and returns no row.
   const { data, error } = await supabase.from('workspaces').update({ name }).eq('id', id).select('id')
-  if (error || !data?.length) return { error: 'Only an owner can rename this workspace.' }
+  if (error) return { error: 'The workspace could not be renamed. Try again.' }
+  if (!data?.length) return { error: 'Only an owner can rename this workspace.' }
 
   revalidatePath('/', 'layout')
   return { ok: true }
