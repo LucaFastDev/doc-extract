@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
 // Access tests (ARCHITECTURE.md section 4.4) run against the local stack after
@@ -7,6 +8,8 @@ import { defineConfig } from 'vitest/config'
 if (existsSync('.env.local')) process.loadEnvFile('.env.local')
 
 export default defineConfig({
+  // A route handler imports through this alias, and tests/access/billing-routes.test.ts runs one.
+  resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   test: {
     include: ['tests/access/**/*.test.ts'],
     environment: 'node',

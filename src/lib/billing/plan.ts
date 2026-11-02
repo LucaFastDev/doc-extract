@@ -24,17 +24,19 @@ export function planEndDate(plan: WorkspacePlan): string | null {
 type SearchParam = string | string[] | undefined
 
 /**
- * What the billing page does with the return marker in its address (Lead ruling 8 on #50).
- * `spendMarker`: any return takes it out. `actOnReturn`: the re-reads, and the message they can end
- * in, belong only to the workspace that went to Checkout and only to an owner of it; every other
- * return gets the plain page.
+ * What the billing page does with the return marker in its address (Lead ruling 8 on #50, issue 87).
+ * `spendMarker`: any return takes it out, the workspace and the session id with it. `sessionId`, set
+ * only when the page acts on the return: the check with Stripe, the re-reads and the message they can
+ * end in belong only to the workspace that went to Checkout, only to an owner of it, and only to a
+ * return naming one session; every other return gets the plain page.
  */
 export function checkoutReturn(
-  marker: { checkout: SearchParam; workspace: SearchParam },
+  marker: { checkout: SearchParam; workspace: SearchParam; session_id: SearchParam },
   current: { id: string; role: string },
-): { spendMarker: boolean; actOnReturn: boolean } {
+): { spendMarker: boolean; sessionId: string | null } {
   const spendMarker = marker.checkout === 'success'
-  return { spendMarker, actOnReturn: spendMarker && marker.workspace === current.id && current.role === 'owner' }
+  const actOnReturn = spendMarker && marker.workspace === current.id && current.role === 'owner'
+  return { spendMarker, sessionId: actOnReturn && typeof marker.session_id === 'string' ? marker.session_id : null }
 }
 
 /** Pages left this month: never below zero, as after dropping to Free over the allowance (US-11.1 AC-7). */

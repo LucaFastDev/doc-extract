@@ -1,8 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type Stripe from 'stripe'
 
-// Opening Stripe Checkout and the customer portal (ARCHITECTURE.md section 6.2, PRD US-11.1, OQ-20,
-// OQ-24, OQ-37), behind POST /api/billing/checkout and /api/billing/portal. The caller's client
+// Opening Stripe Checkout and the customer portal, and asking Stripe about a return from Checkout
+// (ARCHITECTURE.md section 6.2, PRD US-11.1, OQ-20, OQ-24, OQ-37, issue 87), behind POST
+// /api/billing/checkout, /api/billing/portal and /api/billing/checkout-return. The caller's client
 // reads the workspace and checks is_owner; nothing reaches Stripe, or reads a Stripe setting, until
 // those pass. tests/access/billing-routes.test.ts runs this with real users and a fake Stripe.
 
@@ -19,8 +20,12 @@ export interface CheckoutSettings {
 export interface BillingResult {
   status: 200 | 401 | 403 | 409 | 500
   url?: string
+  paid?: boolean
   error?: string
 }
+
+const SESSION_ID_PREFIX = 'cs_'
+const SESSION_ID_MAX_LENGTH = 255
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -78,6 +83,32 @@ export async function createCheckout(
   } catch (error) {
     console.error('A Checkout session could not be created.', error)
     return { status: 500, error: 'Checkout could not be opened. Try again.' }
+  }
+}
+
+/**
+ * Whether a return from Checkout is a completed Checkout of this workspace whose subscription is still
+ * live, as Stripe has it now. An id that cannot be a session's answers false without asking Stripe.
+ */
+export async function checkCheckoutReturn(
+  workspaceId: unknown,
+  sessionId: unknown,
+  deps: { asCaller: SupabaseClient; stripe: () => CheckoutStripe },
+): Promise<BillingResult> {
+  try {
+    const workspace = await ownedWorkspace(workspaceId, deps.asCaller)
+    if ('status' in workspace) return workspace
+    if (typeof sessionId !== 'string' || !sessionId.startsWith(SESSION_ID_PREFIX) || sessionId.length > SESSION_ID_MAX_LENGTH) {
+      return { status: 200, paid: false }
+    }
+
+    const session = await deps.stripe().checkout.sessions.retrieve(sessionId, { expand: ['subscription'] })
+    const subscription = session.subscription
+    const live = typeof subscription === 'object' && (subscription?.status === 'active' || subscription?.status === 'trialing')
+    return { status: 200, paid: session.status === 'complete' && session.metadata?.workspace_id === workspace.id && live }
+  } catch (error) {
+    console.error('A Checkout session could not be checked.', error)
+    return { status: 500, error: 'The payment could not be checked.' }
   }
 }
 
