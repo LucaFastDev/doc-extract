@@ -17,6 +17,7 @@ const RE_READ_MS = 2_000
 const MAX_RE_READS = 10
 
 const CHECKOUT_PATH = '/api/billing/checkout'
+const CHECKOUT_RETURN_PATH = '/api/billing/checkout-return'
 
 const NO_CONNECTION = 'That did not work. Check your connection and try again.'
 
@@ -32,51 +33,89 @@ async function readPlan(workspaceId: string) {
   return { plan: workspaceRow.data, allowance: allowanceRow.data }
 }
 
+// Whether Stripe has this return as a completed Checkout of the workspace, still live. An answer that
+// is not one is logged, is never shown, and counts as not paid: the page must not claim a payment.
+async function returnIsPaid(workspaceId: string, sessionId: string) {
+  try {
+    const response = await fetch(CHECKOUT_RETURN_PATH, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ workspaceId, sessionId }),
+    })
+    if (response.status !== 200) {
+      console.error('The payment could not be checked.', response.status)
+      return false
+    }
+    const body = await response.json()
+    return body?.paid === true
+  } catch (checkError) {
+    console.error('The payment could not be checked.', checkError)
+    return false
+  }
+}
+
 // The billing page (PRD US-11.1). A button asks its route for a Stripe URL and goes there; a failed
-// call shows its message and leaves the plan as it was. On return from a completed Checkout, whose
-// webhook may not have arrived yet, the page re-reads the plan until it turns Pro or the time is up.
-// Otherwise it reads the plan once when it mounts, so in-app Back shows the plan as it is now.
+// call shows its message and leaves the plan as it was. On a return from Checkout it first asks its
+// route whether Stripe has that Checkout as completed and live. If so, since the webhook may not have
+// arrived yet, the page re-reads the plan until it turns Pro or the time is up. Otherwise it reads the
+// plan once when it mounts, or when the answer is no, so in-app Back shows the plan as it is now.
 export function BillingView({
   workspace,
   isOwner,
-  returnedFromCheckout,
+  sessionId,
   initialPlan,
   initialAllowance,
   plans,
 }: {
   workspace: { id: string; name: string }
   isOwner: boolean
-  returnedFromCheckout: boolean
+  sessionId: string | null
   initialPlan: WorkspacePlan
   initialAllowance: PageAllowance
   plans: Plans
 }) {
   const [plan, setPlan] = useState(initialPlan)
   const [allowance, setAllowance] = useState(initialAllowance)
-  const [reReading, setReReading] = useState(returnedFromCheckout && initialPlan.plan === 'free')
+  const [checkingReturn, setCheckingReturn] = useState(sessionId !== null && initialPlan.plan === 'free')
+  const [reReading, setReReading] = useState(false)
   const [stillFree, setStillFree] = useState(false)
   const [redirecting, setRedirecting] = useState(false)
   const [error, setError] = useState<string>()
 
   // Lead ruling 9 on #50: the router rebuilds this view on in-app Back from its cached page, whose
-  // plan can be from before a webhook. So a view that mounts and is not re-reading reads once and
-  // shows what it gets, with no timer and no message. The ref makes it one read under Strict Mode,
-  // which runs this effect twice on mount; the key on the view means the workspace cannot change
-  // under it, so a late answer is always this workspace's.
-  const readOnMount = useRef(!reReading)
+  // plan can be from before a webhook. So a view that mounts and is not checking a return reads once
+  // and shows what it gets, with no timer and no message, and so does one whose return is not paid.
+  // The ref makes it one read, or one check, under Strict Mode, which runs this effect twice on mount;
+  // the key on the view means the workspace cannot change under it, so a late answer is always this
+  // workspace's. The session id goes from the props when the marker is spent, by then already asked
+  // about.
+  const firstRun = useRef(true)
   useEffect(() => {
-    if (!readOnMount.current) return
-    readOnMount.current = false
-    readPlan(workspace.id)
-      .then((read) => {
-        setPlan(read.plan)
-        setAllowance(read.allowance)
-      })
-      .catch((readError) => {
-        // The page keeps what it shows.
-        console.error('The plan could not be read.', readError)
-      })
-  }, [workspace.id])
+    if (!firstRun.current) return
+    firstRun.current = false
+
+    function readOnce() {
+      readPlan(workspace.id)
+        .then((read) => {
+          setPlan(read.plan)
+          setAllowance(read.allowance)
+        })
+        .catch((readError) => {
+          // The page keeps what it shows.
+          console.error('The plan could not be read.', readError)
+        })
+    }
+
+    if (!checkingReturn || sessionId === null) {
+      readOnce()
+      return
+    }
+    returnIsPaid(workspace.id, sessionId).then((paid) => {
+      setCheckingReturn(false)
+      if (paid) setReReading(true)
+      else readOnce()
+    })
+  }, [workspace.id, sessionId, checkingReturn])
 
   useEffect(() => {
     if (!reReading) return
@@ -178,7 +217,7 @@ export function BillingView({
           <Figure label="Pages left this month" value={`${pagesLeft(allowance)} of ${allowance.workspace_limit}`} />
         </dl>
         {endDate && <p className="text-sm">Your Pro plan ends on {endDate}.</p>}
-        {reReading && (
+        {(checkingReturn || reReading) && (
           <p role="status" className="text-sm text-muted-foreground">
             Checking your plan…
           </p>
@@ -196,7 +235,7 @@ export function BillingView({
         {isOwner && (
           <div>
             {plan.plan === 'free' ? (
-              <Button disabled={redirecting || reReading} onClick={() => goToStripe(CHECKOUT_PATH)}>
+              <Button disabled={redirecting || checkingReturn || reReading} onClick={() => goToStripe(CHECKOUT_PATH)}>
                 Upgrade
               </Button>
             ) : (
@@ -221,8 +260,8 @@ export function BillingView({
   )
 }
 
-// The marker and the workspace it names are spent on every return, acted on or not, so a reload, a
-// workspace switch or a rename shows the plan as it is, with no timer. Through the router, not
+// The marker, the workspace it names and the session id are spent on every return, acted on or not, so
+// a reload, a workspace switch or a rename shows the plan as it is, with no timer. Through the router, not
 // window.history.replaceState: on the first render this effect runs before the router patches
 // history, so that call would blank the entry's router state, which breaks Back to it, and leave the
 // marker in the URL the router keeps using. The view's state, and so its re-reads, carries over: only

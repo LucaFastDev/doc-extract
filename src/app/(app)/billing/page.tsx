@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: 'Billing · doc-extract' }
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ checkout?: string | string[]; workspace?: string | string[] }>
+  searchParams: Promise<{ checkout?: string | string[]; workspace?: string | string[]; session_id?: string | string[] }>
 }) {
   const { supabase, current } = await getWorkspaceContext()
   if (!current) return null
@@ -31,8 +31,8 @@ export default async function BillingPage({
   if (allowanceError) throw allowanceError
 
   const plans = await loadPlans(supabase)
-  const { checkout, workspace } = await searchParams
-  const { spendMarker, actOnReturn } = checkoutReturn({ checkout, workspace }, current)
+  const { checkout, workspace, session_id } = await searchParams
+  const { spendMarker, sessionId } = checkoutReturn({ checkout, workspace, session_id }, current)
 
   return (
     <>
@@ -41,7 +41,7 @@ export default async function BillingPage({
         key={current.id}
         workspace={{ id: current.id, name: current.name }}
         isOwner={current.role === 'owner'}
-        returnedFromCheckout={actOnReturn}
+        sessionId={sessionId}
         initialPlan={plan}
         initialAllowance={allowance}
         plans={plans}
