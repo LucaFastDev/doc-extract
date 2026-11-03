@@ -1,8 +1,8 @@
 import type { Decimal } from './decimal.ts'
-import { dateCheck, formulaCheck, lineProductCheck, subtotalCheck, type CheckContext } from './checks.ts'
+import { dateCheck, formulaCheck, lineProductCheck, lineSumCheck, subtotalCheck, type CheckContext } from './checks.ts'
 import { checkU1, duplicateKey, type DuplicateKey } from './duplicate.ts'
 import type { DocTypeDef } from './doctype.ts'
-import { COMMON_FIELDS, recordTool, type CheckResult, type DocumentValues, type FieldDef } from './fields.ts'
+import { COMMON_FIELDS, read, recordTool, type CheckResult, type DocumentValues, type FieldDef } from './fields.ts'
 
 // The receipt type (PRD section 4.1 Receipt): its fields, its tool record_receipt, and its checks
 // A1 to A3, D1 and U1. card_last4 keeps only its last four characters (OQ-29, index.ts).
@@ -47,12 +47,29 @@ export function checkA1(v: DocumentValues, tolerance: Decimal): CheckResult {
   return lineProductCheck('A1', v, tolerance)
 }
 
-/** A2: the line amounts sum to the subtotal. */
+/**
+ * A2: the line amounts sum to the subtotal, or to the total (2026-11-03): many receipts print line
+ * amounts that include VAT. A subtotal that is printed and not matched fails with the subtotal
+ * message unless the lines match the total; an unreadable subtotal fails either way. With no
+ * subtotal printed, a total the lines do not match is still Skipped.
+ */
 export function checkA2(v: DocumentValues, tolerance: Decimal): CheckResult {
-  return subtotalCheck('A2', v, tolerance)
+  const bySubtotal = subtotalCheck('A2', v, tolerance)
+  if (bySubtotal.status === 'pass') return bySubtotal
+  if (read(v.fields.subtotal).state === 'invalid') return bySubtotal
+  const byTotal = lineSumCheck('A2', v, tolerance, {
+    column: 'amount',
+    total: 'total',
+    kind: 'amount',
+    columnLabel: 'amount',
+    totalLabel: 'total',
+    lineLabel: 'line',
+    linesLabel: 'line items',
+  })
+  return byTotal.status === 'pass' ? byTotal : bySubtotal
 }
 
-/** A3: subtotal + tax_total + tip = total. */
+/** A3: subtotal + tax_total + tip = total. A tip that is not printed counts as zero. */
 export function checkA3(v: DocumentValues, tolerance: Decimal): CheckResult {
   return formulaCheck(
     'A3',
@@ -61,7 +78,7 @@ export function checkA3(v: DocumentValues, tolerance: Decimal): CheckResult {
     { name: 'subtotal', label: 'subtotal' },
     [
       { name: 'tax_total', label: 'tax', sign: '+' },
-      { name: 'tip', label: 'tip', sign: '+' },
+      { name: 'tip', label: 'tip', sign: '+', optional: true },
     ],
     { name: 'total', label: 'total' },
   )
