@@ -43,6 +43,9 @@ domain (OQ-27). `<site>` below means that address.
       next deployment. Pass: the landing page footer on `<site>` shows a Portfolio link to that URL.
 - [ ] **Vercel project**: Settings → Git: the production branch is `main`; Settings → Build: the
       framework preset is Next.js. Pass: the latest production deploy was built from `main`.
+- [ ] **Only `main` deploys**: `vercel.json` turns off Git deployments for every branch except
+      `main`. Check: the checks of any open PR. Pass: a PR has no `Vercel` check, and a merge to
+      `main` starts a production deployment.
 - [ ] **No secret in the browser**: on `<site>`, open the browser's developer tools, search the
       loaded JavaScript for `service_role`, `sk_test_` and `whsec_`. Pass: none is found.
 - [ ] **Edge Function secrets**: `supabase secrets list --project-ref <prod ref>` (or dashboard →
