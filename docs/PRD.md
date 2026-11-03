@@ -136,7 +136,11 @@ fits how I use it. The field sets are in section 4.
 - AC-2: A check that fails flags each field it names, with a reason that says what did not add up
   (for example "Line items sum to 1,180.00; subtotal is 1,200.00").
 - AC-3 (**OQ-43**): A check whose inputs are empty (for example no tax printed) is recorded as
-  "Skipped", not as passed or failed.
+  "Skipped", not as passed or failed. The exception (operator's ruling of 2026-11-03): a tip
+  (receipt A3), a discount or shipping (invoice A3), shipping (purchase order A3) and a discount
+  (quote A3) that are not printed count as zero, so the check runs and its message leaves the term
+  out; an optional amount that is printed but is not an amount still fails. Tax, subtotal and total
+  stay required.
 - AC-4 (**OQ-7**): Arithmetic checks treat two amounts as equal when they differ by at most 0.01
   in the document's currency, or by at most 1 for a currency without decimals (ISO 4217 minor
   unit 0, such as JPY).
@@ -463,7 +467,8 @@ Checks:
 
 - A1 each line: quantity × unit_price = amount
 - A2 sum of line amounts = subtotal
-- A3 subtotal − discount_total + shipping + tax_total = total
+- A3 subtotal − discount_total + shipping + tax_total = total (a discount or shipping that is not
+  printed counts as zero, 2026-11-03)
 - A4 total − amount_paid = amount_due
 - D1 invoice_date is not in the future
 - D2 due_date ≥ invoice_date
@@ -484,8 +489,12 @@ Line items: `description`, `quantity`, `unit_price`, `amount`.
 Checks:
 
 - A1 each line: quantity × unit_price = amount
-- A2 sum of line amounts = subtotal
-- A3 subtotal + tax_total + tip = total
+- A2 sum of line amounts = subtotal, or = total (many receipts print line amounts that include
+  VAT; operator's ruling of 2026-11-03). With no line items, or a line with no amount, it is
+  Skipped; a printed subtotal that the lines match passes; a printed total that the lines match
+  passes; a printed subtotal that neither matches fails, naming the subtotal; with no subtotal
+  printed and no match it is Skipped; an unreadable subtotal or line amount fails
+- A3 subtotal + tax_total + tip = total (a tip that is not printed counts as zero, 2026-11-03)
 - D1 transaction_date is not in the future
 - U1 duplicate: same merchant, transaction_date, transaction_time and total
 
@@ -530,7 +539,8 @@ Checks:
 
 - A1 each line: quantity × unit_price = amount
 - A2 sum of line amounts = subtotal
-- A3 subtotal + shipping + tax_total = total
+- A3 subtotal + shipping + tax_total = total (shipping that is not printed counts as zero,
+  2026-11-03)
 - D1 order_date is not in the future
 - D2 requested_delivery_date ≥ order_date
 - U1 duplicate: same buyer and po_number
@@ -572,7 +582,8 @@ Checks:
 
 - A1 each line: quantity × unit_price = amount
 - A2 sum of line amounts = subtotal
-- A3 subtotal − discount_total + tax_total = total
+- A3 subtotal − discount_total + tax_total = total (a discount that is not printed counts as zero,
+  2026-11-03)
 - D1 quote_date is not in the future
 - D2 valid_until ≥ quote_date
 - U1 duplicate: same supplier and quote_number
@@ -793,7 +804,15 @@ directed. Each entry gives the answer and where it is applied.
 41. **OQ-41 Dark theme.** As drafted: light theme only. Applied: US-17.1 AC-4, section 9.
 42. **OQ-42 Several files at once.** Yes, at most 10 files per upload. Applied: US-1.1 AC-4,
     section 5.
-43. **OQ-43 Checks with missing inputs.** As drafted: "Skipped". Applied: US-4.1 AC-3.
+43. **OQ-43 Checks with missing inputs.** As drafted: "Skipped". Changed by the operator on
+    2026-11-03: a tip, discount or shipping that is not printed counts as zero in the A3 that
+    names it (receipt, invoice, purchase order, quote), and a receipt's A2 also passes when the
+    lines match the total. Tax, subtotal and total stay required. Applied: US-4.1 AC-3, section 4
+    (receipt A2, A3 of the four types). Ruling of 2026-11-03 on documents extracted before this
+    change: stored check results are not recalculated in bulk and there is no migration. The
+    stored row of a document already extracted stays until it is approved or re-extracted. A
+    Needs review document opened after the change shows the current rules' result through the
+    live re-check (OQ-44), and approval stores that result.
 44. **OQ-44 Review screen details.** As drafted: live re-check, all pages and zoom, add and delete
     line items, original value beside the correction, approver and time shown. Applied: US-4.1
     AC-7, US-5.1 AC-1, AC-4 and AC-6.

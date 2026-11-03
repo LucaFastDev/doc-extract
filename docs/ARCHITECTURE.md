@@ -793,7 +793,18 @@ milestone 7) throws when `SUPABASE_SERVICE_ROLE_KEY` is unset.
    today's UTC date (OQ-6), compute flags (`low_confidence`, `check_failed`, and
    `currency_guessed` on `currency` when `currency_as_printed` is empty or only a symbol in
    `AMBIGUOUS_CURRENCY_SYMBOLS`, never for a delivery note, OQ-16), and the U1 key. U1 as the
-   function builds it passes, or is skipped when a key field is empty (OQ-43). In the key, names
+   function builds it passes, or is skipped when a key field is empty (OQ-43). An arithmetic check
+   is skipped on an empty input too, with two exceptions the operator ruled on 2026-11-03: in
+   `formulaCheck` (`shared/doctypes/checks.ts`) a term marked `optional` counts as zero when not
+   printed (receipt `tip`, invoice `discount_total` and `shipping`, purchase order `shipping`,
+   quote `discount_total`) and is left out of the failure message, though an unreadable one still
+   fails and `field_paths` still names it; and a receipt's A2 (`shared/doctypes/receipt.ts`) passes
+   when the line amounts match the subtotal or the total. The review screen's live re-check and
+   `approve-document` call the same functions. Ruling of 2026-11-03 on a document extracted
+   before a rule change: stored check results are not recalculated in bulk and there is no
+   migration; the stored row stays until the document is approved or re-extracted; a Needs
+   review document opened after the change shows the current rules' result through the live
+   re-check (OQ-44), and approval stores that result. In the key, names
    and numbers are lower cased and lose all whitespace and punctuation, and an amount part is the
    exact decimal with leading zeros and trailing fractional zeros dropped and the point kept
    (11.80 becomes 11.8, 1180 stays 1180; Lead ruling on amount key fields,

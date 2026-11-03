@@ -63,7 +63,7 @@ export function checkA3(v: DocumentValues, tolerance: Decimal): CheckResult {
     tolerance,
     { name: 'subtotal', label: 'subtotal' },
     [
-      { name: 'shipping', label: 'shipping', sign: '+' },
+      { name: 'shipping', label: 'shipping', sign: '+', optional: true },
       { name: 'tax_total', label: 'tax', sign: '+' },
     ],
     { name: 'total', label: 'total' },
