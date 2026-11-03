@@ -27,6 +27,9 @@ domain (OQ-27). `<site>` below means that address.
 |---|---|---|---|
 | | | | |
 
+Note, 2026-11-03: stage 1 only, not a full run, from commit `a043d72`. The production Supabase
+project ref is `zkoznfvpskqgjgupelac`, region `eu-west-1`.
+
 ## Environment and secrets
 
 - [ ] **Vercel project**: Vercel → the doc-extract project → Settings → Environment Variables →
@@ -41,7 +44,7 @@ domain (OQ-27). `<site>` below means that address.
       Production holds `NEXT_PUBLIC_PORTFOLIO_URL`, the operator's portfolio URL (an `https://`
       address; it is public, so it is not marked Sensitive). A changed value takes effect on the
       next deployment. Pass: the landing page footer on `<site>` shows a Portfolio link to that URL.
-- [ ] **Vercel project**: Settings → Git: the production branch is `main`; Settings → Build: the
+- [x] **Vercel project**: Settings → Git: the production branch is `main`; Settings → Build: the
       framework preset is Next.js. Pass: the latest production deploy was built from `main`.
 - [ ] **Only `main` deploys**: `vercel.json` turns off Git deployments for every branch except
       `main`. Check: the checks of any open PR. Pass: a PR has no `Vercel` check, and a merge to
@@ -89,7 +92,7 @@ domain (OQ-27). `<site>` below means that address.
 
 ## Supabase project settings
 
-- [ ] Migrations: production's history matches the repo (`supabase migration list` shows no
+- [x] Migrations: production's history matches the repo (`supabase migration list` shows no
       local-only row).
 - [ ] Extensions: dashboard → Database → Extensions shows `pgmq`, `pg_cron` and `pg_net` enabled.
 - [ ] The `extract` queue: SQL editor, `select queue_name from pgmq.list_queues()`. Pass: `extract`
@@ -122,12 +125,12 @@ domain (OQ-27). `<site>` below means that address.
       every user has a profile and owns at least their personal workspace.
 - [ ] Auth → no custom SMTP is configured and no captcha is enabled: the app sends no email and has
       no captcha (OQ-19, OQ-33).
-- [ ] Storage: dashboard → Storage shows bucket `documents` (**not public**, file size limit 10 MB,
+- [x] Storage: dashboard → Storage shows bucket `documents` (**not public**, file size limit 10 MB,
       allowed MIME types `application/pdf`, `image/jpeg`, `image/png`, `image/webp`; OQ-4) and
       bucket `demo` (**not public**, the same limits; read through its select policy
       `demo_objects_select` only, with no insert, update or delete policy). Pass: opening a `documents`
       or `demo` object URL without a signed token returns an error.
-- [ ] Storage: the `demo` bucket holds one file per published `demo_documents` row (`select slug,
+- [x] Storage: the `demo` bucket holds one file per published `demo_documents` row (`select slug,
       file_path from demo_documents where published`). Pass: every sample's file opens on its
       `/demo/<slug>` page while signed out.
 - [ ] Storage policies on `documents` (section 5): SQL editor, `select policyname, cmd, roles from
@@ -265,7 +268,7 @@ secret and the two Vault entries `process-queue` already reads (Environment and 
       AI limit is reached…" or "This month's AI limit is reached…" only while a limit is reached.
       `get_budget_status()` answers signed-in users only, so the SQL editor, which has no user,
       gets "sign in to see the AI budget" from it.
-- [ ] Pass: in a private window, signed out, `<site>` and `<site>/demo` work, and the browser's
+- [x] Pass: in a private window, signed out, `<site>` and `<site>/demo` work, and the browser's
       network panel shows no request to `get_budget_status`.
 
 ## Demo
@@ -275,7 +278,7 @@ as anon from `demo_documents` and the private `demo` bucket (sections 4.2, 5 and
 arrive with the migration `20261031193713_demo.sql`; the files do not, so the operator uploads them
 once (Lead ruling 2 on #41).
 
-- [ ] **Upload the sample files**: from the release's commit, upload the seven files in the repo
+- [x] **Upload the sample files**: from the release's commit, upload the seven files in the repo
       folder `demo/samples/` to the production `demo` bucket, each at its own name, which is its
       `file_path` (`invoice-total-mismatch.pdf`, `invoice-duplicate.pdf`, `receipt-photo.png`,
       `bank-statement.pdf`, `purchase-order.pdf`, `delivery-note.pdf`, `quote-date-error.pdf`):
@@ -317,10 +320,10 @@ Google is the only sign-in method (OQ-19, OQ-21).
 
 ## Site address
 
-- [ ] `<site>` loads over HTTPS, and a deep link such as `<site>/demo` loads its page, not a 404.
+- [x] `<site>` loads over HTTPS, and a deep link such as `<site>/demo` loads its page, not a 404.
 - [ ] The landing page links to the repo and to the operator's portfolio, and shows the plans and
       their page limits while signed out (OQ-27).
-- [ ] `<site>/privacy` and `<site>/terms` load while signed out (OQ-30).
+- [x] `<site>/privacy` and `<site>/terms` load while signed out (OQ-30).
 
 ## Invitation links
 
@@ -328,7 +331,7 @@ An owner's invitation is a link `<site>/invite/<token>`, shown once and passed o
 sends no email (OQ-19). The server builds it from `SITE_URL` (section 12), so a wrong value hands
 out links to the wrong place, and an unset one makes creating an invitation fail.
 
-- [ ] Vercel → the doc-extract project → Settings → Environment Variables → Production:
+- [x] Vercel → the doc-extract project → Settings → Environment Variables → Production:
       `SITE_URL` is exactly `<site>`: `https://`, the production address, no path, and not a
       preview or per-deployment `*.vercel.app` address, `localhost` or `127.0.0.1`. A changed value
       takes effect on the next deployment. Pass: the value shown is `<site>`.
@@ -398,7 +401,7 @@ This app takes **no real payments**. Every item here checks that only test mode 
 
 ## Scheduled jobs
 
-- [ ] SQL editor, `select jobname, schedule, active from cron.job`. Pass: `process-queue` (every 10
+- [x] SQL editor, `select jobname, schedule, active from cron.job`. Pass: `process-queue` (every 10
       seconds), `purge-files` (daily at 03:00 UTC) and `cron-history-cleanup` (daily at 03:30 UTC)
       are listed and `active`.
 - [ ] `process-queue` job runs reach the function: SQL editor, `select status_code, content,
