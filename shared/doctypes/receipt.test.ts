@@ -146,6 +146,17 @@ describe('A2: sum of line amounts = subtotal, or = total (2026-11-03)', () => {
     expect(checkA2(receipt({}, lines), CENT).field_paths).toEqual(['line_items[0].amount', 'line_items[1].amount', 'subtotal'])
   })
 
+  it('passes with no subtotal printed when the lines match the printed total', () => {
+    expect(checkA2(receipt({ subtotal: null, total: '9.80' }, lines), CENT)).toMatchObject({ status: 'pass', message: null })
+  })
+
+  it('reports the line amounts and the total as field paths on a pass by the total', () => {
+    const withVat = [line('2', '3.85', '7.70'), line('1', '3.08', '3.08')] // sum 10.78
+    const result = checkA2(receipt({ subtotal: '9.80', tax_total: '0.98', tip: null, total: '10.78' }, withVat), CENT)
+    expect(result.status).toBe('pass')
+    expect(result.field_paths).toEqual(['line_items[0].amount', 'line_items[1].amount', 'total'])
+  })
+
   it('applies the tolerance to the match with the total', () => {
     const off = [line('1', '10.79', '10.79')]
     expect(checkA2(receipt({ subtotal: '9.80', total: '10.78' }, off), CENT).status).toBe('pass')

@@ -75,7 +75,7 @@ describe('A2: sum of line amounts = subtotal', () => {
 })
 
 describe('A3: subtotal − discount_total + tax_total = total', () => {
-  it('passes, fails with the formula, and is skipped with no discount printed', () => {
+  it('passes, and fails with the formula', () => {
     expect(checkA3(quote(), CENT)).toEqual({
       check_id: 'A3',
       status: 'pass',
