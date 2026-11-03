@@ -808,7 +808,11 @@ directed. Each entry gives the answer and where it is applied.
     2026-11-03: a tip, discount or shipping that is not printed counts as zero in the A3 that
     names it (receipt, invoice, purchase order, quote), and a receipt's A2 also passes when the
     lines match the total. Tax, subtotal and total stay required. Applied: US-4.1 AC-3, section 4
-    (receipt A2, A3 of the four types).
+    (receipt A2, A3 of the four types). Ruling of 2026-11-03 on documents extracted before this
+    change: stored check results are not recalculated in bulk and there is no migration. The
+    stored row of a document already extracted stays until it is approved or re-extracted. A
+    Needs review document opened after the change shows the current rules' result through the
+    live re-check (OQ-44), and approval stores that result.
 44. **OQ-44 Review screen details.** As drafted: live re-check, all pages and zoom, add and delete
     line items, original value beside the correction, approver and time shown. Applied: US-4.1
     AC-7, US-5.1 AC-1, AC-4 and AC-6.
