@@ -41,8 +41,10 @@ File names below are in `screenshots/`; each has a `-desktop.png` (1440×900 vie
 
 Messages are quoted word for word from the app. A word in square brackets, such as [file], is filled in
 by the app. The menus, dialogs, refusals and failure messages described below are not in the screenshots
-except where named; design them in the same system. The app has no error page of its own: a page whose
-data cannot be read when it loads has no wording from this app.
+except where named; design them in the same system. Many refusals appear only on a page that has gone out
+of date, because another member, another tab or the 7-day deletion changed something after it loaded. The
+app has no error page of its own: a page whose data cannot be read when it loads has no wording from this
+app.
 
 ### Shared header (every signed-in page)
 
@@ -60,12 +62,14 @@ data cannot be read when it loads has no wording from this app.
   workspace, **Rename workspace** and **Delete workspace** (shown as destructive). The switcher is
   disabled while a switch runs. A failed switch or sign-out has no message of its own.
 - **Create workspace dialog:** title "Create workspace"; "You will be its owner, and it opens once
-  created."; field "Name"; button "Create". Refusals under the field: "Enter a name for the workspace.",
-  "Use 100 characters or fewer for the workspace name.", "The workspace could not be created. Try again."
+  created."; field "Name"; button "Create". The browser's own check stops an empty name. Refusals under the field: "Enter a
+  name for the workspace." (a name of only spaces), "Use 100 characters or fewer for the workspace name.",
+  "The workspace could not be created. Try again."
 - **Rename workspace dialog (owner):** title "Rename workspace"; "Every member sees the new name."; field
-  "Name" holding the current name; button "Save". Refusals under the field: "Enter a name for the
-  workspace.", "Use 100 characters or fewer for the workspace name.", "The workspace could not be
-  renamed. Try again.", "Only an owner can rename this workspace."
+  "Name" holding the current name; button "Save". The browser's own check stops an empty name. Refusals
+  under the field: "Enter a name for the workspace." (a name of only spaces), "Use 100 characters or fewer
+  for the workspace name.", "The workspace could not be renamed. Try again.", "Only an owner can rename
+  this workspace." (an owner made a member while the page was open)
 - **Delete workspace dialog (owner):** title "Delete workspace"; "This deletes [workspace] for everyone:
   its documents, files, results, history, invitations and members. An active Pro subscription is cancelled
   at once. This cannot be undone."; field "Type [workspace] to confirm"; buttons "Cancel" and "Delete
@@ -88,8 +92,8 @@ data cannot be read when it loads has no wording from this app.
 - **Does:** reads what it is, opens the demo, signs in, or follows a footer link.
 - **Elements:** headline "Business documents in, checked data out"; intro paragraph; primary button
   "Try the demo" with "No sign-up. Sample documents, nothing saved."; secondary button "Sign in"; "How it
-  works" (three steps: Upload, Check, Approve and export); "Six document types"; "Measured accuracy" (a
-  sentence on how it is measured, then "The first accuracy run has not been published yet.", as in the
+  works" (three steps: Upload, Check, Approve and export); "Six document types"; "Measured accuracy" (two
+  sentences on how it is measured, then "The first accuracy run has not been published yet.", as in the
   screenshots; once results are published, one table per model with the columns Document type, Header
   fields, Line items and Target, one row per type, and under it "Run on [date] with [model]."); "Plans"
   (Free: 20 pages a month per workspace, $0; Pro: 500 pages a month per workspace, $19 a month) with three
@@ -108,14 +112,15 @@ data cannot be read when it loads has no wording from this app.
   workspace is made for you on first sign-in." and the button "Continue with Google", disabled while
   Google is being opened; Privacy and Terms links.
 - **Failures:** "Sign-in did not complete. Try again." above the button, on coming back from Google
-  without a session. "Google sign-in could not start. Try again." under the button, which works again.
+  without a session. The code also holds "Google sign-in could not start. Try again." for under the
+  button, but no person meets it today: the sign-in library never returns the error that would show it.
 - **Screenshots:** `sign-in-default-desktop.png`, `sign-in-default-phone.png`
 
 ### Demo: sample list `/demo`
 
 - **For:** trying the product without an account. Nothing is saved and no AI is called.
 - **Does:** reads the seven samples and opens one, or signs in to use their own documents. A signed-in
-  visitor goes to their documents instead.
+  visitor sees the same samples, and the panel's button goes to their documents instead.
 - **Elements:** a header with the links "doc-extract" (to the landing page) and "Demo" (to this page);
   title "Try doc-extract on sample documents" and explanation; seven sample cards, each with a title,
   document type and page count, a one-line summary of what it shows (a failed total, a duplicate, low
@@ -123,8 +128,8 @@ data cannot be read when it loads has no wording from this app.
   says "Uploading your own needs an account, with up to 10 pages per account. Sign in with Google to make
   one." with the button "Sign in with Google". Signed in, it says "You are signed in: upload your own
   documents from your document list." with the button "Go to your documents".
-- **Failures:** "Google sign-in could not start. Try again." under the sign-in button. The list has no
-  empty message of its own.
+- **Failures:** none. This is the Sign-in page's button, whose failure message no person meets today (see
+  Sign-in). The list has no empty message of its own.
 - **Screenshots:** `demo-sample-list-desktop.png`, `demo-sample-list-phone.png`
 
 ### Demo: a sample with a failed check `/demo/invoice-total-mismatch`
@@ -165,28 +170,32 @@ The home of a signed-in user. Three screenshots show its states. Owners and memb
 - **Elements:** title "Documents"; "Export" button; **upload area** (drop zone with the limits text "Drop
   up to 10 files here, or choose them. PDF, JPEG, PNG or WebP. PDFs at most 10 MB, images at most 7.5 MB,
   and 10 pages each.", "Choose files" button, "Files are deleted 7 days after upload.", the pages-left line
-  "[n] of your account’s 10 pages left · [n] of this workspace’s 20 pages left this month", whose first part
-  is absent when the account limit is off, and the AI budget line "$3.40 of $10 used this month"); then
-  either the empty message "No documents in [workspace] yet." or the table.
+  "[n] of your account’s [m] pages left · [n] of this workspace’s [m] pages left this month" (10 and 20 in the
+  screenshots), whose first part is absent when the account limit is off, and the AI budget line "[spent] of
+  [cap] used this month" ("$3.40 of $10" in the screenshots, a figure set up for them)); then either the empty
+  message "No documents in [workspace] yet." or the table.
 - **Upload area, other states:** a drag-over state of the drop zone. While uploading, "Uploading [n] of
   [total]…", with Choose files disabled and drops ignored. "Couldn't update pages left. Reload the page to
   see the current count." when the line could not be refreshed after an upload. The budget line adds, while
   a limit is reached, "Today's AI limit is reached. Waiting documents resume at [time]." or "This month's AI
   limit is reached. Waiting documents resume on [date]."; it is hidden when the budget cannot be read.
 - **Upload refused before anything is uploaded,** one or a list, always ending "Nothing was uploaded.":
-  "Choose at least one file.", "You can upload at most 10 files at once.", "[file] is not a PDF, JPEG, PNG or
+  "Choose at least one file." (on dropping something that holds no file), "You can upload at most 10 files at
+  once.", "[file] is not a PDF, JPEG, PNG or
   WebP file. Accepted types: PDF, JPEG, PNG and WebP.", "[file] is over the 7.5 MB limit for images.", "[file]
   is over the 10 MB limit.", "[file] is empty."
-- **Upload refused for one file,** while the others go on, one or a list, without that ending: "[file] is not
-  a PDF, JPEG, PNG or WebP file, or its content does not match its type. Accepted types: PDF, JPEG, PNG and
-  WebP.", "[file] is over the 7.5 MB limit for images.", "[file] could not be read as a PDF.", "[file] has [n]
-  pages. A document can have at most 10 pages.", "[file] has [n] pages, but only [m] pages remain of your page
+- **Upload refused for one file,** while the others go on, one or a list, without that ending; a refused file
+  gets no row in the table: "[file] is not a PDF, JPEG, PNG or WebP file, or its content does not match its
+  type. Accepted types: PDF, JPEG, PNG and WebP.", "[file] could not be read as a PDF.", "[file] has [n] pages.
+  A document can have at most 10 pages.", "[file] has [n] pages, but only [m] pages remain of your page
   allowance (this workspace’s monthly allowance and your account’s 10-page limit).", or, with the account
   limit off, "[file] has [n] pages, but only [m] pages remain of this workspace’s monthly page allowance.",
-  "[file] did not finish uploading. Upload it again.", "[file] could not be queued for extraction. Upload it
-  again.", "The upload could not be submitted. Try again.", "Sign in to upload documents.", "No such
-  document.", "You are not a member of this workspace.", and any other failure as "[file] could not be
-  uploaded: [reason]. Try again." or "[file] could not be uploaded. Try again."
+  "[file] did not finish uploading. Upload it again.", "The upload could not be submitted. Try again." (any
+  failure while the file is checked or sent on for extraction), "Sign in to upload documents." and "No such
+  document." (the person signed out, or was removed from the workspace, while that file was uploading), and
+  any other failure as "[file] could not be uploaded: [reason]. Try again.", where the reason is what the
+  database, the file store or the network answered, in their words, such as "not a member of this workspace"
+  on a page left open after being removed or signing out.
 - **Table:** the columns Name, Type, Status and Pages, with a delete (trash) button in each row's Pages cell.
   Type and Pages stay blank until they are known. Statuses: **Queued**, **Processing**, **Waiting for budget**
   (with a reason), **Needs review**, **Approved**, **Failed** (with a reason and a Retry button) and **Not
@@ -219,6 +228,11 @@ The home of a signed-in user. Three screenshots show its states. Owners and memb
   - Upload area with pages left and the budget line, above a short list:
     `documents-upload-area-pages-left-and-budget-desktop.png`,
     `documents-upload-area-pages-left-and-budget-phone.png`
+- **Set up for the all-statuses screenshots, so not what the app writes:** their Waiting for budget row reads
+  "Today's AI limit is reached. Waiting documents resume at 00:00 UTC." The app's only reason for that status is
+  the one quoted under Reasons in the table, so design the row with that. The sentence shown imitates the budget
+  line's notice, and the budget line above it has no notice because the row was set up on its own. On the Not
+  supported row, "This is a cover letter, not a business document." stands in for Claude's reason.
 
 ### Review screen `/documents/[id]`
 
@@ -254,9 +268,8 @@ The most important screen: a person checks what was read against the original an
   **Reopen**; fields are read-only, an empty one showing "—"; no Approve, Add line, line Delete or Change type; a failed check's tick box stays, disabled.
   The document's Delete stays.
 - **Not supported:** the viewer and History stay. In place of Checks and Fields, one panel: the reason ("Not a
-  supported document type: [Claude's reason]", or "This is not a supported document type."), then "If it is one
-  of the six types, change its type to extract it again as that type.", or, once the file is gone, "Its file has
-  been deleted, so its type can no longer be changed."
+  supported document type: [Claude's reason]"), then "If it is one of the six types, change its type to extract it
+  again as that type.", or, once the file is gone, "Its file has been deleted, so its type can no longer be changed."
 - **File deleted after 7 days:** in place of the viewer, "The file was deleted 7 days after upload, on [time].
   Its fields, checks and history are kept."; no Change type.
 - **Not reviewable:** a Queued, Processing, Waiting for budget or Failed document is reached only by its address:
@@ -271,8 +284,8 @@ The most important screen: a person checks what was read against the original an
   count once the extraction succeeds."; a radio list of the six types; buttons "Cancel" and "Change type and
   extract again", the second disabled until a type is chosen. Success opens the document list. Refusals in the
   dialog: "The type of [file] could not be changed. Try again.", "[file] cannot change type: its file has been
-  deleted.", "Only a document that needs review or is not supported can change type.", and the same two allowance
-  refusals as Retry on the document list.
+  deleted.", "Only a document that needs review or is not supported can change type.", and, for a Not supported
+  document, whose pages are held again, the same two allowance refusals as Retry on the document list.
 - **Delete dialog:** as on the document list; success opens the document list.
 - **Refusals at the top of the screen,** after which the stored values come back: "[field] could not be saved. Try
   again.", "[field] could not be saved: the document no longer needs review.", "That change could not be saved.
@@ -320,7 +333,7 @@ The most important screen: a person checks what was read against the original an
 - **Does:** an owner invites someone and copies the link, changes a member's role, removes a member, or
   revokes an invitation. A member only reads the list.
 - **Elements:** title "Members" and "People in [workspace]."; **Invite** button (owner only); **Members** list
-  (name, or "Unknown user" when there is none, e-mail when it differs from the name, "(you)", role); for an owner, a "…" menu on every row but the only
+  (name, e-mail when it differs from the name, "(you)", role); for an owner, a "…" menu on every row but the only
   owner's, with "Make owner" or "Make member", and "Remove from workspace"; for an owner, on the only owner's row,
   "The only owner cannot be removed or made a member: a workspace needs at least one owner."; **Pending
   invitations** (owner only): e-mail, "[role] · expires [date]" and Revoke per invitation, or "No pending
@@ -328,9 +341,10 @@ The most important screen: a person checks what was read against the original an
 - **Invite someone dialog:** title "Invite someone"; "You get a link for one email address. They join by opening
   it signed in with Google as that address."; field "Email address"; radio "Role", Member (chosen at first,
   "Uploads, reviews, approves and exports documents.") or Owner ("Also invites people, manages members and billing,
-  and renames the workspace."); button "Create link". Refusals under the field: "Enter an email address.", "Choose
-  a role.", "Enter a valid email address.", "Only an owner can invite people to this workspace.", "The invitation
-  could not be created. Try again."
+  and renames the workspace."); button "Create link". The browser's own check stops an empty or malformed address.
+  Refusals under the field: "Enter a valid email address." (an address the browser lets through, with no dot in its
+  domain), "Only an owner can invite people to this workspace." (an owner made a member while the page was open),
+  "The invitation could not be created. Try again."
 - **Invitation link dialog:** title "Invitation link"; "Send this link to [email] yourself: no email is sent. It
   works for 7 days, once, and only for that address. It is shown only now."; field "Link" with the link, shown
   **once**; buttons "Done" and "Copy link", which becomes "Copied" with "Link copied.", or on failure shows "Copying
@@ -357,9 +371,10 @@ The most important screen: a person checks what was read against the original an
 - **Back from paying (owner only):** "Checking your plan…" with Upgrade disabled, until the plan shows Pro, or after
   20 seconds "Your payment went through. Your plan will update shortly."
 - **Failures,** under the figures: "That did not work. Check your connection and try again.", "Checkout could not be
-  opened. Try again.", "The customer portal could not be opened. Try again.", "This workspace is already on Pro.",
-  "This workspace has no Stripe customer yet.", "Only an owner of this workspace can manage billing.", "Sign in to
-  manage billing."
+  opened. Try again.", "The customer portal could not be opened. Try again.", "Only an owner of this workspace can
+  manage billing.", "Sign in to manage billing." And on a page showing Free when the workspace is already on Pro, "This
+  workspace is already on Pro.", with Upgrade disabled, while the page reads the plan again; once it reads Pro, the
+  message goes and the page shows Pro. The message stays if that read fails.
 - **Screenshots:** Free `billing-free-plan-desktop.png`, `billing-free-plan-phone.png`; Pro
   `billing-pro-plan-desktop.png`, `billing-pro-plan-phone.png`
 
