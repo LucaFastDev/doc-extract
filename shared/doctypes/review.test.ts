@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { parseDecimal, type Decimal } from './decimal'
 import { DOC_TYPES } from './index'
 import { currentValue, documentValues, listChecks, parseLinePath, recheck, type StoredField } from './review'
 
@@ -50,6 +51,25 @@ describe('recheck', () => {
     expect(result.checks.find((c) => c.check_id === 'A2')).toMatchObject({ status: 'fail' })
     expect(result.flags.subtotal).toEqual(['low_confidence', 'check_failed'])
     expect(result.flags.currency).toEqual([])
+  })
+
+  it('gives the same A2 and A3 as the checks themselves when a tip is not printed and the lines include tax (2026-11-03)', () => {
+    const amount = (path: string, value: string | null) => ({ ...cell(path, value), kind: 'amount' as const })
+    const rows = [
+      amount('subtotal', '9.80'),
+      amount('tax_total', '0.98'),
+      amount('tip', null),
+      amount('total', '10.78'),
+      amount('line_items[0].amount', '10.78'),
+    ]
+    const result = recheck(DOC_TYPES.receipt, rows, { amountTolerance: '0.01', today: '2026-10-31' })
+    const direct = DOC_TYPES.receipt.checks(documentValues(DOC_TYPES.receipt, rows), {
+      tolerance: parseDecimal('0.01') as Decimal,
+      today: '2026-10-31',
+    })
+    expect(result.checks.find((c) => c.check_id === 'A2')).toMatchObject({ status: 'pass' })
+    expect(result.checks.find((c) => c.check_id === 'A3')).toMatchObject({ status: 'pass' })
+    expect(result.checks).toEqual(direct)
   })
 })
 

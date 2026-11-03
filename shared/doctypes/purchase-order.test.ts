@@ -94,7 +94,33 @@ describe('A3: subtotal + shipping + tax_total = total', () => {
       message: null,
     })
     expect(checkA3(order({ total: '940.00' }), CENT).message).toBe('Subtotal 780.00 + shipping 20.00 + tax 160.00 = 960.00; total is 940.00')
-    expect(checkA3(order({ shipping: null }), CENT)).toMatchObject({ status: 'skipped', message: 'Skipped: no shipping is printed.' })
+  })
+
+  it('counts shipping not printed as zero (2026-11-03): passes when it adds up, fails without a shipping term', () => {
+    expect(checkA3(order({ shipping: null, total: '940.00' }), CENT)).toEqual({
+      check_id: 'A3',
+      status: 'pass',
+      field_paths: ['subtotal', 'shipping', 'tax_total', 'total'],
+      message: null,
+    })
+    expect(checkA3(order({ shipping: null, total: '960.00' }), CENT)).toMatchObject({
+      status: 'fail',
+      message: 'Subtotal 780.00 + tax 160.00 = 940.00; total is 960.00',
+    })
+  })
+
+  it('is still skipped with no tax or no subtotal printed, and fails unreadable shipping', () => {
+    expect(checkA3(order({ tax_total: null }), CENT)).toMatchObject({ status: 'skipped', message: 'Skipped: no tax is printed.' })
+    expect(checkA3(order({ shipping: null, tax_total: null }), CENT).status).toBe('skipped')
+    expect(checkA3(order({ subtotal: null }), CENT).status).toBe('skipped')
+    expect(checkA3(order({ shipping: 'free' }), CENT)).toMatchObject({ status: 'fail', message: 'Shipping "free" is not an amount' })
+  })
+
+  it('A2 still fails when the lines match the total and not the subtotal', () => {
+    expect(checkA2(order({ subtotal: '800.00', total: '780.00' }), CENT)).toMatchObject({
+      status: 'fail',
+      message: 'Line items sum to 780.00; subtotal is 800.00',
+    })
   })
 })
 

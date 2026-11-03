@@ -227,10 +227,51 @@ describe('A3: subtotal − discount_total + shipping + tax_total = total', () =>
     })
   })
 
-  it('is skipped when any input is empty: no tax, discount or shipping printed (OQ-43, Lead ruling 4)', () => {
-    for (const empty of ['subtotal', 'discount_total', 'shipping', 'tax_total', 'total']) {
+  it('is skipped when the subtotal, tax or total is not printed (OQ-43, Lead ruling 4)', () => {
+    for (const empty of ['subtotal', 'tax_total', 'total']) {
       expect(checkA3(invoice({ [empty]: null }), CENT), empty).toMatchObject({ status: 'skipped' })
+      expect(checkA3(invoice({ discount_total: null, shipping: null, [empty]: null }), CENT), empty).toMatchObject({ status: 'skipped' })
     }
+  })
+
+  it('counts a discount and shipping not printed as zero (2026-11-03): passes when it adds up', () => {
+    expect(checkA3(invoice({ discount_total: null, shipping: null }), CENT)).toEqual({
+      check_id: 'A3',
+      status: 'pass',
+      field_paths: ['subtotal', 'discount_total', 'shipping', 'tax_total', 'total'],
+      message: null,
+    })
+  })
+
+  it('fails with the unprinted terms left out of the message', () => {
+    expect(checkA3(invoice({ discount_total: null, shipping: null, total: '1430.00' }), CENT)).toMatchObject({
+      status: 'fail',
+      field_paths: ['subtotal', 'discount_total', 'shipping', 'tax_total', 'total'],
+      message: 'Subtotal 1,200.00 + tax 240.00 = 1,440.00; total is 1,430.00',
+    })
+  })
+
+  it('keeps the term that is printed in the formula and the message when only one is not', () => {
+    expect(checkA3(invoice({ discount_total: '100.00', shipping: null, total: '1340.00' }), CENT).status).toBe('pass')
+    expect(checkA3(invoice({ discount_total: '100.00', shipping: null, total: '1400.00' }), CENT)).toMatchObject({
+      status: 'fail',
+      message: 'Subtotal 1,200.00 − discount 100.00 + tax 240.00 = 1,340.00; total is 1,400.00',
+    })
+    expect(checkA3(invoice({ discount_total: null, shipping: '20.00', total: '1460.00' }), CENT).status).toBe('pass')
+    expect(checkA3(invoice({ discount_total: null, shipping: '20.00', total: '1440.00' }), CENT)).toMatchObject({
+      status: 'fail',
+      message: 'Subtotal 1,200.00 + shipping 20.00 + tax 240.00 = 1,460.00; total is 1,440.00',
+    })
+  })
+
+  it('fails a discount or shipping that is printed but not an amount', () => {
+    expect(checkA3(invoice({ discount_total: 'ten' }), CENT)).toMatchObject({ status: 'fail', message: 'Discount "ten" is not an amount' })
+    expect(checkA3(invoice({ shipping: 'free' }), CENT)).toMatchObject({ status: 'fail', message: 'Shipping "free" is not an amount' })
+  })
+
+  it('A2 still fails when the lines match the total and not the subtotal', () => {
+    const v = invoice({ subtotal: '1000.00', total: '1180.00' }, [line(null, null, '1000.00'), line(null, null, '180.00')])
+    expect(checkA2(v, CENT)).toMatchObject({ status: 'fail', message: 'Line items sum to 1,180.00; subtotal is 1,000.00' })
   })
 
   it('treats amounts in a currency with no minor unit as equal within 1 (OQ-7)', () => {
