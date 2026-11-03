@@ -63,7 +63,7 @@ export function checkA2(v: InvoiceValues, tolerance: Decimal): CheckResult {
   return subtotalCheck('A2', v, tolerance)
 }
 
-/** A3: subtotal − discount_total + shipping + tax_total = total. Skipped when any is not printed. */
+/** A3: subtotal − discount_total + shipping + tax_total = total. A discount or shipping not printed counts as zero. */
 export function checkA3(v: InvoiceValues, tolerance: Decimal): CheckResult {
   return formulaCheck(
     'A3',
@@ -71,8 +71,8 @@ export function checkA3(v: InvoiceValues, tolerance: Decimal): CheckResult {
     tolerance,
     { name: 'subtotal', label: 'subtotal' },
     [
-      { name: 'discount_total', label: 'discount', sign: '−' },
-      { name: 'shipping', label: 'shipping', sign: '+' },
+      { name: 'discount_total', label: 'discount', sign: '−', optional: true },
+      { name: 'shipping', label: 'shipping', sign: '+', optional: true },
       { name: 'tax_total', label: 'tax', sign: '+' },
     ],
     { name: 'total', label: 'total' },
