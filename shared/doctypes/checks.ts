@@ -115,9 +115,14 @@ export interface Term {
   name: string
   label: string
   sign: '+' | '−'
+  /** Not printed counts as zero and is left out of the formula and the message (2026-11-03). An unreadable one still fails. */
+  optional?: boolean
 }
 
-/** A check of the form first ± terms… = result over header amounts. Skipped when any is not printed. */
+/**
+ * A check of the form first ± terms… = result over header amounts. Skipped when any is not printed,
+ * except an optional term, which then counts as zero.
+ */
 export function formulaCheck(
   id: string,
   v: DocumentValues,
@@ -130,7 +135,9 @@ export function formulaCheck(
   const field_paths = parts.map((p) => p.name)
   const readings = parts.map((p) => read(v.fields[p.name]))
 
-  const empty = readings.findIndex((r) => r.state === 'empty')
+  // An optional term that is not printed counts as zero; first and result are never optional.
+  const isOptional = (i: number) => i >= 1 && i <= terms.length && terms[i - 1].optional === true
+  const empty = readings.findIndex((r, i) => r.state === 'empty' && !isOptional(i))
   if (empty >= 0) {
     return { check_id: id, status: 'skipped', field_paths, message: `Skipped: no ${parts[empty].label} is printed.` }
   }
@@ -139,17 +146,22 @@ export function formulaCheck(
     return { check_id: id, status: 'fail', field_paths, message: `${capitalised(parts[invalid].label)} "${textOf(readings[invalid])}" is not an amount` }
   }
 
-  const values = readings.map(valueOf)
-  let computed = values[0]
-  terms.forEach((t, i) => {
-    computed = t.sign === '+' ? add(computed, values[i + 1]) : subtract(computed, values[i + 1])
+  // The terms that were printed; a missing optional one is zero and appears nowhere.
+  const printed = terms.flatMap((t, i) => {
+    const r = readings[i + 1]
+    return r.state === 'empty' ? [] : [{ term: t, value: valueOf(r) }]
   })
-  const actual = values[values.length - 1]
+  const first0 = valueOf(readings[0])
+  const actual = valueOf(readings[readings.length - 1])
+  let computed = first0
+  printed.forEach(({ term, value }) => {
+    computed = term.sign === '+' ? add(computed, value) : subtract(computed, value)
+  })
   if (withinTolerance(computed, actual, tolerance)) return { check_id: id, status: 'pass', field_paths, message: null }
 
   const formula = [
-    `${capitalised(first.label)} ${formatAmount(values[0])}`,
-    ...terms.map((t, i) => `${t.sign} ${t.label} ${formatAmount(values[i + 1])}`),
+    `${capitalised(first.label)} ${formatAmount(first0)}`,
+    ...printed.map(({ term, value }) => `${term.sign} ${term.label} ${formatAmount(value)}`),
   ].join(' ')
   return {
     check_id: id,

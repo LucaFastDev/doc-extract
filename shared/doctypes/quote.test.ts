@@ -83,7 +83,33 @@ describe('A3: subtotal − discount_total + tax_total = total', () => {
       message: null,
     })
     expect(checkA3(quote({ total: '1850.00' }), CENT).message).toBe('Subtotal 1,550.00 − discount 50.00 + tax 300.00 = 1,800.00; total is 1,850.00')
-    expect(checkA3(quote({ discount_total: null }), CENT)).toMatchObject({ status: 'skipped', message: 'Skipped: no discount is printed.' })
+  })
+
+  it('counts a discount not printed as zero (2026-11-03): passes when it adds up, fails without a discount term', () => {
+    expect(checkA3(quote({ discount_total: null, total: '1850.00' }), CENT)).toEqual({
+      check_id: 'A3',
+      status: 'pass',
+      field_paths: ['subtotal', 'discount_total', 'tax_total', 'total'],
+      message: null,
+    })
+    expect(checkA3(quote({ discount_total: null, total: '1800.00' }), CENT)).toMatchObject({
+      status: 'fail',
+      message: 'Subtotal 1,550.00 + tax 300.00 = 1,850.00; total is 1,800.00',
+    })
+  })
+
+  it('is still skipped with no tax or no subtotal printed, and fails an unreadable discount', () => {
+    expect(checkA3(quote({ tax_total: null }), CENT)).toMatchObject({ status: 'skipped', message: 'Skipped: no tax is printed.' })
+    expect(checkA3(quote({ discount_total: null, tax_total: null }), CENT).status).toBe('skipped')
+    expect(checkA3(quote({ subtotal: null }), CENT).status).toBe('skipped')
+    expect(checkA3(quote({ discount_total: 'some' }), CENT)).toMatchObject({ status: 'fail', message: 'Discount "some" is not an amount' })
+  })
+
+  it('A2 still fails when the lines match the total and not the subtotal', () => {
+    expect(checkA2(quote({ subtotal: '1500.00', total: '1550.00' }), CENT)).toMatchObject({
+      status: 'fail',
+      message: 'Line items sum to 1,550.00; subtotal is 1,500.00',
+    })
   })
 
   it('treats amounts in a currency with no minor unit as equal within 1 (OQ-7)', () => {
