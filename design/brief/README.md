@@ -1,8 +1,3 @@
-# doc-extract: design brief
-
-Everything Claude Design needs to design doc-extract: this brief, and a screenshot of every page in
-`screenshots/`. All names, addresses, numbers and e-mail addresses in the screenshots are invented.
-
 ## 1. Paste this into Claude Design
 
 ```text
@@ -28,20 +23,16 @@ Then design the pages in the direction I choose.
 
 ## 2. What the app is and who uses it
 
-doc-extract turns business documents into checked, structured data. A person uploads a PDF, a phone
-photo or a scan; Claude reads it and returns every field and line item with a confidence for each.
-The app then **checks** the result (do the lines add up to the subtotal, does the total match, are the
-dates plausible, is it a duplicate) and puts anything doubtful in front of a person first. The person
-corrects values, ticks off failed checks they accept, approves, and exports approved documents as CSV
-or XLSX.
+doc-extract reads business documents (PDFs, phone photos, scans) with Claude and returns structured
+data: header fields, line items and a confidence for every field. It then **checks** the result
+(arithmetic, dates, duplicates) and puts anything doubtful in front of a person first. A person
+approves the result, and approved results export to CSV or XLSX.
 
 - **Users:** small businesses, bookkeepers and freelancers who now retype documents into spreadsheets.
-  Work happens in English; the documents can be in any language and currency.
+  They work in English; their documents can be in any language and currency.
 - **Visitors:** people arriving from the operator's portfolio. They must see the product working in one
-  click, without signing up (the public demo with stored sample results).
-- **Workspaces:** documents live in workspaces shared by a few people; owners also manage members and billing.
-- **Tone:** a trustworthy working tool, calm and precise. Numbers and warnings must be unmistakable.
-- Billing runs in Stripe test mode only; uploaded files are deleted after 7 days.
+  click, without signing up.
+- **Workspaces:** documents live in workspaces shared by a few people, with the roles owner and member.
 
 ## 3. Pages
 
@@ -71,6 +62,7 @@ them in the same system.
 ### Sign-in `/sign-in`
 
 - **For:** getting into the app. Google is the only way in: no password, no e-mail form.
+- **Does:** presses "Continue with Google", or follows the Privacy and Terms links. Nothing else.
 - **Elements:** card "Sign in to doc-extract" with one explanatory sentence and the button "Continue
   with Google"; Privacy and Terms links.
 - **Screenshots:** `sign-in-default-desktop.png`, `sign-in-default-phone.png`
@@ -78,6 +70,7 @@ them in the same system.
 ### Demo: sample list `/demo`
 
 - **For:** trying the product without an account. Nothing is saved and no AI is called.
+- **Does:** reads the seven samples and opens one, or signs in to use their own documents.
 - **Elements:** header "doc-extract · Demo"; title and explanation; seven sample cards, each with a title,
   document type and page count, a one-line summary of what it shows (a failed total, a duplicate, low
   confidence, a date error, and so on) and an arrow; a "Your own documents" panel with "Sign in with
@@ -87,6 +80,8 @@ them in the same system.
 ### Demo: a sample with a failed check `/demo/invoice-total-mismatch`
 
 - **For:** showing the whole review screen on a PDF invoice whose printed total is wrong.
+- **Does:** compares the values with the pages, reads the failed check, ticks it, edits fields and line
+  items, and chooses a format to download. Nothing is saved.
 - **Elements:** back link "Samples"; file name; Type and Pages; the document viewer (all pages, zoom
   − / +); **Checks** list (A3 Failed with its explanation and a "Tick A3" tick box, A4 Skipped, the rest
   Passed); **Export** (XLSX or CSV radio choice and Download); **Flagged fields** (each flagged field
@@ -99,6 +94,7 @@ them in the same system.
 ### Demo: a photographed document `/demo/receipt-photo`
 
 - **For:** showing an image document (a photographed till receipt) with low-confidence fields.
+- **Does:** compares the photo with the values, and edits the two flagged fields.
 - **Elements:** same screen; the viewer shows a photo instead of PDF pages; two fields flagged "Low
   confidence (58%)" and "(66%)"; every check passes.
 - **Screenshots:** `demo-receipt-photo-image-document-desktop.png`,
@@ -108,6 +104,8 @@ them in the same system.
 
 The home of a signed-in user. Three screenshots show its states.
 
+- **Does:** uploads files, sees each document's status change live, opens a document to review it,
+  retries a failed one, deletes a document, and goes to Export.
 - **Elements:** title "Documents"; "Export" button; **upload area** (drop zone with the limits text "Drop
   up to 10 files here, or choose them. PDF, JPEG, PNG or WebP. PDFs at most 10 MB, images at most 7.5 MB,
   and 10 pages each.", "Choose files" button, "Files are deleted 7 days after upload.", the pages-left line
@@ -131,6 +129,8 @@ The home of a signed-in user. Three screenshots show its states.
 
 The most important screen: a person checks what was read against the original and approves it.
 
+- **Does:** compares each value with the document, corrects values, adds or deletes line items, ticks
+  failed checks they accept, approves (or reopens an approved document), changes the type, deletes.
 - **Elements, all states:** back link "Documents"; file name; **Change type** (for Needs review and Not
   supported documents; opens a dialog to choose one of the six types) and **Delete**; Type, Status and
   Pages; the **document viewer** (every page, zoom − / + with the percentage); **Checks**, one entry per
@@ -151,11 +151,15 @@ The most important screen: a person checks what was read against the original an
 - **Screenshots:** needs review `documents-detail-needs-review-failed-check-desktop.png`,
   `documents-detail-needs-review-failed-check-phone.png`; approved `documents-detail-approved-desktop.png`,
   `documents-detail-approved-phone.png`
+- **Known gap in the approved screenshots:** their History shows no "approved" entry, because that
+  state was set up through the database. A real approval writes one (who and when), so the design must
+  still show it.
 
 ### Export `/documents/export`
 
 - **For:** downloading approved documents of one type as XLSX (sheets "Documents" and "Line items") or
   CSV (a zip of `documents.csv` and `line_items.csv`).
+- **Does:** chooses a type, unticks documents to leave out, chooses a format, and downloads.
 - **Elements:** back link; title; description; **Type** radio list with the approved count per type (a
   type with none is disabled); once a type is chosen, a list of its approved documents, all ticked, to
   untick; **Format** radio (XLSX, CSV); **Download** (disabled until a type is chosen). The screenshot shows
@@ -165,6 +169,8 @@ The most important screen: a person checks what was read against the original an
 ### Members `/members`
 
 - **For:** an owner managing who is in the workspace. Members see the list but no controls.
+- **Does:** an owner invites someone and copies the link, changes a member's role, removes a member, or
+  revokes an invitation. A member only reads the list.
 - **Elements:** title and workspace name; **Invite** button; **Members** list (name, e-mail, "(you)",
   role, and for other members a "…" menu to change role or remove; a note that the last owner cannot be
   removed); **Pending invitations** (e-mail, role, expiry, Revoke). Inviting opens a dialog "Invite someone"
@@ -175,6 +181,8 @@ The most important screen: a person checks what was read against the original an
 ### Billing `/billing`
 
 - **For:** seeing the plan and pages left, and (owners only) upgrading or cancelling.
+- **Does:** reads the plan and pages used and left; an owner upgrades to Pro or manages or cancels it.
+  A member can only read.
 - **Elements:** title and workspace name; a notice that billing is a test-mode demonstration (test card
   4242 4242 4242 4242); **Your plan** (Current plan, Pages used this month, Pages left this month "13 of
   20"); **Upgrade** on Free, **Manage or cancel** on Pro; a note when a Pro plan ends at period end;
@@ -185,6 +193,7 @@ The most important screen: a person checks what was read against the original an
 ### Invitation `/invite/[token]`
 
 - **For:** someone who was sent an invitation link. Signed-out visitors are sent to sign-in first.
+- **Does:** accepts the invitation. When it is refused, they can do nothing here.
 - **Elements:** card "Join a workspace" saying who they are signed in as, and **Accept invitation**.
   Refusals (not for this account, expired, already used) appear in place of the button.
 - **Screenshots:** `invite-valid-invitation-desktop.png`, `invite-valid-invitation-phone.png`
@@ -192,11 +201,13 @@ The most important screen: a person checks what was read against the original an
 ### Privacy `/privacy` and Terms `/terms`
 
 - **For:** plain legal text, a few short paragraphs, with links to the home page and the other page.
+- **Does:** reads, and follows the links. Nothing else.
 - **Screenshots:** `privacy-default-desktop.png`, `privacy-default-phone.png`, `terms-default-desktop.png`,
   `terms-default-phone.png`
 
 ### Not found (any unknown address)
 
+- **Does:** goes to the home page with the one button. Nothing else.
 - **Elements:** "Page not found", "This page does not exist or has moved.", button "Go to the home page".
   A document the user cannot open gets a similar page inside the app.
 - **Screenshots:** `not-found-unknown-address-desktop.png`, `not-found-unknown-address-phone.png`
@@ -204,6 +215,8 @@ The most important screen: a person checks what was read against the original an
 ### No workspace
 
 - **For:** a signed-in user who is in no workspace (for example after being removed from the last one).
+- **Does:** creates a workspace by giving it a name, or deletes their account or signs out from the
+  header. Nothing else.
 - **Elements:** "You are not in any workspace." and the button "Create workspace" (opens a dialog asking
   for a name); the header has only Delete account and Sign out.
 - **Screenshots:** `no-workspace-default-desktop.png`, `no-workspace-default-phone.png`
