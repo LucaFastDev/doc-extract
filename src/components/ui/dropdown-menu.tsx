@@ -6,11 +6,31 @@ import { CircleIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
-// The menu's own button, so its content can tell a press on that button from a press anywhere else.
-const TriggerContext = React.createContext<React.RefObject<HTMLButtonElement | null> | null>(null)
+// The menu's own button, so its content can tell a press on that button from a press anywhere else,
+// and whether a key on that button is what opens the menu.
+const TriggerContext = React.createContext<{
+  button: React.RefObject<HTMLButtonElement | null>
+  setOpeningByKey: (value: boolean) => void
+  takeOpeningByKey: () => boolean
+} | null>(null)
 
 function DropdownMenu({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
-  const trigger = React.useRef<HTMLButtonElement>(null)
+  const button = React.useRef<HTMLButtonElement>(null)
+  const openingByKey = React.useRef(false)
+  const trigger = React.useMemo(
+    () => ({
+      button,
+      setOpeningByKey: (value: boolean) => {
+        openingByKey.current = value
+      },
+      takeOpeningByKey: () => {
+        const value = openingByKey.current
+        openingByKey.current = false
+        return value
+      },
+    }),
+    [],
+  )
   return (
     <TriggerContext.Provider value={trigger}>
       <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />
@@ -19,14 +39,33 @@ function DropdownMenu({ ...props }: React.ComponentProps<typeof DropdownMenuPrim
 }
 
 // With asChild, a ref on the child is kept alongside this one.
-function DropdownMenuTrigger({ ...props }: Omit<React.ComponentProps<typeof DropdownMenuPrimitive.Trigger>, 'ref'>) {
+function DropdownMenuTrigger({
+  onKeyDown,
+  onPointerDown,
+  ...props
+}: Omit<React.ComponentProps<typeof DropdownMenuPrimitive.Trigger>, 'ref'>) {
   const trigger = React.useContext(TriggerContext)
-  return <DropdownMenuPrimitive.Trigger ref={trigger} data-slot="dropdown-menu-trigger" {...props} />
+  return (
+    <DropdownMenuPrimitive.Trigger
+      ref={trigger?.button}
+      data-slot="dropdown-menu-trigger"
+      {...props}
+      onKeyDown={(event) => {
+        trigger?.setOpeningByKey(true)
+        onKeyDown?.(event)
+      }}
+      onPointerDown={(event) => {
+        trigger?.setOpeningByKey(false)
+        onPointerDown?.(event)
+      }}
+    />
+  )
 }
 
 function DropdownMenuContent({
   className,
   sideOffset = 4,
+  onFocus,
   onKeyDownCapture,
   onClickCapture,
   onAuxClickCapture,
@@ -34,6 +73,17 @@ function DropdownMenuContent({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
   const trigger = React.useContext(TriggerContext)
+
+  // A menu opens with focus on itself, and Radix passes it on to the first item only if a document
+  // keydown listener has told it the keyboard is in use. That listener is added in an effect after
+  // hydration, so on a slow machine the key that opens the menu can reach the button first, and focus
+  // then stays on the menu (issue #112). So the button's own keydown decides too, once per opening:
+  // later on, focus returns to the menu when the pointer leaves an item, and must stay there.
+  function focusFirstItemAfterKey(event: React.FocusEvent<HTMLDivElement>) {
+    onFocus?.(event)
+    if (event.target !== event.currentTarget || !trigger?.takeOpeningByKey()) return
+    event.currentTarget.querySelector<HTMLElement>('[role^="menuitem"]:not([data-disabled])')?.focus({ preventScroll: true })
+  }
 
   // A closed menu stays on the page until its exit animation ends, and focus stays on its item until
   // then, so a key that selects would run an item the user has just cancelled (issue #100). Stopped
@@ -66,6 +116,7 @@ function DropdownMenuContent({
           className,
         )}
         {...props}
+        onFocus={focusFirstItemAfterKey}
         onKeyDownCapture={ignoreSelectionKeysWhileClosing}
         onClickCapture={(event) => {
           onClickCapture?.(event)
@@ -85,7 +136,7 @@ function DropdownMenuContent({
           onInteractOutside?.(event)
           const { originalEvent } = event.detail
           const inside = originalEvent instanceof FocusEvent || (originalEvent.button === 0 && !originalEvent.ctrlKey)
-          if (inside && trigger?.current?.contains(originalEvent.target as Node)) event.preventDefault()
+          if (inside && trigger?.button.current?.contains(originalEvent.target as Node)) event.preventDefault()
         }}
       />
     </DropdownMenuPrimitive.Portal>
