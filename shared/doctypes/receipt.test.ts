@@ -65,10 +65,9 @@ describe('A1: each line, quantity × unit_price = amount', () => {
   })
 })
 
-describe('A2: sum of line amounts = subtotal, or = total (2026-11-03)', () => {
-  const lines = [line('2', '3.50', '7.00'), line('1', '2.80', '2.80')] // sum 9.80
-
+describe('A2: sum of line amounts = subtotal', () => {
   it('passes, fails saying both sums, and is skipped with no lines or no subtotal', () => {
+    const lines = [line('2', '3.50', '7.00'), line('1', '2.80', '2.80')]
     expect(checkA2(receipt({}, lines), CENT)).toMatchObject({ check_id: 'A2', status: 'pass' })
     expect(checkA2(receipt({ subtotal: '10.80' }, lines), CENT)).toMatchObject({
       status: 'fail',
@@ -77,6 +76,10 @@ describe('A2: sum of line amounts = subtotal, or = total (2026-11-03)', () => {
     expect(checkA2(receipt({}, []), CENT).status).toBe('skipped')
     expect(checkA2(receipt({ subtotal: null }, lines), CENT).status).toBe('skipped')
   })
+})
+
+describe('A2 on a receipt: subtotal or total (2026-11-03)', () => {
+  const lines = [line('2', '3.50', '7.00'), line('1', '2.80', '2.80')] // sum 9.80
 
   // One test for each case of the ruling, in its order.
   it('case 1: no line items is skipped', () => {
