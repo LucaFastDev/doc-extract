@@ -3,9 +3,10 @@ import type { ToolDefinition } from '../../../shared/doctypes/fields.ts'
 
 // The Claude client (ARCHITECTURE.md section 9). process-queue gives it the Messages API of the
 // official SDK; the unit tests give it recorded responses. One call per document: the file as a
-// base64 document or image block, and the tools under tool_choice auto with strict schemas, since
-// Sonnet 5.5 refuses forced tool use (Lead ruling 1 on #24). Exactly one tool call is a result;
-// anything else is invalid output.
+// base64 document or image block, and the tools under tool_choice auto, since Sonnet 5.5 refuses
+// forced tool use (Lead ruling 1 on #24). A single chosen type's tool is strict; the tools sent to
+// detect the type are not (see buildRequest). Exactly one tool call is a result; anything else is
+// invalid output.
 
 /** Stored on every extractions row, so a result can be traced to the prompt that made it. */
 export const PROMPT_VERSION = '2026-10-31.2'
@@ -66,6 +67,9 @@ export class ClaudeError extends Error {
   }
 }
 
+/** A tool as sent: the same definition, without `strict` when the type is being detected. */
+type RequestTool = Omit<ToolDefinition, 'strict'> & { strict?: true }
+
 /** What the client needs of the SDK: messages.create. */
 export interface MessagesApi {
   create(params: ExtractRequest): Promise<unknown>
@@ -75,7 +79,7 @@ export interface ExtractRequest {
   model: string
   max_tokens: number
   system: string
-  tools: ToolDefinition[]
+  tools: RequestTool[]
   tool_choice: { type: 'auto' }
   messages: { role: 'user'; content: Record<string, unknown>[] }[]
 }
@@ -102,10 +106,12 @@ function fileBlock(file: ExtractFile): Record<string, unknown> {
 
 /**
  * The one request for a document: every type's tool and record_not_supported to detect the type,
- * or only the chosen type's tool (OQ-1); tool_choice auto in both cases.
+ * or only the chosen type's tool (OQ-1); tool_choice auto in both cases. All seven strict at once
+ * is over the API's grammar limit (400, "compiled grammar is too large"), so the detection request
+ * is not strict; the answer is validated against the type's schema before it is stored either way.
  */
 export function buildRequest(file: ExtractFile, docType: DocType | null, options: ClientOptions): ExtractRequest {
-  const tools = toolsFor(docType)
+  const tools: RequestTool[] = docType ? toolsFor(docType) : toolsFor(null).map(({ strict: _strict, ...tool }) => tool)
   const ask = docType
     ? `Record this document with the ${tools[0].name} tool.`
     : 'Record this document by calling exactly one of the tools.'

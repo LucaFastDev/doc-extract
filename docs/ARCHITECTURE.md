@@ -779,9 +779,9 @@ milestone 7) throws when `SUPABASE_SERVICE_ROLE_KEY` is unset.
    resets, delay the message with `extract_set_vt(…, 600)`, and stop. No attempt is counted
    (OQ-23).
 3. Set status `processing`, `processing_started_at = now()`, `attempts = attempts + 1`.
-4. Call Claude (section 9) with the file from Storage, under `tool_choice` `auto` with every tool
-   `strict`: with every type's tool and `record_not_supported` when the type is to be detected,
-   or with only the chosen type's tool when `doc_type_source` is `user` (OQ-1). Claude must call
+4. Call Claude (section 9) with the file from Storage, under `tool_choice` `auto`: with every
+   type's tool and `record_not_supported`, not `strict`, when the type is to be detected, or with
+   only the chosen type's `strict` tool when `doc_type_source` is `user` (OQ-1). Claude must call
    exactly one of them; no tool call, or more than one, is invalid output (Lead ruling 1 on #24:
    Sonnet 5.5 answers forced tool use, `any` or a named tool, with a 400).
 5. If Claude called `record_not_supported`: in `record_extraction`, settle spend, store the
@@ -1007,7 +1007,10 @@ ago, in plain SQL with no function call.
   for the API. PDFs keep the 10 MB upload limit.
 - **Type detection and structured output in one call** (OQ-1): each type's JSON Schema in
   `shared/doctypes/<type>.ts` is the input schema of a tool `record_<type>` with `strict: true`,
-  and a seventh tool, `record_not_supported`, also strict, takes a short reason. Sonnet 5.5 refuses
+  and a seventh tool, `record_not_supported`, also strict, takes a short reason. All seven strict
+  in one request are over the API's grammar limit (400, "compiled grammar is too large"), so
+  `buildRequest` drops `strict` when it sends them to detect the type; a single chosen type's tool
+  stays strict. Sonnet 5.5 refuses
   forced tool use (`tool_choice` `any` or a named tool) with a 400, so every request uses
   `tool_choice: { type: "auto" }`, and the system prompt tells Claude to call exactly one of the
   tools sent (Lead ruling 1 on #24). To detect the type, every type's tool and
@@ -1047,7 +1050,7 @@ ago, in plain SQL with no function call.
   It answers the Messages API with recorded tool-call responses chosen by the SHA-256 of the
   uploaded file, and can be told to return 400, 429 or 529 to test failures and retries. It reads
   the same fixture files as the unit tests, refuses with a 400 a request that is not
-  `tool_choice` `auto` with every tool strict, and lists what it was sent at `GET /requests`.
+  `tool_choice` `auto` with one chosen tool strict or the detection tools not, and lists what it was sent at `GET /requests`.
   `npm run functions:env` writes `supabase/functions/.env` (a dummy key, the mock server at
   `host.docker.internal` on a port derived from the checkout, the local `CRON_SECRET`) before
   `npx supabase start`. The e2e upload specs run with `app_config.extract_concurrency` at 0, so

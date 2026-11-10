@@ -96,23 +96,23 @@ test('an invoice reaches Needs review with type Invoice, detected by Claude', as
   // Its page counts for good.
   expect(await accountPagesUsed(user)).toBe(1)
 
-  // The request had the shape Lead ruling 1 on #24 sets: tool_choice auto, every tool strict.
+  // The request had the shape Lead ruling 1 on #24 sets: tool_choice auto, and no tool strict when the type is detected.
   const seen = (await (await fetch(`http://127.0.0.1:${mockClaudePort()}/requests`)).json()) as {
     tool_choice: unknown
-    tools: { name: string; strict: boolean }[]
+    tools: { name: string; strict?: boolean }[]
     status: number
   }[]
   const call = seen.find((s) => s.status === 200 && s.tools.some((t) => t.name === 'record_invoice'))
   expect(call).toMatchObject({
     tool_choice: { type: 'auto' },
     tools: [
-      { name: 'record_invoice', strict: true },
-      { name: 'record_receipt', strict: true },
-      { name: 'record_bank_statement', strict: true },
-      { name: 'record_purchase_order', strict: true },
-      { name: 'record_delivery_note', strict: true },
-      { name: 'record_quote', strict: true },
-      { name: 'record_not_supported', strict: true },
+      { name: 'record_invoice' },
+      { name: 'record_receipt' },
+      { name: 'record_bank_statement' },
+      { name: 'record_purchase_order' },
+      { name: 'record_delivery_note' },
+      { name: 'record_quote' },
+      { name: 'record_not_supported' },
     ],
   })
 })
