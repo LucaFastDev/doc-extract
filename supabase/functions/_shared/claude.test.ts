@@ -13,15 +13,18 @@ const PNG = { bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]), mimeTyp
 const OPTIONS = { model: 'claude-sonnet-5-5', maxTokens: 8192 }
 
 describe('buildRequest', () => {
-  it('detects the type: every tool, strict, under tool_choice auto, temperature 0, max_tokens from app_config', () => {
+  it('detects the type: every tool, strict, under tool_choice auto, max_tokens from app_config', () => {
     const request = buildRequest(PDF, null, OPTIONS)
     expect(request).toMatchObject({
       model: 'claude-sonnet-5-5',
       max_tokens: 8192,
-      temperature: 0,
       system: SYSTEM_PROMPT,
       tool_choice: { type: 'auto' },
     })
+    // claude-sonnet-5-5 answers 400 to a non-default temperature, top_p or top_k.
+    expect(request).not.toHaveProperty('temperature')
+    expect(request).not.toHaveProperty('top_p')
+    expect(request).not.toHaveProperty('top_k')
     expect(request.tools.map((t) => [t.name, t.strict])).toEqual([
       ['record_invoice', true],
       ['record_receipt', true],

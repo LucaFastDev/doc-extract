@@ -35,7 +35,7 @@ export const DEFAULT_MODEL = 'claude-sonnet-5-5'
  * app_config's values as the queue milestone set them (supabase/migrations/20261031091312_extract_queue.sql):
  * the runner reads no database, so it carries the defaults the app runs with.
  */
-export const SETTINGS = { max_tokens: 8192, temperature: 0, confidence_threshold: 0.8, amount_tolerance: '0.01', attempts: 3 } as const
+export const SETTINGS = { max_tokens: 8192, confidence_threshold: 0.8, amount_tolerance: '0.01', attempts: 3 } as const
 
 /** Waits before the second and third attempt after a 429, a 529 or another retryable error. */
 export const RETRY_DELAYS_MS = [10_000, 30_000]

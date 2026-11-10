@@ -91,7 +91,7 @@ counts and cost at the end and records them in the results file.
 ## How it scores
 
 For each document the runner sends the request the app sends (`buildRequest` with every type's tool
-and `record_not_supported`, so the type is detected; `temperature` 0, `max_tokens` 8192), validates
+and `record_not_supported`, so the type is detected; no `temperature`, `max_tokens` 8192), validates
 the answer as the app does before storing it (`prepareResult`, with `app_config`'s confidence
 threshold 0.8 and tolerance 0.01), and compares the stored values with `expected/`:
 
@@ -120,7 +120,7 @@ threshold 0.8 and tolerance 0.01), and compares the stored values with `expected
   "date": "2026-11-02",                 // the run's UTC date
   "model": "claude-sonnet-5-5",
   "prompt_version": "2026-10-31.2",     // PROMPT_VERSION in supabase/functions/_shared/claude.ts
-  "settings": { "max_tokens": 8192, "temperature": 0, "confidence_threshold": 0.8, "amount_tolerance": "0.01", "attempts": 3 },
+  "settings": { "max_tokens": 8192, "confidence_threshold": 0.8, "amount_tolerance": "0.01", "attempts": 3 },
   "types": {                            // one entry per type: invoice, receipt, bank_statement,
     "invoice": {                        // purchase_order, delivery_note, quote
       "documents": 5,

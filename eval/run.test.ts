@@ -115,7 +115,7 @@ describe('npm run eval', () => {
     expect(r.date).toBe('2026-11-02')
     expect(r.model).toBe('claude-sonnet-5-5')
     expect(r.prompt_version).toBe(PROMPT_VERSION)
-    expect(r.settings).toEqual({ max_tokens: 8192, temperature: 0, confidence_threshold: 0.8, amount_tolerance: '0.01', attempts: 3 })
+    expect(r.settings).toEqual({ max_tokens: 8192, confidence_threshold: 0.8, amount_tolerance: '0.01', attempts: 3 })
     expect(Object.keys(r.types).sort()).toEqual(Object.keys(DOC_TYPES).sort())
     for (const t of Object.values(r.types)) {
       expect(t.documents).toBe(5)
