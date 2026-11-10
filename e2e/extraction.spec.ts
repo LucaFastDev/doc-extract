@@ -342,6 +342,6 @@ test('Retry is not offered once the file is deleted', async ({ page, context, ba
   )
   await signIn(context, baseURL!, user)
   await page.goto('/documents')
-  await expect(row(page, 'Old scan.pdf')).toContainText('Claude could not read this file.')
+  await expect(row(page, 'Old scan.pdf')).toContainText('The file was removed. Upload it again to try once more.')
   await expect(row(page, 'Old scan.pdf').getByRole('button', { name: /Retry/ })).toHaveCount(0)
 })
