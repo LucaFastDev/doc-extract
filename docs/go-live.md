@@ -240,7 +240,7 @@ secret and the two Vault entries `process-queue` already reads (Environment and 
       where jobname in ('purge-files', 'cron-history-cleanup') order by jobname`. Pass: two rows,
       both `active`; `cron-history-cleanup` at `30 3 * * *` with `calls_purge` false;
       `purge-files` at `0 3 * * *` with `calls_purge` true.
-- [ ] A run's result, after 03:00 UTC: SQL editor, `select d.status, d.return_message,
+- [x] A run's result, after 03:00 UTC: SQL editor, `select d.status, d.return_message,
       d.start_time from cron.job_run_details d join cron.job j using (jobid) where j.jobname =
       'purge-files' order by d.start_time desc limit 3`. Pass: one row a day, `succeeded`. That
       row says only that the request was sent; the function's answer is in `select status_code,
@@ -250,6 +250,7 @@ secret and the two Vault entries `process-queue` already reads (Environment and 
       "stale_uploads_removed":0,"reservations_released":0}`, with `files_failed` 0; a 401 means the
       Vault `cron_secret` and the `CRON_SECRET` function secret differ. Edge Functions →
       `purge-files` → Logs shows the same invocation answered 200, with no "could not remove" line.
+      Passed 2026-11-10.
 - [x] Nothing older is left: SQL editor, `select count(*) from documents where created_at < now() -
       interval '8 days' and file_deleted_at is null` (Pass: 0), `select count(*) from documents
       where status = 'uploading' and created_at < now() - interval '1 day'` (Pass: 0), and `select
@@ -359,13 +360,13 @@ out links to the wrong place, and an unset one makes creating an invitation fail
 
 This app takes **no real payments**. Every item here checks that only test mode is in use.
 
-- [ ] `STRIPE_SECRET_KEY` in Vercel is a **test** key (`sk_test_…`); no live key (`sk_live_…` or
+- [x] `STRIPE_SECRET_KEY` in Vercel is a **test** key (`sk_test_…`); no live key (`sk_live_…` or
       `rk_live_…`) is set anywhere. Pass: Stripe dashboard → Developers → API keys, with "Test
       mode" on, shows the key whose last four characters match. A key that does not start with
       `sk_test_` stops the server (`src/instrumentation.ts`, section 6.2): every page and route,
       the landing page and the demo included, answers 500, and Vercel's function log says
       "STRIPE_SECRET_KEY does not start with sk_test_". An unset key does not stop the server: the
-      demo and the landing page work, and only the billing calls fail.
+      demo and the landing page work, and only the billing calls fail. Passed 2026-11-10.
 - [x] Stripe dashboard (test mode) → Products: the Pro product has a recurring price of **$19 a
       month in USD** with no trial (OQ-24); its price id is the one in `STRIPE_PRICE_PRO`. Pass:
       SQL editor, `select monthly_price_usd from plan_limits where plan = 'pro'` is the same 19.00,
@@ -409,8 +410,8 @@ This app takes **no real payments**. Every item here checks that only test mode 
 - [x] SQL editor, `select jobname, status, start_time from cron.job_run_details d join cron.job j
       using (jobid) order by start_time desc limit 20`. Pass: recent runs of both jobs show
       `succeeded`.
-- [ ] Edge Functions → `process-queue` and `purge-files` → Logs: recent invocations return 200 (a
-      401 means the cron job's `CRON_SECRET` does not match the function's).
+- [x] Edge Functions → `process-queue` and `purge-files` → Logs: recent invocations return 200 (a
+      401 means the cron job's `CRON_SECRET` does not match the function's). Passed 2026-11-10.
 - [x] Retention (OQ-14, OQ-39): SQL editor, `select count(*) from documents where created_at <
       now() - interval '8 days' and file_deleted_at is null`. Pass: 0.
 - [x] Queue: SQL editor, `select * from pgmq.metrics('extract')`. Pass: the oldest message is less
@@ -428,7 +429,7 @@ This app takes **no real payments**. Every item here checks that only test mode 
 
 ## Rollback
 
-- [ ] How to go back: in Vercel → Deployments, promote the previous production deploy; redeploy
+- [x] How to go back: in Vercel → Deployments, promote the previous production deploy; redeploy
       the previous release's Edge Functions with `supabase functions deploy` from that commit.
       Migrations only move forward: a migration that needs undoing gets a new follow-up migration,
-      named in the release notes.
+      named in the release notes. Passed 2026-11-10.
