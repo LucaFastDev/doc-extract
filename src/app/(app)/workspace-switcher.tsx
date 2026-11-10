@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { DELETE_FAILED } from '@/lib/account/memberships'
+import { deleteFailureMessage } from '@/lib/workspace/delete-failure'
 import { NAME_TOO_LONG, nameTooLongForBrowser } from '@/lib/workspace/name'
 import { createWorkspace, renameWorkspace, switchWorkspace, type FormState } from './actions'
 
@@ -246,9 +246,10 @@ function DeleteForm({
         window.location.assign('/documents')
         return
       }
-      setError(DELETE_FAILED)
+      setError(deleteFailureMessage(response.status))
     } catch {
-      setError(DELETE_FAILED)
+      // No answer, such as the network failing: the reason cannot be told.
+      setError(deleteFailureMessage(null))
     }
     setPending(false)
     setFailures((count) => count + 1)

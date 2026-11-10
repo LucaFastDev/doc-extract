@@ -77,9 +77,17 @@ export interface PageAllowance {
 /** The statuses whose reason the list shows (issue #24, criterion 10). */
 const REASON_SHOWN: readonly string[] = ['failed', 'unsupported', 'waiting_budget']
 
-/** Why a document failed, is not supported or is waiting for budget; null for any other. */
-export function statusReason(doc: { status: ListedStatus; status_reason: string | null }): string | null {
+/** What a Failed row says once the purge has deleted its file, in place of its reason (issue #132). */
+export const FILE_REMOVED = 'The file was removed. Upload it again to try once more.'
+
+/**
+ * Why a document failed, is not supported or is waiting for budget; null for any other. A Failed
+ * document whose file is deleted cannot be retried, so its stored reason, which may say to retry
+ * later, gives way to FILE_REMOVED (issue #132, criterion 1).
+ */
+export function statusReason(doc: { status: ListedStatus; status_reason: string | null; file_deleted_at?: string | null }): string | null {
   if (!REASON_SHOWN.includes(doc.status)) return null
+  if (doc.status === 'failed' && doc.file_deleted_at) return FILE_REMOVED
   const reason = doc.status_reason?.trim()
   return reason ? reason : null
 }

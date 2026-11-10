@@ -5,6 +5,7 @@ import {
   channelLiveState,
   checkSelection,
   DOC_TYPE_LABELS,
+  FILE_REMOVED,
   isListed,
   isReviewable,
   STATUS_LABELS,
@@ -179,6 +180,19 @@ describe('statusReason', () => {
     }
     expect(statusReason({ status: 'failed', status_reason: null })).toBeNull()
     expect(statusReason({ status: 'failed', status_reason: '  ' })).toBeNull()
+  })
+
+  // Issue #132, criterion 1.
+  it('says the file was removed, in place of the reason, on a Failed document whose file is deleted', () => {
+    const deleted = '2026-10-30T00:00:00Z'
+    expect(FILE_REMOVED).toBe('The file was removed. Upload it again to try once more.')
+    for (const status_reason of ['Extraction failed 3 times. The last time, Claude was overloaded. Retry later.', null]) {
+      expect(statusReason({ status: 'failed', status_reason, file_deleted_at: deleted })).toBe(FILE_REMOVED)
+    }
+    expect(statusReason({ status: 'failed', status_reason: 'Why.', file_deleted_at: null })).toBe('Why.')
+    for (const status of ['unsupported', 'waiting_budget'] as const) {
+      expect(statusReason({ status, status_reason: 'Why.', file_deleted_at: deleted }), status).toBe('Why.')
+    }
   })
 })
 
