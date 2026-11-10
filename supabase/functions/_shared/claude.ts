@@ -74,7 +74,6 @@ export interface MessagesApi {
 export interface ExtractRequest {
   model: string
   max_tokens: number
-  temperature: number
   system: string
   tools: ToolDefinition[]
   tool_choice: { type: 'auto' }
@@ -113,7 +112,6 @@ export function buildRequest(file: ExtractFile, docType: DocType | null, options
   return {
     model: options.model,
     max_tokens: options.maxTokens,
-    temperature: 0,
     system: SYSTEM_PROMPT,
     tools,
     tool_choice: { type: 'auto' },

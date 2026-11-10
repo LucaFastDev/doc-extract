@@ -64,6 +64,7 @@ function subscription(overrides: Record<string, unknown> = {}) {
     customer: `cus_${randomUUID()}`,
     status: 'active',
     cancel_at_period_end: false,
+    cancel_at: null,
     metadata: {},
     items: { object: 'list', data: [{ id: 'si_1', current_period_end: PERIOD_END }] },
     ...overrides,
@@ -205,6 +206,22 @@ describe('customer.subscription.updated', () => {
     const ws = await newWorkspace()
     await setWorkspace(ws, { plan: 'pro', stripe_customer_id: `cus_${randomUUID()}`, plan_period_end: '2030-01-01T00:00:00Z' })
     const sub = subscription({ cancel_at_period_end: true, metadata: { workspace_id: ws } })
+
+    expect((await deliver(event('customer.subscription.updated', sub), retrieving(sub).stripe)).status).toBe(200)
+
+    expect(await workspace(ws)).toEqual({
+      plan: 'pro',
+      stripe_customer_id: sub.customer,
+      stripe_subscription_id: sub.id,
+      plan_period_end: new Date(PERIOD_END_ISO),
+      plan_cancel_at_period_end: true,
+    })
+  })
+
+  it('with cancel_at at the period end, as the customer portal cancels, keeps Pro and sets the flag', async () => {
+    const ws = await newWorkspace()
+    await setWorkspace(ws, { plan: 'pro', stripe_customer_id: `cus_${randomUUID()}`, plan_period_end: '2030-01-01T00:00:00Z' })
+    const sub = subscription({ cancel_at: PERIOD_END, metadata: { workspace_id: ws } })
 
     expect((await deliver(event('customer.subscription.updated', sub), retrieving(sub).stripe)).status).toBe(200)
 

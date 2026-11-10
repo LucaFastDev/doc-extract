@@ -35,6 +35,14 @@ function periodEnd(subscription: Stripe.Subscription): string | null {
   return seconds ? new Date(seconds * 1000).toISOString() : null
 }
 
+/**
+ * Whether the subscription is set to end. Stripe's customer portal sets `cancel_at` to the period
+ * end and leaves `cancel_at_period_end` false, so either one means the plan ends.
+ */
+function setToEnd(subscription: Stripe.Subscription): boolean {
+  return subscription.cancel_at_period_end || subscription.cancel_at != null
+}
+
 async function workspaceById(admin: Admin, id: string | undefined): Promise<string | null> {
   if (!id || !UUID.test(id)) return null
   const { data, error } = await admin.from('workspaces').select('id').eq('id', id).maybeSingle<{ id: string }>()
@@ -116,7 +124,7 @@ async function onCheckoutCompleted(event: Stripe.Event, session: Stripe.Checkout
     stripe_customer_id: idOf(session.customer),
     stripe_subscription_id: subscriptionId,
     plan_period_end: periodEnd(subscription),
-    plan_cancel_at_period_end: subscription.cancel_at_period_end,
+    plan_cancel_at_period_end: setToEnd(subscription),
   })
 }
 
@@ -134,7 +142,7 @@ async function onSubscriptionUpdated(event: Stripe.Event, eventCopy: Stripe.Subs
     stripe_customer_id: idOf(subscription.customer),
     stripe_subscription_id: subscription.id,
     plan_period_end: periodEnd(subscription),
-    plan_cancel_at_period_end: subscription.cancel_at_period_end,
+    plan_cancel_at_period_end: setToEnd(subscription),
   }
   if (keepsPro(subscription)) return setWorkspace(admin, workspace, values)
   // A subscription that is not paying only ends the plan if it is the one the workspace holds,

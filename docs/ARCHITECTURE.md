@@ -1029,7 +1029,8 @@ ago, in plain SQL with no function call.
   types) plus each tool's description and field descriptions, which name the type's fields, their
   meaning and the usual labels in several languages. Each prompt has a `prompt_version`, stored on
   every extraction and every eval run.
-- **Temperature**: 0.
+- **Temperature**: not sent. `claude-sonnet-5-5` answers 400 to a non-default `temperature`,
+  `top_p` or `top_k`, so the request leaves all three out.
 - **Client**: `_shared/claude.ts` wraps the official TypeScript SDK in an interface
   `ClaudeClient.extract(file, docType | null) → { docType | 'not_supported', result, usage }`,
   with the SDK's own retries off (retries are the queue's, section 6.4).
