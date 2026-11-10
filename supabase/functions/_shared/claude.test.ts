@@ -3,8 +3,9 @@ import { buildRequest, ClaudeError, classifyError, createClaudeClient, PROMPT_VE
 import { fixtureApi, fixtureResponse } from './fake-claude'
 
 // The Claude client (ARCHITECTURE.md section 9, Lead ruling 1 on #24): one Messages API call per
-// document, the file as a base64 document or image block, every type's strict tool plus
-// record_not_supported under tool_choice auto to detect the type, or only the chosen type's tool;
+// document, the file as a base64 document or image block, every type's tool plus
+// record_not_supported, not strict, under tool_choice auto to detect the type, or only the chosen
+// type's strict tool;
 // exactly one tool call is a result, anything else is invalid output. No network: the SDK is
 // replaced by recorded responses from ./fixtures.
 
@@ -13,7 +14,7 @@ const PNG = { bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]), mimeTyp
 const OPTIONS = { model: 'claude-sonnet-5-5', maxTokens: 8192 }
 
 describe('buildRequest', () => {
-  it('detects the type: every tool, strict, under tool_choice auto, max_tokens from app_config', () => {
+  it('detects the type: every tool, none strict, under tool_choice auto, max_tokens from app_config', () => {
     const request = buildRequest(PDF, null, OPTIONS)
     expect(request).toMatchObject({
       model: 'claude-sonnet-5-5',
@@ -26,19 +27,19 @@ describe('buildRequest', () => {
     expect(request).not.toHaveProperty('top_p')
     expect(request).not.toHaveProperty('top_k')
     expect(request.tools.map((t) => [t.name, t.strict])).toEqual([
-      ['record_invoice', true],
-      ['record_receipt', true],
-      ['record_bank_statement', true],
-      ['record_purchase_order', true],
-      ['record_delivery_note', true],
-      ['record_quote', true],
-      ['record_not_supported', true],
+      ['record_invoice', undefined],
+      ['record_receipt', undefined],
+      ['record_bank_statement', undefined],
+      ['record_purchase_order', undefined],
+      ['record_delivery_note', undefined],
+      ['record_quote', undefined],
+      ['record_not_supported', undefined],
     ])
   })
 
   it('sends only the chosen type’s tool, still under tool_choice auto', () => {
     const request = buildRequest(PDF, 'invoice', OPTIONS)
-    expect(request.tools.map((t) => t.name)).toEqual(['record_invoice'])
+    expect(request.tools.map((t) => [t.name, t.strict])).toEqual([['record_invoice', true]])
     expect(request.tool_choice).toEqual({ type: 'auto' })
     for (const type of ['receipt', 'bank_statement', 'purchase_order', 'delivery_note', 'quote'] as const) {
       expect(buildRequest(PDF, type, OPTIONS).tools.map((t) => t.name), type).toEqual([`record_${type}`])

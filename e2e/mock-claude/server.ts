@@ -9,7 +9,7 @@ import { mockClaudePort } from './port.ts'
 // answers POST /v1/messages by the SHA-256 of the file in the request, with a recorded response
 // from supabase/functions/_shared/fixtures/ (or, for a request that sends only the tool of a type
 // the user chose, the document's answer for that tool), and refuses a request whose shape breaks Lead ruling 1
-// on #24 (tool_choice auto, every tool strict) with a 400, so a wrong request fails the spec that
+// on #24 (tool_choice auto; one chosen tool strict, the detection tools not) with a 400, so a wrong request fails the spec that
 // sent it. GET /requests lists what it was sent, for the specs to check. Run with
 // `node e2e/mock-claude/server.ts`. Nothing here reaches the real API.
 
@@ -43,9 +43,9 @@ function answer(request: MessagesRequest): { status: number; body: unknown; sha:
   const block = request.messages?.[0]?.content?.find((b) => b.type === 'document' || b.type === 'image')
   const sha = block?.source?.data ? sha256(Buffer.from(block.source.data, 'base64')) : null
   if (request.tool_choice?.type !== 'auto') return { ...error(400, 'tool_choice must be auto'), sha }
-  if (!request.tools?.length || request.tools.some((t) => t.strict !== true)) {
-    return { ...error(400, 'every tool must be strict'), sha }
-  }
+  if (!request.tools?.length) return { ...error(400, 'no tools'), sha }
+  const strictAsSent = request.tools.length === 1 ? request.tools[0].strict === true : request.tools.every((t) => t.strict === undefined)
+  if (!strictAsSent) return { ...error(400, 'one chosen tool must be strict, and the detection tools not'), sha }
   const doc = sha ? bySha.get(sha) : undefined
   if (!sha || !doc) return { ...error(400, 'no recording for this file'), sha }
 
