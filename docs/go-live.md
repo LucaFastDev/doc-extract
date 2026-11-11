@@ -240,7 +240,7 @@ secret and the two Vault entries `process-queue` already reads (Environment and 
       where jobname in ('purge-files', 'cron-history-cleanup') order by jobname`. Pass: two rows,
       both `active`; `cron-history-cleanup` at `30 3 * * *` with `calls_purge` false;
       `purge-files` at `0 3 * * *` with `calls_purge` true.
-- [ ] A run's result, after 03:00 UTC: SQL editor, `select d.status, d.return_message,
+- [x] A run's result, after 03:00 UTC: SQL editor, `select d.status, d.return_message,
       d.start_time from cron.job_run_details d join cron.job j using (jobid) where j.jobname =
       'purge-files' order by d.start_time desc limit 3`. Pass: one row a day, `succeeded`. That
       row says only that the request was sent; the function's answer is in `select status_code,
@@ -409,7 +409,7 @@ This app takes **no real payments**. Every item here checks that only test mode 
 - [x] SQL editor, `select jobname, status, start_time from cron.job_run_details d join cron.job j
       using (jobid) order by start_time desc limit 20`. Pass: recent runs of both jobs show
       `succeeded`.
-- [ ] Edge Functions → `process-queue` and `purge-files` → Logs: recent invocations return 200 (a
+- [x] Edge Functions → `process-queue` and `purge-files` → Logs: recent invocations return 200 (a
       401 means the cron job's `CRON_SECRET` does not match the function's).
 - [x] Retention (OQ-14, OQ-39): SQL editor, `select count(*) from documents where created_at <
       now() - interval '8 days' and file_deleted_at is null`. Pass: 0.
