@@ -104,7 +104,7 @@ sequenceDiagram
     SUB->>DB: status queued
     SUB-->>UI: 202
   end
-  loop every 10 s (pg_cron)
+  loop every 10 s while a message is visible (pg_cron)
     PQ->>Q: read 1 message, visibility 300 s
     PQ->>DB: reserve_spend(estimate): month and day
     alt budget reached
@@ -858,6 +858,17 @@ statement fits in one Edge Function run. The cron job fires every 10 seconds and
 locally, 2 in production, Lead ruling 3 on #24), so at most that many documents are processed at
 once; pgmq's visibility timeout stops two runs from taking the same message. The job reads the
 functions' base URL and `CRON_SECRET` from Vault (section 12).
+
+The job sends its requests only when the queue holds a message that is visible now
+(`exists (select 1 from pgmq.q_extract where vt <= now())`, migration
+`20261120102848_process_queue_only_when_visible.sql`). An idle project otherwise made about 8,600
+requests a day that each answered `empty`, and the gateway, invocation and function logs of those
+took about 21 MB a day of the Free plan's 1 GB a month of log ingestion, which the whole
+organisation shares. A message a run holds (invisible for 300 s) or one that is delayed (waiting
+for budget, or behind another run) sends nothing until its `vt` passes; the next run then sends
+for it. That is why the test is on `vt` and not on `pgmq.metrics`' `queue_length`, which counts
+invisible messages too. pg_cron still runs the job every 10 seconds and logs each run, so
+`cron.job_run_details` and the database log grow as before (section 8).
 
 ## 7. Spend cap and page allowances, server-side
 
