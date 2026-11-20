@@ -115,6 +115,53 @@ describe('the queue and its cron job', () => {
     // The local seed puts both Vault entries, so the job runs locally and in CI.
     expect(secrets).toEqual([{ name: 'cron_secret' }, { name: 'functions_base_url' }])
   })
+
+  it('posts to process-queue only while a message is visible, extract_concurrency times', async () => {
+    const user = await signUp()
+    const { id } = await createDocument(user, await personalWorkspaceId(user))
+    await rolledBack(async (db) => {
+      // The job's own SQL, run as the role pg_cron runs it as. Each row it returns is one
+      // net.http_post call; the rollback discards the requests before pg_net sends any.
+      const job = await db.query<{ command: string; username: string }>(
+        "select command, username from cron.job where jobname = 'process-queue'",
+      )
+      expect(job.rows).toHaveLength(1)
+      expect(job.rows[0].username).toBe('postgres')
+      expect((await db.query('select current_user as role')).rows).toEqual([{ role: 'postgres' }])
+      const posts = async () => (await db.query(job.rows[0].command)).rowCount
+
+      // Two requests a run, as in production, so "one per message" cannot pass for "per run".
+      await db.query('update public.app_config set extract_concurrency = 2')
+      // Other tests' messages are set aside for this transaction only.
+      await db.query('delete from pgmq.q_extract')
+      expect(await posts(), 'an empty queue').toBe(0)
+
+      const sent = await db.query<{ id: string }>("select pgmq.send('extract', jsonb_build_object('document_id', $1::text)) as id", [id])
+      const msgId = sent.rows[0].id
+      // pgmq stamps vt with the clock, which is later than this transaction's now(); the job runs
+      // in a transaction of its own, begun after the send, so there the message is visible.
+      await db.query('update pgmq.q_extract set vt = now() where msg_id = $1', [msgId])
+      expect(await posts(), 'one visible message').toBe(2)
+
+      await db.query('update public.app_config set extract_concurrency = 0')
+      expect(await posts(), 'extraction paused').toBe(0)
+      await db.query('update public.app_config set extract_concurrency = 2')
+
+      // Delayed, as process-queue delays a document waiting for budget.
+      await db.query("select pgmq.set_vt('extract', $1::bigint, 600)", [msgId])
+      expect(await posts(), 'only a delayed message').toBe(0)
+
+      // Held by a run: read with process-queue's 300 s visibility timeout.
+      await db.query('update pgmq.q_extract set vt = now() where msg_id = $1', [msgId])
+      const read = await db.query("select msg_id from pgmq.read('extract', 300, 1)")
+      expect(read.rows).toEqual([{ msg_id: msgId }])
+      expect(await posts(), 'only a message a run holds').toBe(0)
+
+      // Its vt passes: the next run posts for it again.
+      await db.query("update pgmq.q_extract set vt = now() - interval '1 second' where msg_id = $1", [msgId])
+      expect(await posts(), 'a message whose vt has passed').toBe(2)
+    })
+  })
 })
 
 describe('reserve_pages and release_pages', () => {

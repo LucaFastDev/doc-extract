@@ -172,8 +172,8 @@ it to the `submit-document` Edge Function, which counts its pages and reserves t
 ## Extraction
 
 Milestone 5: `submit-document` sends each accepted document to the pgmq queue `extract`; a pg_cron
-job posts to `process-queue` every 10 seconds, which reserves spend, calls Claude and stores the
-result (sections 6.1, 6.3, 6.4, 7 and 9).
+job posts to `process-queue` every 10 seconds while the queue holds a visible message, which
+reserves spend, calls Claude and stores the result (sections 6.1, 6.3, 6.4, 7 and 9).
 
 - [x] `submit-document` is redeployed from the release's commit (it now sends to the queue):
       `supabase functions deploy submit-document --project-ref <prod ref>`, with "Enforce JWT
@@ -401,8 +401,22 @@ This app takes **no real payments**. Every item here checks that only test mode 
 - [x] SQL editor, `select jobname, schedule, active from cron.job`. Pass: `process-queue` (every 10
       seconds), `purge-files` (daily at 03:00 UTC) and `cron-history-cleanup` (daily at 03:30 UTC)
       are listed and `active`.
+- [ ] The `process-queue` job posts only when a message is visible (migration
+      `20261120102848_process_queue_only_when_visible.sql`, section 6.4): SQL editor, `select
+      count(*) as jobs, bool_and(username = 'postgres') as as_postgres, bool_and(command like
+      '%where exists (select 1 from pgmq.q_extract q where q.vt <= now())%') as guarded from
+      cron.job where jobname = 'process-queue'`. Pass: 1, true, true (one job, not a second one
+      under another role, and it runs as the role that owns the queue table).
+- [ ] Idle log volume: after an hour with no upload, dashboard → Logs → Logs Explorer, time range
+      **Last hour** only (a wider range spends the organisation's Log Query allowance), `select
+      source, count(*) as n from logs group by source order by n desc limit 20`. Pass: `edge_logs`
+      and `function_edge_logs` are near 0 (they were about 358 and 357 an hour before the
+      migration); `postgres_logs` stays near 720, pg_cron's start and completed lines for each
+      run, which is expected.
 - [x] `process-queue` job runs reach the function: SQL editor, `select status_code, content,
-      error_msg, created from net._http_response order by id desc limit 10`. Pass: recent rows are
+      error_msg, created from net._http_response order by id desc limit 10`. pg_net keeps answers
+      for about 6 hours and the job sends nothing while the queue is empty, so upload a document
+      first if there are no rows. Pass: recent rows are
       200 with `{"outcome": …}`; a 401 means the Vault `cron_secret` and the `CRON_SECRET` function
       secret differ, a 404 or "Couldn't resolve host name" a wrong `functions_base_url`. The job
       sends `app_config.extract_concurrency` requests per run, so 0 there pauses extraction.
@@ -410,7 +424,8 @@ This app takes **no real payments**. Every item here checks that only test mode 
       using (jobid) order by start_time desc limit 20`. Pass: recent runs of both jobs show
       `succeeded`.
 - [ ] Edge Functions → `process-queue` and `purge-files` → Logs: recent invocations return 200 (a
-      401 means the cron job's `CRON_SECRET` does not match the function's).
+      401 means the cron job's `CRON_SECRET` does not match the function's). `process-queue` is
+      invoked only while a document is queued, so its log is empty for an idle period.
 - [x] Retention (OQ-14, OQ-39): SQL editor, `select count(*) from documents where created_at <
       now() - interval '8 days' and file_deleted_at is null`. Pass: 0.
 - [x] Queue: SQL editor, `select * from pgmq.metrics('extract')`. Pass: the oldest message is less
